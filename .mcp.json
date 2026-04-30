@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "squad-coordinator": {
+      "type": "http",
+      "url": "http://localhost:8070/"
+    }
+  }
+}
