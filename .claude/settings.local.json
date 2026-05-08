@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(yarn test *)",
+      "Bash(CIRCLECI=true yarn test src/pages/Registered/index.test.tsx --run)",
+      "Bash(yarn tsc *)",
+      "Bash(yarn lint:eslint src/pages/Registered/RegisterSteps/steps/CompleteStep/createCustomer.ts src/pages/Registered/index.test.tsx)",
+      "Bash(yarn lint:eslint src/pages/Registered/RegisterSteps/steps/CompleteStep/createCustomer.ts)",
+      "Bash(yarn lint:eslint src/pages/Registered/index.test.tsx)",
+      "Bash(CIRCLECI=true yarn test src/pages/Registered/ --run)",
+      "Bash(yarn lint:dependencies)",
+      "Bash(yarn lint:knip)",
+      "Bash(git stash *)"
+    ]
+  }
+}

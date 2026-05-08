@@ -214,6 +214,15 @@ export const routeList: (BuyerPortalRoute | RouteItem)[] = [
     idLang: 'global.navMenu.accountSettings',
   },
   {
+    path: '/manage-subscriptions',
+    name: 'Manage Subscriptions',
+    wsKey: 'manageSubscriptions',
+    isMenuItem: true,
+    permissions: accountSettingPermissions,
+    isTokenLogin: true,
+    idLang: 'global.navMenu.manageSubscriptions',
+  },
+  {
     path: '/company-hierarchy',
     name: 'Company hierarchy',
     subsidiariesCompanyKey: 'companyHierarchy',

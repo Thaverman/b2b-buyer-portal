@@ -56,6 +56,7 @@ declare global {
   interface Window {
     tipDispatch: DispatchProps;
     globalTipDispatch: any;
+    dataLayer?: Record<string, unknown>[];
     B3: {
       setting: {
         channel_id: number;
