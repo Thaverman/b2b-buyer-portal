@@ -57,6 +57,8 @@ declare global {
     tipDispatch: DispatchProps;
     globalTipDispatch: any;
     dataLayer?: Record<string, unknown>[];
+    /** Store-specific suffix set by the host project; gates order-id obfuscation. */
+    storeSuffix?: string;
     B3: {
       setting: {
         channel_id: number;
