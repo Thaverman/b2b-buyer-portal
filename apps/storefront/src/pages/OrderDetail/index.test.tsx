@@ -21,8 +21,6 @@ import {
 } from 'tests/test-utils';
 import { when } from 'vitest-when';
 
-import { formatOrderId } from '@/utils/orderId';
-
 import { AddressConfig } from '@/shared/service/b2b/graphql/address';
 import {
   CustomerOrderNode,
@@ -35,6 +33,7 @@ import {
   Shipment,
 } from '@/shared/service/b2b/graphql/orders';
 import { CustomerRole, MoneyFormat } from '@/types';
+import { formatOrderId } from '@/utils/orderId';
 
 import { DigitalDownloadElementsResponse } from './components/getDigitalDownloadElements';
 import OrderDetails from '.';

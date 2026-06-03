@@ -1498,9 +1498,7 @@ describe('when order-id obfuscation is enabled', () => {
   it('decodes an obfuscated order id typed into the invoice search box', async () => {
     const getInvoices = vi.fn().mockReturnValue(buildInvoicesResponseWith('WHATEVER_VALUES'));
 
-    server.use(
-      graphql.query('GetInvoices', ({ query }) => HttpResponse.json(getInvoices(query))),
-    );
+    server.use(graphql.query('GetInvoices', ({ query }) => HttpResponse.json(getInvoices(query))));
 
     renderWithProviders(<Invoice />, { preloadedState });
 

@@ -277,9 +277,7 @@ function OrderDetail() {
             >
               {b3Lang('orderDetail.orderId', {
                 orderId:
-                  parseOrderId(orderId) != null
-                    ? formatOrderId(parseOrderId(orderId)!)
-                    : orderId,
+                  parseOrderId(orderId) != null ? formatOrderId(parseOrderId(orderId)!) : orderId,
               })}
               {b3Lang('orderDetail.purchaseOrderNumber', {
                 purchaseOrderNumber: poNumber ?? '',
