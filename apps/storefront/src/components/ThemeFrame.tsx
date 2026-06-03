@@ -21,24 +21,35 @@ function IFrameSetContent(el: HTMLIFrameElement | null, content: string, forceWr
 }
 
 const handleLoad = (_iframeRef: RefObject<HTMLIFrameElement>) => {
-  // resolve iframe use document mousedown no effect
-  if (_iframeRef.current?.contentDocument?.addEventListener) {
-    _iframeRef.current.contentDocument.addEventListener('keydown', () => {
-      document.dispatchEvent(new Event('keydown'));
-    });
-    _iframeRef.current.contentDocument.addEventListener('mousedown', () => {
-      document.dispatchEvent(new Event('mousedown'));
-    });
-    _iframeRef.current.contentDocument.addEventListener('touchstart', () => {
-      document.dispatchEvent(new Event('touchstart'));
-    });
-    _iframeRef.current.contentDocument.addEventListener('touchmove', () => {
-      document.dispatchEvent(new Event('touchmove'));
-    });
-    _iframeRef.current.contentDocument.addEventListener('click', () => {
-      document.dispatchEvent(new Event('click'));
-    });
-  }
+  // Forward iframe events to the parent document so listeners (e.g. MUI
+  // ClickAwayListener) react to interactions inside the iframe. Dispatch on
+  // the iframe element — not document — so e.target is a real Element with
+  // a working closest() method.
+  const iframe = _iframeRef.current;
+  const doc = iframe?.contentDocument;
+  if (!iframe || !doc?.addEventListener) return;
+
+  doc.addEventListener('keydown', (e) => {
+    iframe.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: e.key }),
+    );
+  });
+  doc.addEventListener('mousedown', () => {
+    iframe.dispatchEvent(
+      new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }),
+    );
+  });
+  doc.addEventListener('touchstart', () => {
+    iframe.dispatchEvent(new Event('touchstart', { bubbles: true, cancelable: true }));
+  });
+  doc.addEventListener('touchmove', () => {
+    iframe.dispatchEvent(new Event('touchmove', { bubbles: true, cancelable: true }));
+  });
+  doc.addEventListener('click', () => {
+    iframe.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, cancelable: true, view: window }),
+    );
+  });
 };
 
 interface ThemeFrameProps {
