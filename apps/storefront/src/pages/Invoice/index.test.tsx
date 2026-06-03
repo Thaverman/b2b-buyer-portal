@@ -21,6 +21,7 @@ import {
 import { when } from 'vitest-when';
 
 import { permissionLevels } from '@/constants';
+import { formatOrderId } from '@/utils/orderId';
 
 import { InvoiceStatusCode } from './components/InvoiceStatus';
 import { triggerPdfDownload } from './components/triggerPdfDownload';
@@ -1446,6 +1447,52 @@ describe('when the url contains an invoiceId parameter', () => {
     await waitFor(() => {
       expect(screen.getAllByRole('link', { name: 'Download PDF' })).toHaveLength(2);
     });
+  });
+});
+
+describe('when order-id obfuscation is enabled', () => {
+  beforeEach(() => {
+    window.storeSuffix = 'SW';
+
+    server.use(
+      graphql.query('GetInvoices', () =>
+        HttpResponse.json(
+          buildInvoicesResponseWith({
+            data: { invoices: { edges: [buildInvoiceWith({ node: { orderNumber: '4444' } })] } },
+          }),
+        ),
+      ),
+      graphql.query('GetInvoiceStats', () =>
+        HttpResponse.json(buildInvoiceStatsResponseWith('WHATEVER_VALUES')),
+      ),
+    );
+  });
+
+  afterEach(() => {
+    delete window.storeSuffix;
+  });
+
+  it('displays the obfuscated order number instead of the raw number', async () => {
+    renderWithProviders(<Invoice />, { preloadedState });
+
+    await waitForElementToBeRemoved(() => screen.queryByText(/loading/i));
+
+    const obfuscated = formatOrderId('4444');
+
+    expect(screen.queryByRole('button', { name: '4444' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: obfuscated })).toBeInTheDocument();
+  });
+
+  it('navigates to the obfuscated order-detail url from the order-number cell', async () => {
+    const { navigation } = renderWithProviders(<Invoice />, { preloadedState });
+
+    await waitForElementToBeRemoved(() => screen.queryByText(/loading/i));
+
+    const obfuscated = formatOrderId('4444');
+
+    await userEvent.click(screen.getByRole('button', { name: obfuscated }));
+
+    expect(navigation).toHaveBeenCalledWith(`/orderDetail/${obfuscated}`);
   });
 });
 

@@ -10,6 +10,7 @@ import { InvoiceList } from '@/types/invoice';
 import { verifyLevelPermission } from '@/utils/b3CheckPermissions/check';
 import { b2bPermissionsMap } from '@/utils/b3CheckPermissions/config';
 import { snackbar } from '@/utils/b3Tip';
+import { formatOrderId } from '@/utils/orderId';
 
 import { gotoInvoiceCheckoutUrl } from '../utils/payment';
 import { getInvoiceDownloadPDFUrl, handlePrintPDF } from '../utils/pdf';
@@ -92,7 +93,7 @@ function B3Pulldown({
   const handleViewOrder = () => {
     const { orderNumber } = row;
     close();
-    navigate(`/orderDetail/${orderNumber}`);
+    navigate(`/orderDetail/${formatOrderId(orderNumber)}`);
   };
 
   const handlePay = async () => {
