@@ -21,6 +21,8 @@ import {
 } from 'tests/test-utils';
 import { when } from 'vitest-when';
 
+import { formatOrderId } from '@/utils/orderId';
+
 import { AddressConfig } from '@/shared/service/b2b/graphql/address';
 import {
   CustomerOrderNode,
@@ -2867,5 +2869,56 @@ describe('when a personal customer visits an order', () => {
         expect(screen.getByText('Please select at least one item')).toBeVisible();
       });
     });
+  });
+});
+
+describe('when order-id obfuscation is enabled', () => {
+  const preloadedState = {
+    company: buildCompanyStateWith({ customer: { role: CustomerRole.B2C } }),
+    storeInfo: buildStoreInfoStateWith({ timeFormat: { display: 'j F Y' } }),
+  };
+
+  beforeEach(() => {
+    window.storeSuffix = 'SW';
+  });
+
+  afterEach(() => {
+    delete window.storeSuffix;
+  });
+
+  it('decodes the obfuscated route param to fetch by the real id and shows the obfuscated id in the header', async () => {
+    const obfuscated = formatOrderId(6696);
+
+    vi.mocked(useParams).mockReturnValue({ id: obfuscated });
+
+    const getOrder = vi.fn();
+
+    server.use(
+      graphql.query('GetCustomerOrderStatuses', () =>
+        HttpResponse.json(buildCustomerOrderStatusesWith('WHATEVER_VALUES')),
+      ),
+      graphql.query('AddressConfig', () =>
+        HttpResponse.json(buildAddressConfigResponseWith('WHATEVER_VALUES')),
+      ),
+      graphql.query('GetCustomerOrder', ({ query }) => HttpResponse.json(getOrder(query))),
+    );
+
+    // only return the order when the request carries the DECODED numeric id (6696)
+    when(getOrder)
+      .calledWith(stringContainingAll('6696'))
+      .thenReturn(
+        buildCustomerOrderResponseWith({
+          data: { customerOrder: { status: 'Pending', poNumber: '' } },
+        }),
+      );
+
+    renderWithProviders(<OrderDetails />, { preloadedState });
+
+    await waitForElementToBeRemoved(() => screen.queryAllByRole('progressbar'));
+
+    // heading shows "Order #<obfuscated>" — proves both decode (order rendered) and re-encoded display
+    expect(
+      await screen.findByRole('heading', { name: new RegExp(`Order #${obfuscated}`) }),
+    ).toBeVisible();
   });
 });
