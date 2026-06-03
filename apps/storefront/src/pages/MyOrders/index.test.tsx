@@ -21,6 +21,7 @@ import {
 import { when } from 'vitest-when';
 
 import { CompanyStatus, CustomerRole, UserTypes } from '@/types';
+import { formatOrderId } from '@/utils/orderId';
 
 import {
   CompanyOrderNode,
@@ -1720,3 +1721,76 @@ describe('when a customer is masquerading as a company customer', () => {
 });
 
 describe.todo('when a customer is part of a company hierarchy');
+
+describe('when order-id obfuscation is enabled', () => {
+  const preloadedState = {
+    company: buildCompanyStateWith({ customer: { role: CustomerRole.B2C } }),
+    storeInfo: buildStoreInfoStateWith({ timeFormat: { display: 'j F Y' } }),
+  };
+
+  beforeEach(() => {
+    window.storeSuffix = 'SW';
+    server.use(
+      graphql.query('GetCustomerOrderStatuses', () =>
+        HttpResponse.json(buildCustomerOrderStatusesWith('WHATEVER_VALUES')),
+      ),
+    );
+  });
+
+  afterEach(() => {
+    delete window.storeSuffix;
+  });
+
+  it('displays the obfuscated order id instead of the raw id', async () => {
+    server.use(
+      graphql.query('GetCustomerOrders', () =>
+        HttpResponse.json(
+          buildGetCustomerOrdersWith({
+            data: {
+              customerOrders: {
+                totalCount: 1,
+                edges: [buildCustomerOrderNodeWith({ node: { orderId: '66996' } })],
+              },
+            },
+          }),
+        ),
+      ),
+    );
+
+    renderWithProviders(<MyOrders />, { preloadedState });
+
+    await waitForElementToBeRemoved(() => screen.queryAllByRole('progressbar'));
+
+    const obfuscated = formatOrderId('66996');
+
+    expect(screen.queryByRole('cell', { name: '66996' })).not.toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: obfuscated })).toBeInTheDocument();
+  });
+
+  it('navigates to the obfuscated order-detail url when clicking a row', async () => {
+    server.use(
+      graphql.query('GetCustomerOrders', () =>
+        HttpResponse.json(
+          buildGetCustomerOrdersWith({
+            data: {
+              customerOrders: {
+                totalCount: 1,
+                edges: [buildCustomerOrderNodeWith({ node: { orderId: '66996' } })],
+              },
+            },
+          }),
+        ),
+      ),
+    );
+
+    const { navigation } = renderWithProviders(<MyOrders />, { preloadedState });
+
+    await waitForElementToBeRemoved(() => screen.queryAllByRole('progressbar'));
+
+    const obfuscated = formatOrderId('66996');
+
+    await userEvent.click(screen.getByRole('cell', { name: obfuscated }));
+
+    expect(navigation).toHaveBeenCalledWith(`/orderDetail/${obfuscated}`);
+  });
+});

@@ -8,6 +8,7 @@ import Typography from '@mui/material/Typography';
 import { isB2BUserSelector, useAppSelector } from '@/store';
 import { currencyFormat } from '@/utils/b3CurrencyFormat';
 import { displayFormat } from '@/utils/b3DateFormat';
+import { formatOrderId } from '@/utils/orderId';
 
 import OrderStatus from './components/OrderStatus';
 
@@ -63,7 +64,7 @@ export function OrderItemCard({ item, goToDetail }: OrderItemCardProps) {
                 color: 'rgba(0, 0, 0, 0.87)',
               }}
             >
-              {`# ${item.orderId}`}
+              {`# ${formatOrderId(item.orderId)}`}
             </Typography>
             <Typography
               sx={{
