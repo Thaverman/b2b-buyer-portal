@@ -1494,6 +1494,34 @@ describe('when order-id obfuscation is enabled', () => {
 
     expect(navigation).toHaveBeenCalledWith(`/orderDetail/${obfuscated}`);
   });
+
+  it('decodes an obfuscated order id typed into the invoice search box', async () => {
+    const getInvoices = vi.fn().mockReturnValue(buildInvoicesResponseWith('WHATEVER_VALUES'));
+
+    server.use(
+      graphql.query('GetInvoices', ({ query }) => HttpResponse.json(getInvoices(query))),
+    );
+
+    renderWithProviders(<Invoice />, { preloadedState });
+
+    await waitForElementToBeRemoved(() => screen.queryByText(/loading/i));
+
+    const obfuscated = formatOrderId('4444');
+
+    when(getInvoices)
+      .calledWith(stringContainingAll('search: "4444"'))
+      .thenReturn(
+        buildInvoicesResponseWith({
+          data: { invoices: { edges: [buildInvoiceWith({ node: { orderNumber: '4444' } })] } },
+        }),
+      );
+
+    await userEvent.type(screen.getByPlaceholderText(/Search/), obfuscated);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: obfuscated })).toBeInTheDocument();
+    });
+  });
 });
 
 describe('when the url contains a receiptId (coming back from checkout)', () => {
