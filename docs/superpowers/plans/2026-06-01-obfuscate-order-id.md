@@ -803,7 +803,7 @@ Change the order-number column render (lines 598-602):
         </Box>
 ```
 
-(Task 7 will extend this import to add `parseOrderId` for the search handler.)
+(Task 7 will extend this import to add `decodeOrderIdForSearch` for the search handler.)
 
 - [ ] **Step 4: Implement — `InvoiceItemCard.tsx`**
 
@@ -915,10 +915,10 @@ Expected: FAIL — the obfuscated string is sent verbatim as the `search` value 
 
 - [ ] **Step 3: Implement**
 
-In `src/pages/Invoice/index.tsx`, extend the util import to add `parseOrderId`:
+In `src/pages/Invoice/index.tsx`, extend the util import to add `decodeOrderIdForSearch` (the shared helper added in Task 4, which uses round-trip validation so free text / PO numbers / raw ids pass through and only genuine obfuscated ids are decoded):
 
 ```ts
-import { formatOrderId, parseOrderId } from '@/utils/orderId';
+import { decodeOrderIdForSearch, formatOrderId } from '@/utils/orderId';
 ```
 
 Change `handleChange` (line 210):
@@ -926,13 +926,9 @@ Change `handleChange` (line 210):
 ```ts
   const handleChange = (key: string, value: string) => {
     if (key === 'search') {
-      // translate a clean obfuscated id to the real id; pass free text / real id through
-      const decoded = parseOrderId(value);
-      const q = value !== '' && !/^\d+$/.test(value) && decoded != null ? String(decoded) : value;
-
       setFilterData({
         ...filterData,
-        q,
+        q: decodeOrderIdForSearch(value),
       });
       setFilterChangeFlag(true);
       setType(InvoiceListType.NORMAL);
