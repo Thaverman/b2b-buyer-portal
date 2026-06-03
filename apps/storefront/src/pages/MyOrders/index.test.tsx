@@ -1793,4 +1793,68 @@ describe('when order-id obfuscation is enabled', () => {
 
     expect(navigation).toHaveBeenCalledWith(`/orderDetail/${obfuscated}`);
   });
+
+  it('decodes an obfuscated id typed into the search box before querying', async () => {
+    const getOrders = vi.fn().mockReturnValue(buildGetCustomerOrdersWith('WHATEVER_VALUES'));
+
+    server.use(
+      graphql.query('GetCustomerOrders', ({ query }) => HttpResponse.json(getOrders(query))),
+    );
+
+    renderWithProviders(<MyOrders />, { preloadedState });
+
+    await waitForElementToBeRemoved(() => screen.queryAllByRole('progressbar'));
+
+    when(getOrders)
+      .calledWith(stringContainingAll('search: "66996"'))
+      .thenReturn(
+        buildGetCustomerOrdersWith({
+          data: {
+            customerOrders: {
+              totalCount: 1,
+              edges: [buildCustomerOrderNodeWith({ node: { orderId: '66996' } })],
+            },
+          },
+        }),
+      );
+
+    const obfuscated = formatOrderId('66996'); // e.g. "HZ4BIDUG-SW"
+
+    await userEvent.type(screen.getByPlaceholderText(/Search/), obfuscated);
+
+    await waitFor(() => {
+      expect(screen.getByRole('cell', { name: obfuscated })).toBeInTheDocument();
+    });
+  });
+
+  it('passes free text through the search box unchanged', async () => {
+    const getOrders = vi.fn().mockReturnValue(buildGetCustomerOrdersWith('WHATEVER_VALUES'));
+
+    server.use(
+      graphql.query('GetCustomerOrders', ({ query }) => HttpResponse.json(getOrders(query))),
+    );
+
+    renderWithProviders(<MyOrders />, { preloadedState });
+
+    await waitForElementToBeRemoved(() => screen.queryAllByRole('progressbar'));
+
+    when(getOrders)
+      .calledWith(stringContainingAll('search: "PO-4567"'))
+      .thenReturn(
+        buildGetCustomerOrdersWith({
+          data: {
+            customerOrders: {
+              totalCount: 1,
+              edges: [buildCustomerOrderNodeWith({ node: { orderId: '66996' } })],
+            },
+          },
+        }),
+      );
+
+    await userEvent.type(screen.getByPlaceholderText(/Search/), 'PO-4567');
+
+    await waitFor(() => {
+      expect(screen.getByRole('cell', { name: formatOrderId('66996') })).toBeInTheDocument();
+    });
+  });
 });
