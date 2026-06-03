@@ -1,4 +1,4 @@
-import { formatOrderId, parseOrderId } from './orderId';
+import { decodeOrderIdForSearch, formatOrderId, parseOrderId } from './orderId';
 
 describe('with a store suffix set', () => {
   beforeEach(() => {
@@ -53,6 +53,30 @@ describe('with a store suffix set', () => {
     expect(formatOrderId('abc')).toBe('abc');
     expect(formatOrderId(-5)).toBe('-5');
     expect(formatOrderId(1.5)).toBe('1.5');
+  });
+
+  describe('decodeOrderIdForSearch', () => {
+    it('decodes one of our obfuscated ids to the real numeric string', () => {
+      const obfuscated = formatOrderId(66996); // "<body>-SW"
+      expect(decodeOrderIdForSearch(obfuscated)).toBe('66996');
+    });
+
+    it('passes a raw numeric id through unchanged', () => {
+      expect(decodeOrderIdForSearch('66996')).toBe('66996');
+    });
+
+    it('passes a PO number / free text through unchanged', () => {
+      expect(decodeOrderIdForSearch('PO-4567')).toBe('PO-4567');
+    });
+
+    it('does not mis-decode free text that merely ends with the suffix', () => {
+      // round-trip rejects this: re-encoding never reproduces "FOO-SW"
+      expect(decodeOrderIdForSearch('FOO-SW')).toBe('FOO-SW');
+    });
+
+    it('passes empty input through unchanged', () => {
+      expect(decodeOrderIdForSearch('')).toBe('');
+    });
   });
 });
 

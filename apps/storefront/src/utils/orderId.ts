@@ -43,3 +43,20 @@ export function parseOrderId(value: string): number | null {
 
   return decoded ?? null;
 }
+
+/**
+ * Normalizes a search-box value: if it is one of our obfuscated order ids, returns
+ * the decoded real id as a string; otherwise returns the input unchanged. Round-trip
+ * validation (re-encoding the decoded id must reproduce the input) ensures free text,
+ * PO numbers, and raw numeric ids pass through untouched.
+ */
+export function decodeOrderIdForSearch(value: string): string {
+  const trimmed = (value ?? '').trim();
+  const decoded = parseOrderId(trimmed);
+
+  if (decoded != null && formatOrderId(decoded) === trimmed) {
+    return String(decoded);
+  }
+
+  return value;
+}

@@ -12,7 +12,7 @@ import { isB2BUserSelector, useAppSelector } from '@/store';
 import { CustomerRole } from '@/types';
 import { currencyFormat, ordersCurrencyFormat } from '@/utils/b3CurrencyFormat';
 import { displayFormat } from '@/utils/b3DateFormat';
-import { formatOrderId, parseOrderId } from '@/utils/orderId';
+import { decodeOrderIdForSearch, formatOrderId } from '@/utils/orderId';
 
 import OrderStatus from './components/OrderStatus';
 import { orderStatusTranslationVariables } from './shared/getOrderStatus';
@@ -331,16 +331,9 @@ function Order({ isCompanyOrder = false }: OrderProps) {
 
   const handleChange = (key: string, value: string) => {
     if (key === 'search') {
-      // translate a clean obfuscated id to the real id; pass free text / PO# / real id through
-      const suffix = (window.storeSuffix ?? '').trim();
-      const looksObfuscated =
-        suffix !== '' && value !== '' && !/^\d+$/.test(value) && value.endsWith(`-${suffix}`);
-      const decoded = looksObfuscated ? parseOrderId(value) : null;
-      const q = decoded != null ? String(decoded) : value;
-
       setFilterData((data) => ({
         ...data,
-        q,
+        q: decodeOrderIdForSearch(value),
       }));
     }
   };
