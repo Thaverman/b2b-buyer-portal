@@ -1452,7 +1452,7 @@ describe('when the url contains an invoiceId parameter', () => {
 
 describe('when order-id obfuscation is enabled', () => {
   beforeEach(() => {
-    window.storeSuffix = 'SW';
+    window.BC_CONTEXT = { storeSuffix: 'SW' };
 
     server.use(
       graphql.query('GetInvoices', () =>
@@ -1469,7 +1469,7 @@ describe('when order-id obfuscation is enabled', () => {
   });
 
   afterEach(() => {
-    delete window.storeSuffix;
+    delete window.BC_CONTEXT;
   });
 
   it('displays the obfuscated order number instead of the raw number', async () => {

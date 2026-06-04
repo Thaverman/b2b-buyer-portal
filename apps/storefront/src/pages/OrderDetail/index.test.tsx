@@ -2878,11 +2878,11 @@ describe('when order-id obfuscation is enabled', () => {
   };
 
   beforeEach(() => {
-    window.storeSuffix = 'SW';
+    window.BC_CONTEXT = { storeSuffix: 'SW' };
   });
 
   afterEach(() => {
-    delete window.storeSuffix;
+    delete window.BC_CONTEXT;
   });
 
   it('decodes the obfuscated route param to fetch by the real id and shows the obfuscated id in the header', async () => {

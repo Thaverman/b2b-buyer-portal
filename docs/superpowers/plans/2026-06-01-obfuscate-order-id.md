@@ -4,7 +4,7 @@
 
 **Goal:** Display BigCommerce order IDs as reversible, branded, obfuscated strings (e.g. `123` → `HZ4BIDUG-SW`) in all UI text and in `/orderDetail` URLs, decoding back to the real numeric ID on the detail page and in search.
 
-**Architecture:** A single pure utility module (`src/utils/orderId.ts`) owns one `sqids` instance and exports `formatOrderId` (real id → display string) and `parseOrderId` (display string / route param → real numeric id). Every display surface and link-builder calls `formatOrderId`; the detail page and search box call `parseOrderId`. Obfuscation is gated on `window.storeSuffix`: when it is absent, both functions pass the plain numeric id through, so behavior is identical to today.
+**Architecture:** A single pure utility module (`src/utils/orderId.ts`) owns one `sqids` instance and exports `formatOrderId` (real id → display string) and `parseOrderId` (display string / route param → real numeric id). Every display surface and link-builder calls `formatOrderId`; the detail page and search box call `parseOrderId`. Obfuscation is gated on `window.BC_CONTEXT.storeSuffix`: when it is absent, both functions pass the plain numeric id through, so behavior is identical to today.
 
 **Tech Stack:** React 18, TypeScript, [`sqids`](https://github.com/sqids/sqids-javascript) `^0.3.0`, Vitest + jsdom + Testing Library + MSW + `vitest-when`, builders from `tests/test-utils`.
 
@@ -17,9 +17,9 @@
 ## Background the engineer needs
 
 - **`sqids@0.3.0` API:** `import Sqids, { defaultOptions } from 'sqids'`. `new Sqids({ alphabet, minLength, blocklist })`. `sqids.encode(numbers: number[]): string`, `sqids.decode(id: string): number[]`. `defaultOptions.blocklist` is an exported `Set<string>` of ~700 profanity words. Passing a custom `blocklist` REPLACES the default, so we merge: `new Set([...defaultOptions.blocklist, 'Uline'])`.
-- **The config (fixed):** alphabet `JH4D0BET3UA1W5VO8XZYIRLCGK7FQS96N2MP` (36 unique chars, validated), `minLength: 8`, blocklist = default profanity + `'Uline'`. The suffix comes from `window.storeSuffix` (set by a separate host project) and is appended as `-<suffix>` (e.g. `-SW`). The example `HZ4BIDUG-SW` is illustrative; the exact encoded body depends on the config — assert via round-trip, not against a hardcoded literal.
-- **Disambiguation rule** (how `parseOrderId` tells the two forms apart): a pure-digit string is a real id; anything else is decoded. This is safe because `formatOrderId` only emits an obfuscated value when `window.storeSuffix` exists, and that value always carries a `-SUFFIX` and a predominantly-alphabetic body.
-- **Why existing tests keep passing:** the test environment never sets `window.storeSuffix`, so `formatOrderId('66996') === '66996'` in every existing test. Existing assertions on `66996` / `4444` / `/orderDetail/66996` are unaffected. New behavior is tested in new `describe` blocks that set the suffix.
+- **The config (fixed):** alphabet `JH4D0BET3UA1W5VO8XZYIRLCGK7FQS96N2MP` (36 unique chars, validated), `minLength: 8`, blocklist = default profanity + `'Uline'`. The suffix comes from `window.BC_CONTEXT.storeSuffix` (set by a separate host project) and is appended as `-<suffix>` (e.g. `-SW`). The example `HZ4BIDUG-SW` is illustrative; the exact encoded body depends on the config — assert via round-trip, not against a hardcoded literal.
+- **Disambiguation rule** (how `parseOrderId` tells the two forms apart): a pure-digit string is a real id; anything else is decoded. This is safe because `formatOrderId` only emits an obfuscated value when `window.BC_CONTEXT.storeSuffix` exists, and that value always carries a `-SUFFIX` and a predominantly-alphabetic body.
+- **Why existing tests keep passing:** the test environment never sets `window.BC_CONTEXT.storeSuffix`, so `formatOrderId('66996') === '66996'` in every existing test. Existing assertions on `66996` / `4444` / `/orderDetail/66996` are unaffected. New behavior is tested in new `describe` blocks that set the suffix.
 - **`MyOrders` and `CompanyOrderList` both render the same `pages/order/Order.tsx` component**, so editing `Order.tsx` fixes both lists.
 
 ## File structure
@@ -27,7 +27,7 @@
 | File | Responsibility | Action |
 |---|---|---|
 | `apps/storefront/package.json` | dependency list | Modify — add `sqids` |
-| `src/index.d.ts` | global `Window` typing | Modify — add `storeSuffix?: string` |
+| `src/index.d.ts` | global `Window` typing | Modify — add `BC_CONTEXT?: { storeSuffix?: string }` |
 | `src/utils/orderId.ts` | encode/decode util (the only place that knows sqids) | Create |
 | `src/utils/orderId.test.ts` | unit tests for the util | Create |
 | `src/pages/order/Order.tsx` | order list: cell render, row navigation, search | Modify |
@@ -40,7 +40,7 @@
 
 ---
 
-## Task 1: Add the `sqids` dependency and the `window.storeSuffix` global type
+## Task 1: Add the `sqids` dependency and the `window.BC_CONTEXT.storeSuffix` global type (read from the host-set BigCommerce storefront context)
 
 **Files:**
 - Modify: `apps/storefront/package.json` (dependencies)
@@ -68,15 +68,17 @@ Expected: prints an 8+ char id and `[ 123 ]` (e.g. `HZ4BIDUG [ 123 ]`). Confirms
 
 - [ ] **Step 3: Add the global type**
 
-In `src/index.d.ts`, add `storeSuffix` to the first `Window` interface (the one starting at line 56). Insert after the `dataLayer` line:
+In `src/index.d.ts`, add `BC_CONTEXT` to the first `Window` interface (the one starting at line 56). Insert after the `dataLayer` line:
 
 ```ts
   interface Window {
     tipDispatch: DispatchProps;
     globalTipDispatch: any;
     dataLayer?: Record<string, unknown>[];
-    /** Store-specific suffix set by the host project; gates order-id obfuscation. */
-    storeSuffix?: string;
+    /** BigCommerce storefront context set by the host project; `storeSuffix` gates order-id obfuscation. */
+    BC_CONTEXT?: {
+      storeSuffix?: string;
+    };
     B3: {
 ```
 
@@ -94,7 +96,7 @@ Expected: PASS (no errors).
 
 ```bash
 git add apps/storefront/package.json apps/storefront/yarn.lock apps/storefront/src/index.d.ts
-git commit -m "feat: add sqids dependency and window.storeSuffix type for order-id obfuscation"
+git commit -m "feat: add sqids dependency and window.BC_CONTEXT.storeSuffix type for order-id obfuscation"
 ```
 
 ---
@@ -114,11 +116,11 @@ import { formatOrderId, parseOrderId } from './orderId';
 
 describe('with a store suffix set', () => {
   beforeEach(() => {
-    window.storeSuffix = 'SW';
+    window.BC_CONTEXT = { storeSuffix: 'SW' };
   });
 
   afterEach(() => {
-    delete window.storeSuffix;
+    delete window.BC_CONTEXT;
   });
 
   it('encodes a numeric id to an obfuscated string with the suffix', () => {
@@ -170,7 +172,7 @@ describe('with a store suffix set', () => {
 
 describe('without a store suffix', () => {
   beforeEach(() => {
-    delete window.storeSuffix;
+    delete window.BC_CONTEXT;
   });
 
   it('returns the plain numeric id', () => {
@@ -212,7 +214,7 @@ const sqids = new Sqids({
 
 /** The store suffix set by the host project; obfuscation is active only when present. */
 function getStoreSuffix(): string {
-  return (window.storeSuffix ?? '').trim();
+  return (window.BC_CONTEXT?.storeSuffix ?? '').trim();
 }
 
 /** Real numeric id -> display string. Falls back to the plain id when no suffix is set. */
@@ -284,7 +286,7 @@ describe('when order-id obfuscation is enabled', () => {
   };
 
   beforeEach(() => {
-    window.storeSuffix = 'SW';
+    window.BC_CONTEXT = { storeSuffix: 'SW' };
     server.use(
       graphql.query('GetCustomerOrderStatuses', () =>
         HttpResponse.json(buildCustomerOrderStatusesWith('WHATEVER_VALUES')),
@@ -293,7 +295,7 @@ describe('when order-id obfuscation is enabled', () => {
   });
 
   afterEach(() => {
-    delete window.storeSuffix;
+    delete window.BC_CONTEXT;
   });
 
   it('displays the obfuscated order id instead of the raw id', async () => {
@@ -425,7 +427,7 @@ Run:
 yarn test src/pages/MyOrders/index.test.tsx --run
 ```
 
-Expected: PASS — both new obfuscation tests pass AND all existing tests still pass (they don't set `window.storeSuffix`).
+Expected: PASS — both new obfuscation tests pass AND all existing tests still pass (they don't set `window.BC_CONTEXT.storeSuffix`).
 
 - [ ] **Step 6: Run the sibling list + mobile tests**
 
@@ -602,11 +604,11 @@ describe('when order-id obfuscation is enabled', () => {
   };
 
   beforeEach(() => {
-    window.storeSuffix = 'SW';
+    window.BC_CONTEXT = { storeSuffix: 'SW' };
   });
 
   afterEach(() => {
-    delete window.storeSuffix;
+    delete window.BC_CONTEXT;
   });
 
   it('decodes the obfuscated route param to fetch by the real id and shows the obfuscated id in the header', async () => {
@@ -729,7 +731,7 @@ Add this `describe` block to the file (it reuses the module-scope `preloadedStat
 ```ts
 describe('when order-id obfuscation is enabled', () => {
   beforeEach(() => {
-    window.storeSuffix = 'SW';
+    window.BC_CONTEXT = { storeSuffix: 'SW' };
 
     server.use(
       graphql.query('GetInvoices', () =>
@@ -746,7 +748,7 @@ describe('when order-id obfuscation is enabled', () => {
   });
 
   afterEach(() => {
-    delete window.storeSuffix;
+    delete window.BC_CONTEXT;
   });
 
   it('displays the obfuscated order number instead of the raw number', async () => {
@@ -871,7 +873,7 @@ git commit -m "feat: display obfuscated order numbers on invoice list and naviga
 
 - [ ] **Step 1: Write the failing test**
 
-Add this test inside the `describe('when order-id obfuscation is enabled', ...)` block created in Task 6 (it already sets `window.storeSuffix` and the `GetInvoiceStats` handler in its `beforeEach`):
+Add this test inside the `describe('when order-id obfuscation is enabled', ...)` block created in Task 6 (it already sets `window.BC_CONTEXT.storeSuffix` and the `GetInvoiceStats` handler in its `beforeEach`):
 
 ```ts
   it('decodes an obfuscated order id typed into the invoice search box', async () => {
@@ -1045,4 +1047,4 @@ git commit -m "test: finalize order-id obfuscation verification"
 
 - **Spec coverage:** Display (Tasks 3, 5, 6) ✓; URL/navigation (Tasks 3, 5, 6) ✓; route-param decode (Task 5) ✓; smart-decode search (Tasks 4, 7) ✓; suffix fallback (Task 2 unit tests) ✓; merged blocklist (Task 1 verify + Task 2 blocklist test) ✓; boundaries left raw (Task 8 confirms) ✓; dependency + global type (Task 1) ✓; rollout-by-suffix (covered by gating + existing tests passing unchanged) ✓.
 - **Placeholder scan:** All test bodies now use the exact, verified handler names (`GetCustomerOrder`, `AddressConfig`, `GetCustomerOrderStatuses`, `GetInvoices`, `GetInvoiceStats`) and builders (`buildCustomerOrderResponseWith`, `buildCustomerOrderStatusesWith`, `buildAddressConfigResponseWith`, `buildInvoicesResponseWith`, `buildInvoiceWith`, `buildInvoiceStatsResponseWith`) defined in each existing test file. The only soft note is in Task 5 (use the file's existing `GetCustomerOrder` builder if its name differs) — every source edit shows complete code.
-- **Type consistency:** `formatOrderId(id: number | string): string` and `parseOrderId(value: string): number | null` are used consistently across all tasks; `window.storeSuffix?: string` added in Task 1 matches usage in Task 2.
+- **Type consistency:** `formatOrderId(id: number | string): string` and `parseOrderId(value: string): number | null` are used consistently across all tasks; `window.BC_CONTEXT.storeSuffix` (typed via `BC_CONTEXT?: { storeSuffix?: string }`) added in Task 1 matches usage in Task 2.

@@ -9,7 +9,7 @@
 Display an obfuscated order identifier to users instead of the raw, sequential
 BigCommerce order ID. Encoding uses [`sqids`](https://github.com/sqids/sqids-javascript)
 (reversible, URL-safe), with a project-specific alphabet, a minimum length of 8,
-and a blocklist. A store-specific suffix (read from `window.storeSuffix`, set by a
+and a blocklist. A store-specific suffix (read from `window.BC_CONTEXT.storeSuffix`, set by a
 separate host project) is appended for display.
 
 Example: order `123` → **`HZ4BIDUG-SW`**.
@@ -23,7 +23,7 @@ the real numeric ID before performing lookups.
 - Replace every user-facing **text** display of an order ID with the obfuscated form.
 - Use the obfuscated form in `/orderDetail/:id` **URLs**, decoding on the detail page.
 - Let the search box accept an obfuscated ID (smart-decode to the real ID).
-- Degrade gracefully to the real numeric ID when `window.storeSuffix` is absent.
+- Degrade gracefully to the real numeric ID when `window.BC_CONTEXT.storeSuffix` is absent.
 
 ## Non-goals
 
@@ -40,7 +40,7 @@ the real numeric ID before performing lookups.
 | Decision | Choice |
 |---|---|
 | Scope | **Display + URL.** Detail page and search decode back to the real ID. |
-| Suffix missing (`window.storeSuffix` empty/undefined) | **Fall back to the real numeric ID** everywhere. |
+| Suffix missing (`window.BC_CONTEXT.storeSuffix` empty/undefined) | **Fall back to the real numeric ID** everywhere. |
 | Display surfaces | **All** — order list (My + Company), order detail header, invoice order numbers, dashboard, and any remaining text surfaces. |
 | Search input | **Smart decode** — translate a clean obfuscated ID to the real ID; pass free text / PO numbers / real IDs through unchanged. |
 | Blocklist | **Merge** sqids' built-in profanity blocklist **and** add `"Uline"`. |
@@ -61,7 +61,7 @@ them.
 
 A single domain-agnostic module owns one `Sqids` singleton and exports two pure
 functions. Every display surface and link-builder calls `formatOrderId`; the detail
-page and search box call `parseOrderId`. The `window.storeSuffix` gate lives inside
+page and search box call `parseOrderId`. The `window.BC_CONTEXT.storeSuffix` gate lives inside
 the module.
 
 Rejected alternatives:
@@ -70,7 +70,7 @@ Rejected alternatives:
   (`Order.entityId: number` would become a display string), breaks numeric
   sort/lookup, and fights the requirement that print/return/PDF still need the
   real number.
-- **React hook + `<OrderId>` component** — `window.storeSuffix` is a global, not
+- **React hook + `<OrderId>` component** — `window.BC_CONTEXT.storeSuffix` is a global, not
   React state, so reactivity would be illusory; and the *parse* side must run in
   plain functions (route-param handling, search), where hooks cannot. The pure
   util covers both; a thin display component could still be layered on later if
@@ -92,7 +92,7 @@ const sqids = new Sqids({
 
 /** The store suffix set by the host project; obfuscation is active only when present. */
 function getStoreSuffix(): string {
-  return (window.storeSuffix ?? '').trim();
+  return (window.BC_CONTEXT?.storeSuffix ?? '').trim();
 }
 
 /** Real numeric id -> display string. Falls back to the plain id when no suffix is set. */
@@ -122,7 +122,7 @@ export function parseOrderId(value: string): number | null {
   then `sqids.decode`.
 
 This never collides because `formatOrderId` only emits an obfuscated value when
-`window.storeSuffix` exists, and such a value always carries a `-SUFFIX` and a
+`window.BC_CONTEXT.storeSuffix` exists, and such a value always carries a `-SUFFIX` and a
 predominantly alphabetic body. When no suffix exists, every surface uses the plain
 numeric form, which the digit path handles.
 
@@ -131,7 +131,7 @@ returns `null` on unparseable input so callers can fall back.
 
 ### Global typing
 
-Augment the global `Window` type with `storeSuffix?: string` in a `.d.ts`,
+Augment the global `Window` type with `BC_CONTEXT?: { storeSuffix?: string }` in a `.d.ts`,
 alongside the existing `window.b2b` typing.
 
 ## Surface wiring
@@ -196,7 +196,7 @@ Project stack: Vitest + jsdom, Testing Library, MSW, `vitest-when`, builders,
 
 ### Unit — `src/utils/orderId.test.ts`
 
-Set `window.storeSuffix` in `beforeEach`, delete in `afterEach`.
+Set `window.BC_CONTEXT.storeSuffix` in `beforeEach`, delete in `afterEach`.
 
 - Round-trip: `parseOrderId(formatOrderId(n)) === n` across a range of IDs.
 - `formatOrderId` with suffix → matches `^[ALPHABET]{8,}-SW$`.
@@ -227,7 +227,7 @@ Set `window.storeSuffix` in `beforeEach`, delete in `afterEach`.
 
 ## Rollout
 
-No separate feature flag. The feature is **implicitly gated by `window.storeSuffix`**.
+No separate feature flag. The feature is **implicitly gated by `window.BC_CONTEXT.storeSuffix`**.
 On stores where the host project has not set it, behavior is identical to today
 (real IDs). It activates automatically once the suffix is present, and the host can
 disable it simply by not setting the global. Safe, progressive, reversible.

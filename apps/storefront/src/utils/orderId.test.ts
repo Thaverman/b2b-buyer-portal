@@ -2,11 +2,11 @@ import { decodeOrderIdForSearch, formatOrderId, parseOrderId } from './orderId';
 
 describe('with a store suffix set', () => {
   beforeEach(() => {
-    window.storeSuffix = 'SW';
+    window.BC_CONTEXT = { storeSuffix: 'SW' };
   });
 
   afterEach(() => {
-    delete window.storeSuffix;
+    delete window.BC_CONTEXT;
   });
 
   it('encodes a numeric id to an obfuscated string with the suffix', () => {
@@ -82,7 +82,7 @@ describe('with a store suffix set', () => {
 
 describe('without a store suffix', () => {
   beforeEach(() => {
-    delete window.storeSuffix;
+    delete window.BC_CONTEXT;
   });
 
   it('returns the plain numeric id', () => {

@@ -57,8 +57,10 @@ declare global {
     tipDispatch: DispatchProps;
     globalTipDispatch: any;
     dataLayer?: Record<string, unknown>[];
-    /** Store-specific suffix set by the host project; gates order-id obfuscation. */
-    storeSuffix?: string;
+    /** BigCommerce storefront context set by the host project; `storeSuffix` gates order-id obfuscation. */
+    BC_CONTEXT?: {
+      storeSuffix?: string;
+    };
     B3: {
       setting: {
         channel_id: number;

@@ -11,7 +11,7 @@ const sqids = new Sqids({
 
 /** The store suffix set by the host project; obfuscation is active only when present. */
 function getStoreSuffix(): string {
-  return (window.storeSuffix ?? '').trim();
+  return (window.BC_CONTEXT?.storeSuffix ?? '').trim();
 }
 
 /** Real numeric id -> display string. Falls back to the plain id when no suffix is set. */

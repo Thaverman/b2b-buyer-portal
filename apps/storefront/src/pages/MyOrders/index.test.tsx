@@ -1729,7 +1729,7 @@ describe('when order-id obfuscation is enabled', () => {
   };
 
   beforeEach(() => {
-    window.storeSuffix = 'SW';
+    window.BC_CONTEXT = { storeSuffix: 'SW' };
     server.use(
       graphql.query('GetCustomerOrderStatuses', () =>
         HttpResponse.json(buildCustomerOrderStatusesWith('WHATEVER_VALUES')),
@@ -1738,7 +1738,7 @@ describe('when order-id obfuscation is enabled', () => {
   });
 
   afterEach(() => {
-    delete window.storeSuffix;
+    delete window.BC_CONTEXT;
   });
 
   it('displays the obfuscated order id instead of the raw id', async () => {

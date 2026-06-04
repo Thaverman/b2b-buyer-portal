@@ -27,7 +27,10 @@
       "Bash(node -e \"const p=require\\('./apps/storefront/package.json'\\); console.log\\('engines:', JSON.stringify\\(p.engines\\)\\);\")",
       "Bash(awk '/### Commit guideline/,/### Styling/' CONTRIBUTING.md)",
       "Bash(git commit -q -m 'docs: sync order-id obfuscation plan with implemented search-helper approach *)",
-      "Bash(git branch *)"
+      "Bash(git branch *)",
+      "Bash(npx vitest *)",
+      "Bash(echo \"exit=$?\")",
+      "Read(//tmp/**)"
     ]
   },
   "enableAllProjectMcpServers": true,
