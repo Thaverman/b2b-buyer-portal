@@ -21,6 +21,7 @@ import {
 import { when } from 'vitest-when';
 
 import { permissionLevels } from '@/constants';
+import { formatOrderId } from '@/utils/orderId';
 
 import { InvoiceStatusCode } from './components/InvoiceStatus';
 import { triggerPdfDownload } from './components/triggerPdfDownload';
@@ -1445,6 +1446,78 @@ describe('when the url contains an invoiceId parameter', () => {
 
     await waitFor(() => {
       expect(screen.getAllByRole('link', { name: 'Download PDF' })).toHaveLength(2);
+    });
+  });
+});
+
+describe('when order-id obfuscation is enabled', () => {
+  beforeEach(() => {
+    window.BC_CONTEXT = { storeSuffix: 'SW' };
+
+    server.use(
+      graphql.query('GetInvoices', () =>
+        HttpResponse.json(
+          buildInvoicesResponseWith({
+            data: { invoices: { edges: [buildInvoiceWith({ node: { orderNumber: '4444' } })] } },
+          }),
+        ),
+      ),
+      graphql.query('GetInvoiceStats', () =>
+        HttpResponse.json(buildInvoiceStatsResponseWith('WHATEVER_VALUES')),
+      ),
+    );
+  });
+
+  afterEach(() => {
+    delete window.BC_CONTEXT;
+  });
+
+  it('displays the obfuscated order number instead of the raw number', async () => {
+    renderWithProviders(<Invoice />, { preloadedState });
+
+    await waitForElementToBeRemoved(() => screen.queryByText(/loading/i));
+
+    const obfuscated = formatOrderId('4444');
+
+    expect(screen.queryByRole('button', { name: '4444' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: obfuscated })).toBeInTheDocument();
+  });
+
+  it('navigates to the obfuscated order-detail url from the order-number cell', async () => {
+    const { navigation } = renderWithProviders(<Invoice />, { preloadedState });
+
+    await waitForElementToBeRemoved(() => screen.queryByText(/loading/i));
+
+    const obfuscated = formatOrderId('4444');
+
+    await userEvent.click(screen.getByRole('button', { name: obfuscated }));
+
+    expect(navigation).toHaveBeenCalledWith(`/orderDetail/${obfuscated}`);
+  });
+
+  it('decodes an obfuscated order id typed into the invoice search box', async () => {
+    const getInvoices = vi.fn().mockReturnValue(buildInvoicesResponseWith('WHATEVER_VALUES'));
+
+    server.use(graphql.query('GetInvoices', ({ query }) => HttpResponse.json(getInvoices(query))));
+
+    renderWithProviders(<Invoice />, { preloadedState });
+
+    await waitForElementToBeRemoved(() => screen.queryByText(/loading/i));
+
+    const obfuscated = formatOrderId('4444');
+
+    when(getInvoices)
+      .calledWith(stringContainingAll('search: "4444"'))
+      .thenReturn(
+        buildInvoicesResponseWith({
+          data: { invoices: { edges: [buildInvoiceWith({ node: { orderNumber: '4444' } })] } },
+        }),
+      );
+
+    await userEvent.type(screen.getByPlaceholderText(/Search/), obfuscated);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: obfuscated })).toBeInTheDocument();
     });
   });
 });

@@ -41,6 +41,7 @@ const Registered = lazy(() => import('@/pages/Registered'));
 const RegisteredBCToB2B = lazy(() => import('@/pages/RegisteredBCToB2B'));
 const ShoppingLists = lazy(() => import('@/pages/ShoppingLists'));
 const ShoppingListDetails = lazy(() => import('@/pages/ShoppingListDetails'));
+const ManageSubscriptions = lazy(() => import('@/pages/ManageSubscriptions'));
 const UserManagement = lazy(() => import('@/pages/UserManagement'));
 const CompanyHierarchy = lazy(() => import('@/pages/CompanyHierarchy'));
 
@@ -60,6 +61,7 @@ const routesMap: Record<string, LazyExoticComponent<(props: PageProps) => ReactE
   '/accountSettings': AccountSetting,
   '/quoteDetail/:id': QuoteDetail,
   '/company-hierarchy': CompanyHierarchy,
+  '/manage-subscriptions': ManageSubscriptions,
 };
 
 function addComponentToRoutes(routes: BuyerPortalRoute[]): RouteItem[] {

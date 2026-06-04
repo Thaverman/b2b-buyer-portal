@@ -19,6 +19,7 @@ import {
 import { isB2BUserSelector, useAppSelector } from '@/store';
 import { AddressConfigItem, CustomerRole, OrderProductItem, OrderStatusItem } from '@/types';
 import b2bLogger from '@/utils/b3Logger';
+import { formatOrderId, parseOrderId } from '@/utils/orderId';
 
 import OrderStatus from '../order/components/OrderStatus';
 import { orderStatusTranslationVariables } from '../order/shared/getOrderStatus';
@@ -103,7 +104,7 @@ function OrderDetail() {
   useEffect(() => {
     if (orderId) {
       const getOrderDetails = async () => {
-        const id = parseInt(orderId, 10);
+        const id = parseOrderId(orderId);
         if (!id) {
           return;
         }
@@ -274,7 +275,10 @@ function OrderDetail() {
                 color: b3HexToRgb(customColor, 0.87) || '#263238',
               }}
             >
-              {b3Lang('orderDetail.orderId', { orderId })}
+              {b3Lang('orderDetail.orderId', {
+                orderId:
+                  parseOrderId(orderId) != null ? formatOrderId(parseOrderId(orderId)!) : orderId,
+              })}
               {b3Lang('orderDetail.purchaseOrderNumber', {
                 purchaseOrderNumber: poNumber ?? '',
               })}

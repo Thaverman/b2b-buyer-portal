@@ -8,6 +8,7 @@ import { useB3Lang } from '@/lib/lang';
 import { InvoiceList, InvoiceListNode } from '@/types/invoice';
 import { currencyFormat } from '@/utils/b3CurrencyFormat';
 import { displayFormat } from '@/utils/b3DateFormat';
+import { formatOrderId } from '@/utils/orderId';
 
 import B3Pulldown from './components/B3Pulldown';
 import InvoiceStatus from './components/InvoiceStatus';
@@ -74,10 +75,10 @@ export function InvoiceItemCard(props: InvoiceItemCardProps) {
             textDecoration: 'underline',
           }}
           onClick={() => {
-            navigate(`/orderDetail/${item.orderNumber}`);
+            navigate(`/orderDetail/${formatOrderId(item.orderNumber)}`);
           }}
         >
-          {item?.orderNumber || '-'}
+          {item?.orderNumber ? formatOrderId(item.orderNumber) : '-'}
         </Box>
       ),
     },

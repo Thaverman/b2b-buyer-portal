@@ -12,6 +12,7 @@ import { isB2BUserSelector, useAppSelector } from '@/store';
 import { CustomerRole } from '@/types';
 import { currencyFormat, ordersCurrencyFormat } from '@/utils/b3CurrencyFormat';
 import { displayFormat } from '@/utils/b3DateFormat';
+import { decodeOrderIdForSearch, formatOrderId } from '@/utils/orderId';
 
 import OrderStatus from './components/OrderStatus';
 import { orderStatusTranslationVariables } from './shared/getOrderStatus';
@@ -240,7 +241,7 @@ function Order({ isCompanyOrder = false }: OrderProps) {
   const navigate = useNavigate();
 
   const goToDetail = (item: ListItem, index: number) => {
-    navigate(`/orderDetail/${item.orderId}`, {
+    navigate(`/orderDetail/${formatOrderId(item.orderId)}`, {
       state: {
         currentIndex: index,
         searchParams: {
@@ -261,7 +262,7 @@ function Order({ isCompanyOrder = false }: OrderProps) {
       title: b3Lang('orders.order'),
       width: '10%',
       isSortable: true,
-      render: ({ orderId }) => orderId,
+      render: ({ orderId }) => formatOrderId(orderId),
     },
     {
       key: 'companyName',
@@ -332,7 +333,7 @@ function Order({ isCompanyOrder = false }: OrderProps) {
     if (key === 'search') {
       setFilterData((data) => ({
         ...data,
-        q: value,
+        q: decodeOrderIdForSearch(value),
       }));
     }
   };

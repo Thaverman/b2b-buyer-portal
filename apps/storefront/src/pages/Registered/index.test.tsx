@@ -852,7 +852,6 @@ const expectedPayloadType2 = {
     force_password_reset: false,
     new_password: 'Password123',
   },
-  channel_ids: [1],
   email: 'john.doe@example.com',
   first_name: 'John',
   form_fields: [],

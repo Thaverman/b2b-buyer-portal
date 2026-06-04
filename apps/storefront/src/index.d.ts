@@ -56,6 +56,11 @@ declare global {
   interface Window {
     tipDispatch: DispatchProps;
     globalTipDispatch: any;
+    dataLayer?: Record<string, unknown>[];
+    /** BigCommerce storefront context set by the host project; `storeSuffix` gates order-id obfuscation. */
+    BC_CONTEXT?: {
+      storeSuffix?: string;
+    };
     B3: {
       setting: {
         channel_id: number;

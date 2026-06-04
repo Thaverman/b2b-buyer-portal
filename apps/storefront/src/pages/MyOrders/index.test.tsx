@@ -21,6 +21,7 @@ import {
 import { when } from 'vitest-when';
 
 import { CompanyStatus, CustomerRole, UserTypes } from '@/types';
+import { formatOrderId } from '@/utils/orderId';
 
 import {
   CompanyOrderNode,
@@ -1720,3 +1721,140 @@ describe('when a customer is masquerading as a company customer', () => {
 });
 
 describe.todo('when a customer is part of a company hierarchy');
+
+describe('when order-id obfuscation is enabled', () => {
+  const preloadedState = {
+    company: buildCompanyStateWith({ customer: { role: CustomerRole.B2C } }),
+    storeInfo: buildStoreInfoStateWith({ timeFormat: { display: 'j F Y' } }),
+  };
+
+  beforeEach(() => {
+    window.BC_CONTEXT = { storeSuffix: 'SW' };
+    server.use(
+      graphql.query('GetCustomerOrderStatuses', () =>
+        HttpResponse.json(buildCustomerOrderStatusesWith('WHATEVER_VALUES')),
+      ),
+    );
+  });
+
+  afterEach(() => {
+    delete window.BC_CONTEXT;
+  });
+
+  it('displays the obfuscated order id instead of the raw id', async () => {
+    server.use(
+      graphql.query('GetCustomerOrders', () =>
+        HttpResponse.json(
+          buildGetCustomerOrdersWith({
+            data: {
+              customerOrders: {
+                totalCount: 1,
+                edges: [buildCustomerOrderNodeWith({ node: { orderId: '66996' } })],
+              },
+            },
+          }),
+        ),
+      ),
+    );
+
+    renderWithProviders(<MyOrders />, { preloadedState });
+
+    await waitForElementToBeRemoved(() => screen.queryAllByRole('progressbar'));
+
+    const obfuscated = formatOrderId('66996');
+
+    expect(screen.queryByRole('cell', { name: '66996' })).not.toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: obfuscated })).toBeInTheDocument();
+  });
+
+  it('navigates to the obfuscated order-detail url when clicking a row', async () => {
+    server.use(
+      graphql.query('GetCustomerOrders', () =>
+        HttpResponse.json(
+          buildGetCustomerOrdersWith({
+            data: {
+              customerOrders: {
+                totalCount: 1,
+                edges: [buildCustomerOrderNodeWith({ node: { orderId: '66996' } })],
+              },
+            },
+          }),
+        ),
+      ),
+    );
+
+    const { navigation } = renderWithProviders(<MyOrders />, { preloadedState });
+
+    await waitForElementToBeRemoved(() => screen.queryAllByRole('progressbar'));
+
+    const obfuscated = formatOrderId('66996');
+
+    await userEvent.click(screen.getByRole('cell', { name: obfuscated }));
+
+    expect(navigation).toHaveBeenCalledWith(`/orderDetail/${obfuscated}`);
+  });
+
+  it('decodes an obfuscated id typed into the search box before querying', async () => {
+    const getOrders = vi.fn().mockReturnValue(buildGetCustomerOrdersWith('WHATEVER_VALUES'));
+
+    server.use(
+      graphql.query('GetCustomerOrders', ({ query }) => HttpResponse.json(getOrders(query))),
+    );
+
+    renderWithProviders(<MyOrders />, { preloadedState });
+
+    await waitForElementToBeRemoved(() => screen.queryAllByRole('progressbar'));
+
+    when(getOrders)
+      .calledWith(stringContainingAll('search: "66996"'))
+      .thenReturn(
+        buildGetCustomerOrdersWith({
+          data: {
+            customerOrders: {
+              totalCount: 1,
+              edges: [buildCustomerOrderNodeWith({ node: { orderId: '66996' } })],
+            },
+          },
+        }),
+      );
+
+    const obfuscated = formatOrderId('66996'); // e.g. "HZ4BIDUG-SW"
+
+    await userEvent.type(screen.getByPlaceholderText(/Search/), obfuscated);
+
+    await waitFor(() => {
+      expect(screen.getByRole('cell', { name: obfuscated })).toBeInTheDocument();
+    });
+  });
+
+  it('passes free text through the search box unchanged', async () => {
+    const getOrders = vi.fn().mockReturnValue(buildGetCustomerOrdersWith('WHATEVER_VALUES'));
+
+    server.use(
+      graphql.query('GetCustomerOrders', ({ query }) => HttpResponse.json(getOrders(query))),
+    );
+
+    renderWithProviders(<MyOrders />, { preloadedState });
+
+    await waitForElementToBeRemoved(() => screen.queryAllByRole('progressbar'));
+
+    when(getOrders)
+      .calledWith(stringContainingAll('search: "PO-4567"'))
+      .thenReturn(
+        buildGetCustomerOrdersWith({
+          data: {
+            customerOrders: {
+              totalCount: 1,
+              edges: [buildCustomerOrderNodeWith({ node: { orderId: '66996' } })],
+            },
+          },
+        }),
+      );
+
+    await userEvent.type(screen.getByPlaceholderText(/Search/), 'PO-4567');
+
+    await waitFor(() => {
+      expect(screen.getByRole('cell', { name: formatOrderId('66996') })).toBeInTheDocument();
+    });
+  });
+});

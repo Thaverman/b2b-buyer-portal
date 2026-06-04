@@ -23,6 +23,7 @@ import { dateWithLocaleSupport, getUTCTimestamp } from '@/utils/b3DateFormat';
 import b2bLogger from '@/utils/b3Logger';
 import { snackbar } from '@/utils/b3Tip';
 import { handleGetCorrespondingCurrencyToken } from '@/utils/currencyUtils';
+import { decodeOrderIdForSearch, formatOrderId } from '@/utils/orderId';
 
 import B3Filter from '../../components/filter/B3Filter';
 
@@ -211,7 +212,7 @@ function Invoice() {
     if (key === 'search') {
       setFilterData({
         ...filterData,
-        q: value,
+        q: decodeOrderIdForSearch(value),
       });
       setFilterChangeFlag(true);
       setType(InvoiceListType.NORMAL);
@@ -596,10 +597,10 @@ function Invoice() {
             },
           }}
           onClick={() => {
-            navigate(`/orderDetail/${item.orderNumber}`);
+            navigate(`/orderDetail/${formatOrderId(item.orderNumber)}`);
           }}
         >
-          {item?.orderNumber || '-'}
+          {item?.orderNumber ? formatOrderId(item.orderNumber) : '-'}
         </Box>
       ),
       width: '12%',

@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(yarn test *)",
+      "Bash(CIRCLECI=true yarn test src/pages/Registered/index.test.tsx --run)",
+      "Bash(yarn tsc *)",
+      "Bash(yarn lint:eslint src/pages/Registered/RegisterSteps/steps/CompleteStep/createCustomer.ts src/pages/Registered/index.test.tsx)",
+      "Bash(yarn lint:eslint src/pages/Registered/RegisterSteps/steps/CompleteStep/createCustomer.ts)",
+      "Bash(yarn lint:eslint src/pages/Registered/index.test.tsx)",
+      "Bash(CIRCLECI=true yarn test src/pages/Registered/ --run)",
+      "Bash(yarn lint:dependencies)",
+      "Bash(yarn lint:knip)",
+      "Bash(git stash *)",
+      "PowerShell($env:Path = \"C:\\\\ProgramData\\\\nvm\\\\v22.16.0;\" + $env:Path; Push-Location \"d:\\\\vsCodeRepo\\\\b2b-buyer-portal-branch\\\\b2b-buyer-portal\\\\apps\\\\storefront\"; yarn test src/pages/MyOrders/index.test.tsx --run -t \"search box\" 2>&1; Pop-Location)",
+      "PowerShell($env:Path = \"C:\\\\ProgramData\\\\nvm\\\\v22.16.0;\" + $env:Path; Push-Location \"d:\\\\vsCodeRepo\\\\b2b-buyer-portal-branch\\\\b2b-buyer-portal\\\\apps\\\\storefront\"; yarn test src/pages/MyOrders/index.test.tsx --run 2>&1; Pop-Location)",
+      "PowerShell($env:Path = \"C:\\\\ProgramData\\\\nvm\\\\v22.16.0;\" + $env:Path; Push-Location \"d:\\\\vsCodeRepo\\\\b2b-buyer-portal-branch\\\\b2b-buyer-portal\\\\apps\\\\storefront\"; yarn test src/pages/MyOrders/index.test.tsx --run 2>&1 | Select-String -Pattern \"\\(FAIL|PASS|✓|✗|×|Error|failed|passed\\)\" | Select-Object -First 60; Pop-Location)",
+      "Bash(git diff *)",
+      "Bash(node -e \"const m=require\\('sqids'\\); const S=m.default??m.Sqids; console.log\\('default export:', typeof S\\); console.log\\('defaultOptions:', typeof m.defaultOptions, m.defaultOptions && \\('blocklist' in m.defaultOptions\\), m.defaultOptions && m.defaultOptions.blocklist && m.defaultOptions.blocklist.size\\); const s=new S\\({alphabet:'JH4D0BET3UA1W5VO8XZYIRLCGK7FQS96N2MP',minLength:8,blocklist:new Set\\([...m.defaultOptions.blocklist,'Uline']\\)}\\); const id=s.encode\\([123]\\); console.log\\('encode\\(123\\)=',id,'decode=',s.decode\\(id\\), 'len=', id.length\\);\")",
+      "Bash(npx eslint *)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(grep -v \"Delete \\\\`\")",
+      "Bash(echo \"DEPCRUISE-EXIT=$?\")",
+      "Bash(echo \"KNIP-EXIT=$?\")",
+      "Bash(cat .nvmrc)",
+      "Bash(node -e \"const p=require\\('./apps/storefront/package.json'\\); console.log\\('engines:', JSON.stringify\\(p.engines\\)\\);\")",
+      "Bash(awk '/### Commit guideline/,/### Styling/' CONTRIBUTING.md)",
+      "Bash(git commit -q -m 'docs: sync order-id obfuscation plan with implemented search-helper approach *)",
+      "Bash(git branch *)",
+      "Bash(npx vitest *)",
+      "Bash(echo \"exit=$?\")",
+      "Read(//tmp/**)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "squad-coordinator"
+  ]
+}
