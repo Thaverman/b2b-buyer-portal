@@ -9,6 +9,7 @@ import {
   checkEveryPermissionsCode,
   validatePermissionWithComparisonType,
 } from '@/utils/b3CheckPermissions/check';
+import { platform } from '@/utils/basicConfig';
 
 import { legacyPermissions, newPermissions } from './routes/config';
 
@@ -223,6 +224,15 @@ export const routeList: (BuyerPortalRoute | RouteItem)[] = [
     idLang: 'global.navMenu.manageSubscriptions',
   },
   {
+    path: '/payment-methods',
+    name: 'Payment methods',
+    wsKey: 'paymentMethods',
+    isMenuItem: true,
+    permissions: accountSettingPermissions,
+    isTokenLogin: true,
+    idLang: 'global.navMenu.paymentMethods',
+  },
+  {
     path: '/company-hierarchy',
     name: 'Company hierarchy',
     subsidiariesCompanyKey: 'companyHierarchy',
@@ -265,6 +275,15 @@ export const getAllowedRoutesWithoutComponent = (globalState: GlobalState): Buye
 
   return routeList.filter((item: Partial<RouteItem>) => {
     const { permissions = [], permissionCodes, path } = item;
+
+    // /payment-methods is Stencil-only, host-configured, and hidden while agenting —
+    // the Current Customer JWT identifies the logged-in rep, not the masqueraded buyer.
+    if (
+      path === '/payment-methods' &&
+      (platform !== 'bigcommerce' || !window.BC_CONTEXT?.paymentMethods || isAgenting)
+    ) {
+      return false;
+    }
 
     if (role === CustomerRole.SUPER_ADMIN && !isAgenting) {
       return permissions.includes(4);
