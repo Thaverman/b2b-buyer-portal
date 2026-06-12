@@ -754,5 +754,10 @@
   "paymentMethods.unavailable": "Payment methods are not available.",
   "paymentMethods.sessionExpired": "Your session has expired — please sign in again.",
   "paymentMethods.loadError": "We couldn't load your saved cards.",
-  "paymentMethods.retry": "Try again"
+  "paymentMethods.retry": "Try again",
+  "paymentMethods.setAsDefault": "Set as default",
+  "paymentMethods.defaultUpdated": "Default card updated",
+  "paymentMethods.errors.notFound": "That card no longer exists.",
+  "paymentMethods.errors.rateLimited": "Too many requests — please try again in a minute.",
+  "paymentMethods.errors.generic": "Something went wrong. Please try again."
 }

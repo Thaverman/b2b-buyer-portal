@@ -1,16 +1,25 @@
 import {
   buildB2BFeaturesStateWith,
   builder,
+  delay,
   faker,
   http,
   HttpResponse,
   renderWithProviders,
   screen,
   startMockServer,
+  waitFor,
+  within,
 } from 'tests/test-utils';
+
+import { snackbar } from '@/utils/b3Tip';
 
 import { StoredInstrument } from './api';
 import PaymentMethods from '.';
+
+vi.mock('@/utils/b3Tip', () => ({
+  snackbar: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
+}));
 
 vi.mock('@/utils/b3Logger');
 
@@ -132,4 +141,111 @@ it('shows the unavailable state while a sales rep is masquerading', () => {
   });
 
   expect(screen.getByText('Payment methods are not available.')).toBeInTheDocument();
+});
+
+it('sets a card as default and re-renders from the refreshed list', async () => {
+  const visa = buildStoredInstrumentWith({ brand: 'VISA', last4: '4242', isDefault: true });
+  const amex = buildStoredInstrumentWith({ brand: 'AMEX', last4: '0005', isDefault: false });
+
+  mockJwt();
+  mockList([visa, amex]);
+
+  const requestBody = vi.fn();
+
+  server.use(
+    http.post(`${apiBase}/customers/Customer/SetDefaultStoredInstrument`, async ({ request }) => {
+      requestBody(await request.json());
+
+      return HttpResponse.json({
+        customerId: 999,
+        instruments: [
+          { ...visa, isDefault: false },
+          { ...amex, isDefault: true },
+        ],
+      });
+    }),
+  );
+
+  const { user } = renderWithProviders(<PaymentMethods />);
+
+  // only the non-default AMEX row offers the action
+  await user.click(await screen.findByRole('button', { name: 'Set as default' }));
+
+  await waitFor(() => {
+    expect(snackbar.success).toHaveBeenCalledWith('Default card updated');
+  });
+  expect(requestBody).toHaveBeenCalledWith({ jwt: 'fresh-jwt', token: amex.token });
+
+  // the refreshed list moved the default: the chip is now in the AMEX card and
+  // the set-as-default action moved to the VISA card
+  const amexCard = screen.getByText('AMEX •••• 0005').closest('.MuiCard-root') as HTMLElement;
+  const visaCard = screen.getByText('VISA •••• 4242').closest('.MuiCard-root') as HTMLElement;
+  expect(within(amexCard).getByText('Default')).toBeInTheDocument();
+  expect(
+    within(amexCard).queryByRole('button', { name: 'Set as default' }),
+  ).not.toBeInTheDocument();
+  expect(within(visaCard).getByRole('button', { name: 'Set as default' })).toBeInTheDocument();
+});
+
+it('does not offer set-as-default on the default card', async () => {
+  mockJwt();
+  mockList([buildStoredInstrumentWith({ isDefault: true })]);
+
+  renderWithProviders(<PaymentMethods />);
+
+  expect(await screen.findByText('Default')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Set as default' })).not.toBeInTheDocument();
+});
+
+it('disables row actions while a mutation is pending', async () => {
+  mockJwt();
+  mockList([
+    buildStoredInstrumentWith({ isDefault: false }),
+    buildStoredInstrumentWith({ isDefault: false }),
+  ]);
+  server.use(
+    http.post(`${apiBase}/customers/Customer/SetDefaultStoredInstrument`, async () => {
+      await delay('infinite');
+
+      return HttpResponse.json({ customerId: 999, instruments: [] });
+    }),
+  );
+
+  const { user } = renderWithProviders(<PaymentMethods />);
+
+  const buttons = await screen.findAllByRole('button', { name: 'Set as default' });
+
+  await user.click(buttons[0]);
+
+  await waitFor(() => {
+    expect(screen.getAllByRole('button', { name: 'Set as default' })[1]).toBeDisabled();
+  });
+});
+
+it('refetches the list when set-as-default reports the card no longer exists', async () => {
+  const card = buildStoredInstrumentWith({ isDefault: false });
+  const listRequests = vi.fn();
+
+  mockJwt();
+  server.use(
+    http.post(`${apiBase}/customers/Customer/StoredInstruments`, () => {
+      listRequests();
+
+      return HttpResponse.json({ customerId: 999, instruments: [card] });
+    }),
+    http.post(`${apiBase}/customers/Customer/SetDefaultStoredInstrument`, () =>
+      HttpResponse.json({ error: 'instrument_not_found' }, { status: 404 }),
+    ),
+  );
+
+  const { user } = renderWithProviders(<PaymentMethods />);
+
+  await user.click(await screen.findByRole('button', { name: 'Set as default' }));
+
+  await waitFor(() => {
+    expect(snackbar.error).toHaveBeenCalledWith('That card no longer exists.');
+  });
+  await waitFor(() => {
+    expect(listRequests).toHaveBeenCalledTimes(2);
+  });
 });

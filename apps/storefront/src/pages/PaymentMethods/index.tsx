@@ -1,15 +1,22 @@
 import { Alert, Box, Button, Typography } from '@mui/material';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import B3Spin from '@/components/spin/B3Spin';
 import { useB3Lang } from '@/lib/lang';
 import { useAppSelector } from '@/store';
+import { snackbar } from '@/utils/b3Tip';
 
 import PaymentMethodRow from './components/PaymentMethodRow';
-import { isPaymentMethodsAvailable, listStoredInstruments, PaymentMethodsError } from './api';
+import {
+  isPaymentMethodsAvailable,
+  listStoredInstruments,
+  PaymentMethodsError,
+  setDefaultStoredInstrument,
+} from './api';
 
 function PaymentMethods() {
   const b3Lang = useB3Lang();
+  const queryClient = useQueryClient();
   const customerId = useAppSelector(({ company }) => company.customer.id);
   const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
   // The JWT identifies the logged-in customer, so a masquerading rep must not manage cards here.
@@ -19,6 +26,34 @@ function PaymentMethods() {
     queryKey: ['storedInstruments', customerId],
     queryFn: listStoredInstruments,
     enabled: isAvailable,
+  });
+
+  const handleMutationError = (err: unknown) => {
+    if (err instanceof PaymentMethodsError) {
+      if (err.kind === 'notFound') {
+        snackbar.error(b3Lang('paymentMethods.errors.notFound'));
+        queryClient.invalidateQueries({ queryKey: ['storedInstruments', customerId] });
+        return;
+      }
+      if (err.kind === 'rateLimited') {
+        snackbar.error(b3Lang('paymentMethods.errors.rateLimited'));
+        return;
+      }
+      if (err.kind === 'sessionExpired') {
+        snackbar.error(b3Lang('paymentMethods.sessionExpired'));
+        return;
+      }
+    }
+    snackbar.error(b3Lang('paymentMethods.errors.generic'));
+  };
+
+  const setDefaultMutation = useMutation({
+    mutationFn: setDefaultStoredInstrument,
+    onSuccess: (refreshed) => {
+      queryClient.setQueryData(['storedInstruments', customerId], refreshed);
+      snackbar.success(b3Lang('paymentMethods.defaultUpdated'));
+    },
+    onError: handleMutationError,
   });
 
   if (!isAvailable) {
@@ -31,6 +66,7 @@ function PaymentMethods() {
   }
 
   const isSessionExpired = error instanceof PaymentMethodsError && error.kind === 'sessionExpired';
+  const isMutating = setDefaultMutation.isPending;
 
   return (
     <B3Spin isSpinning={isFetching}>
@@ -58,7 +94,12 @@ function PaymentMethods() {
         )}
         {data &&
           data.instruments.map((instrument) => (
-            <PaymentMethodRow key={instrument.token} instrument={instrument} />
+            <PaymentMethodRow
+              key={instrument.token}
+              instrument={instrument}
+              disableActions={isMutating}
+              onSetDefault={() => setDefaultMutation.mutate(instrument.token)}
+            />
           ))}
       </Box>
     </B3Spin>

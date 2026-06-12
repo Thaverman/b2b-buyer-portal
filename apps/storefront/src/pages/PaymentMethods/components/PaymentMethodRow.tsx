@@ -1,4 +1,4 @@
-import { Box, Card, CardContent, Chip, Typography } from '@mui/material';
+import { Box, Button, Card, CardContent, Chip, Typography } from '@mui/material';
 
 import { useB3Lang } from '@/lib/lang';
 
@@ -6,13 +6,15 @@ import { StoredInstrument } from '../api';
 
 interface PaymentMethodRowProps {
   instrument: StoredInstrument;
+  disableActions: boolean;
+  onSetDefault: () => void;
 }
 
 // A card is valid through the last day of its expiry month.
 const isExpired = ({ expiryYear, expiryMonth }: StoredInstrument) =>
   new Date(expiryYear, expiryMonth, 1) <= new Date();
 
-function PaymentMethodRow({ instrument }: PaymentMethodRowProps) {
+function PaymentMethodRow({ instrument, disableActions, onSetDefault }: PaymentMethodRowProps) {
   const b3Lang = useB3Lang();
 
   return (
@@ -37,6 +39,11 @@ function PaymentMethodRow({ instrument }: PaymentMethodRowProps) {
         )}
         {isExpired(instrument) && (
           <Chip label={b3Lang('paymentMethods.expired')} color="warning" size="small" />
+        )}
+        {!instrument.isDefault && (
+          <Button size="small" disabled={disableActions} onClick={onSetDefault}>
+            {b3Lang('paymentMethods.setAsDefault')}
+          </Button>
         )}
       </CardContent>
     </Card>
