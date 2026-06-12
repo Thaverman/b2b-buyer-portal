@@ -8,6 +8,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 [CONTRIBUTING.md](CONTRIBUTING.md) has commit-message format, ESLint rule disables to avoid adding to, and folder-structure expectations.
 
+## How to work
+
+These four principles govern every task; AGENTS.md governs the code.
+
+### Think before coding
+
+**Don't assume, don't hide confusion, surface tradeoffs.** State assumptions explicitly — if uncertain, ask. If multiple interpretations exist, present them; don't pick silently. If a simpler approach exists, say so and push back when warranted. If something is unclear, stop and name what's confusing before continuing.
+
+### Simplicity first
+
+**Minimum code that solves the problem, nothing speculative.** No features beyond what was asked, no abstractions for single-use code, no unrequested "flexibility" or configurability, no error handling for impossible cases. If 200 lines could be 50, rewrite. Ask: "would a senior engineer call this overcomplicated?" — if yes, simplify.
+
+### Surgical changes
+
+**Touch only what you must, and clean up only your own mess.** Don't "improve" adjacent code, comments, or formatting; don't refactor what isn't broken; match existing style even if you'd do it differently. Remove imports/vars/functions that *your* changes orphaned, but leave pre-existing dead code — mention it, don't delete it. Every changed line should trace directly to the request.
+
+### Goal-driven execution
+
+**Define success criteria, then loop until verified.** Turn tasks into verifiable goals: "add validation" → write tests for invalid inputs, then make them pass; "fix the bug" → write a failing repro test, then make it pass; "refactor X" → ensure tests pass before and after. For multi-step work, state a brief plan with a verify check per step. Strong criteria let you loop independently; weak ones ("make it work") force constant clarification.
+
 ## Working directory
 
 **All commands run from [apps/storefront/](apps/storefront/), not the repo root.** The repo is a Turborepo monorepo but currently hosts a single package; running `yarn test` or `yarn dev` from root goes through `turbo` delegation, but for anything beyond that (single-file test, `tsc --noEmit`, `yarn generate`), `cd apps/storefront` first.
