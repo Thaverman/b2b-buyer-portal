@@ -60,6 +60,11 @@ declare global {
     /** BigCommerce storefront context set by the host project; `storeSuffix` gates order-id obfuscation. */
     BC_CONTEXT?: {
       storeSuffix?: string;
+      /** Gates the /payment-methods page; absent = feature off. */
+      paymentMethods?: {
+        apiBase: string;
+        appClientId: string;
+      };
     };
     B3: {
       setting: {
