@@ -40,3 +40,4 @@ slack-message.json
 supergraph.graphql
 apps/storefront/node_modules_old*
 node_modules_old/turbo-windows-64/bin/turbo.exe
+.claude/worktrees/
