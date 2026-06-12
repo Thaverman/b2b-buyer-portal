@@ -33,9 +33,10 @@
 | `src/pages/PaymentMethods/api.test.ts` | Create | MSW tests for the API module |
 | `src/pages/PaymentMethods/components/PaymentMethodRow.tsx` | Create | One card row: label, expiry, chips, actions |
 | `src/pages/PaymentMethods/index.tsx` | Create | Page: query, states, mutations, delete dialog |
-| `src/pages/PaymentMethods/index.test.tsx` | Create | Page tests (list, states, mutations, dialog) |
+| `src/pages/PaymentMethods/index.test.tsx` | Create | Page tests (list, states, mutations, dialog, agenting) |
+| `src/pages/PaymentMethods/index.platform.test.tsx` | Create | Platform-gate test (file-level `vi.mock` of basicConfig) |
 | `src/lib/lang/locales/en.json` | Modify | `paymentMethods.*` + `global.navMenu.paymentMethods` keys |
-| `src/shared/routeList.ts` | Modify | Route entry + `BC_CONTEXT` gate in `getAllowedRoutesWithoutComponent` |
+| `src/shared/routeList.ts` | Modify | Route entry + three-way gate (platform / `BC_CONTEXT` / agenting) in `getAllowedRoutesWithoutComponent` |
 | `src/shared/routes/index.tsx` | Modify | Lazy import + `routesMap` entry |
 
 ---
@@ -85,6 +86,8 @@ import {
   PaymentMethodsError,
   setDefaultStoredInstrument,
 } from './api';
+
+vi.mock('@/utils/b3Logger');
 
 const { server } = startMockServer();
 
@@ -230,6 +233,8 @@ Create `src/pages/PaymentMethods/api.ts`:
 
 ```ts
 import { getCurrentCustomerJWT } from '@/shared/service/bc';
+import b2bLogger from '@/utils/b3Logger';
+import { platform } from '@/utils/basicConfig';
 
 export interface StoredInstrument {
   token: string;
@@ -257,7 +262,12 @@ export class PaymentMethodsError extends Error {
   }
 }
 
-export const getPaymentMethodsConfig = () => window.BC_CONTEXT?.paymentMethods;
+const getPaymentMethodsConfig = () => window.BC_CONTEXT?.paymentMethods;
+
+// Stencil-only: getCurrentCustomerJWT early-returns undefined on every other platform,
+// which would misrender as "session expired"; gate the feature out instead.
+export const isPaymentMethodsAvailable = () =>
+  platform === 'bigcommerce' && Boolean(getPaymentMethodsConfig());
 
 const post = async (
   action: string,
@@ -271,6 +281,11 @@ const post = async (
   // The Current Customer JWT lives ~15s; fetch a fresh one for every call.
   const jwt = await getCurrentCustomerJWT(config.appClientId).catch(() => undefined);
   if (!jwt) {
+    // Also fires when the SSW app is not installed / appClientId is wrong — without this
+    // line a pure config error is indistinguishable from a real expired session.
+    b2bLogger.error(
+      'Payment methods: /customer/current.jwt returned no token — expired storefront session, or BC_CONTEXT.paymentMethods.appClientId does not belong to an app installed on this store',
+    );
     throw new PaymentMethodsError('sessionExpired');
   }
 
@@ -289,6 +304,9 @@ const post = async (
     return response.json();
   }
   if (response.status === 401) {
+    b2bLogger.error(
+      'Payment methods: API rejected the JWT (401) — expired session, or BC_CONTEXT.paymentMethods.appClientId does not match the backend StoreSecrets ClientId',
+    );
     throw new PaymentMethodsError('sessionExpired');
   }
   if (response.status === 404) {
@@ -330,6 +348,7 @@ git commit -m "feat: add payment methods API module with Current Customer JWT au
 - Create: `src/pages/PaymentMethods/components/PaymentMethodRow.tsx`
 - Create: `src/pages/PaymentMethods/index.tsx`
 - Create: `src/pages/PaymentMethods/index.test.tsx`
+- Create: `src/pages/PaymentMethods/index.platform.test.tsx`
 - Modify: `src/lib/lang/locales/en.json`
 
 - [ ] **Step 1: Add the page locale keys**
@@ -343,7 +362,7 @@ In `src/lib/lang/locales/en.json`, add these entries (keep the file's existing a
 "paymentMethods.default": "Default",
 "paymentMethods.expired": "Expired",
 "paymentMethods.empty": "You have no saved cards. Cards can be saved during checkout.",
-"paymentMethods.unavailable": "Payment methods are not available on this store.",
+"paymentMethods.unavailable": "Payment methods are not available.",
 "paymentMethods.sessionExpired": "Your session has expired — please sign in again.",
 "paymentMethods.loadError": "We couldn't load your saved cards.",
 "paymentMethods.retry": "Try again",
@@ -355,6 +374,7 @@ Create `src/pages/PaymentMethods/index.test.tsx`:
 
 ```tsx
 import {
+  buildB2BFeaturesStateWith,
   builder,
   faker,
   http,
@@ -367,6 +387,8 @@ import {
 import { StoredInstrument } from './api';
 
 import PaymentMethods from '.';
+
+vi.mock('@/utils/b3Logger');
 
 const { server } = startMockServer();
 
@@ -477,7 +499,47 @@ it('shows the unavailable state when BC_CONTEXT is not configured', () => {
 
   renderWithProviders(<PaymentMethods />);
 
-  expect(screen.getByText('Payment methods are not available on this store.')).toBeInTheDocument();
+  expect(screen.getByText('Payment methods are not available.')).toBeInTheDocument();
+});
+
+it('shows the unavailable state while a sales rep is masquerading', () => {
+  renderWithProviders(<PaymentMethods />, {
+    preloadedState: {
+      b2bFeatures: buildB2BFeaturesStateWith({ masqueradeCompany: { isAgenting: true } }),
+    },
+  });
+
+  expect(screen.getByText('Payment methods are not available.')).toBeInTheDocument();
+});
+```
+
+Also create `src/pages/PaymentMethods/index.platform.test.tsx` (separate file because
+the platform mock is file-level; pattern from `AccountSetting/index.test.tsx`):
+
+```tsx
+import { renderWithProviders, screen } from 'tests/test-utils';
+
+import PaymentMethods from '.';
+
+vi.mock('@/utils/basicConfig', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/utils/basicConfig')>()),
+  platform: 'catalyst',
+}));
+
+beforeEach(() => {
+  window.BC_CONTEXT = {
+    paymentMethods: { apiBase: 'https://api.example.com', appClientId: 'ssw-app-client-id' },
+  };
+});
+
+afterEach(() => {
+  delete window.BC_CONTEXT;
+});
+
+it('shows the unavailable state on non-bigcommerce platforms even when configured', () => {
+  renderWithProviders(<PaymentMethods />);
+
+  expect(screen.getByText('Payment methods are not available.')).toBeInTheDocument();
 });
 ```
 
@@ -550,21 +612,25 @@ import { Alert, Box, Button, Typography } from '@mui/material';
 
 import B3Spin from '@/components/spin/B3Spin';
 import { useB3Lang } from '@/lib/lang';
+import { useAppSelector } from '@/store';
 
-import { getPaymentMethodsConfig, listStoredInstruments, PaymentMethodsError } from './api';
+import { isPaymentMethodsAvailable, listStoredInstruments, PaymentMethodsError } from './api';
 import PaymentMethodRow from './components/PaymentMethodRow';
 
 function PaymentMethods() {
   const b3Lang = useB3Lang();
-  const isConfigured = Boolean(getPaymentMethodsConfig());
+  const customerId = useAppSelector(({ company }) => company.customer.id);
+  const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
+  // The JWT identifies the logged-in customer, so a masquerading rep must not manage cards here.
+  const isAvailable = isPaymentMethodsAvailable() && !isAgenting;
 
   const { data, isFetching, isError, error, refetch } = useQuery({
-    queryKey: ['storedInstruments'],
+    queryKey: ['storedInstruments', customerId],
     queryFn: listStoredInstruments,
-    enabled: isConfigured,
+    enabled: isAvailable,
   });
 
-  if (!isConfigured) {
+  if (!isAvailable) {
     return (
       <Box>
         <Typography variant="h4">{b3Lang('paymentMethods.title')}</Typography>
@@ -613,9 +679,9 @@ export default PaymentMethods;
 
 - [ ] **Step 6: Run the tests — expect pass**
 
-Run: `yarn vitest run src/pages/PaymentMethods/index.test.tsx`
+Run: `yarn vitest run src/pages/PaymentMethods`
 
-Expected: PASS, 6 tests.
+Expected: PASS — 7 tests in `index.test.tsx`, 1 in `index.platform.test.tsx` (plus the 11 API tests from Task 1).
 
 - [ ] **Step 7: Commit**
 
@@ -771,7 +837,7 @@ it('refetches the list when set-as-default reports the card no longer exists', a
 
 Run: `yarn vitest run src/pages/PaymentMethods/index.test.tsx`
 
-Expected: the four new tests FAIL (no 'Set as default' button exists yet); the six existing tests still pass.
+Expected: the four new tests FAIL (no 'Set as default' button exists yet); the seven existing tests still pass.
 
 - [ ] **Step 4: Add the action to the row component**
 
@@ -843,10 +909,11 @@ import { Alert, Box, Button, Typography } from '@mui/material';
 
 import B3Spin from '@/components/spin/B3Spin';
 import { useB3Lang } from '@/lib/lang';
+import { useAppSelector } from '@/store';
 import { snackbar } from '@/utils/b3Tip';
 
 import {
-  getPaymentMethodsConfig,
+  isPaymentMethodsAvailable,
   listStoredInstruments,
   PaymentMethodsError,
   setDefaultStoredInstrument,
@@ -856,19 +923,22 @@ import PaymentMethodRow from './components/PaymentMethodRow';
 function PaymentMethods() {
   const b3Lang = useB3Lang();
   const queryClient = useQueryClient();
-  const isConfigured = Boolean(getPaymentMethodsConfig());
+  const customerId = useAppSelector(({ company }) => company.customer.id);
+  const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
+  // The JWT identifies the logged-in customer, so a masquerading rep must not manage cards here.
+  const isAvailable = isPaymentMethodsAvailable() && !isAgenting;
 
   const { data, isFetching, isError, error, refetch } = useQuery({
-    queryKey: ['storedInstruments'],
+    queryKey: ['storedInstruments', customerId],
     queryFn: listStoredInstruments,
-    enabled: isConfigured,
+    enabled: isAvailable,
   });
 
   const handleMutationError = (err: unknown) => {
     if (err instanceof PaymentMethodsError) {
       if (err.kind === 'notFound') {
         snackbar.error(b3Lang('paymentMethods.errors.notFound'));
-        queryClient.invalidateQueries({ queryKey: ['storedInstruments'] });
+        queryClient.invalidateQueries({ queryKey: ['storedInstruments', customerId] });
         return;
       }
       if (err.kind === 'rateLimited') {
@@ -886,13 +956,13 @@ function PaymentMethods() {
   const setDefaultMutation = useMutation({
     mutationFn: setDefaultStoredInstrument,
     onSuccess: (refreshed) => {
-      queryClient.setQueryData(['storedInstruments'], refreshed);
+      queryClient.setQueryData(['storedInstruments', customerId], refreshed);
       snackbar.success(b3Lang('paymentMethods.defaultUpdated'));
     },
     onError: handleMutationError,
   });
 
-  if (!isConfigured) {
+  if (!isAvailable) {
     return (
       <Box>
         <Typography variant="h4">{b3Lang('paymentMethods.title')}</Typography>
@@ -949,7 +1019,7 @@ export default PaymentMethods;
 
 Run: `yarn vitest run src/pages/PaymentMethods/index.test.tsx`
 
-Expected: PASS, 10 tests.
+Expected: PASS, 11 tests.
 
 - [ ] **Step 7: Commit**
 
@@ -975,7 +1045,7 @@ In `src/lib/lang/locales/en.json`, add next to the existing `paymentMethods.*` k
 ```json
 "paymentMethods.delete": "Delete",
 "paymentMethods.deleteDialog.title": "Delete card?",
-"paymentMethods.deleteDialog.content": "{card} will be permanently removed from your saved cards and from your payment provider. This cannot be undone.",
+"paymentMethods.deleteDialog.content": "{card} will be permanently removed from your saved cards and from your payment provider, and will no longer be available at checkout. This cannot be undone.",
 "paymentMethods.deleteDialog.cancel": "Cancel",
 "paymentMethods.deleteDialog.confirm": "Delete",
 "paymentMethods.deleted": "Card deleted",
@@ -1012,7 +1082,7 @@ it('deletes a card after confirmation and re-renders from the refreshed list', a
 
   expect(
     await screen.findByText(
-      'AMEX •••• 0005 will be permanently removed from your saved cards and from your payment provider. This cannot be undone.',
+      'AMEX •••• 0005 will be permanently removed from your saved cards and from your payment provider, and will no longer be available at checkout. This cannot be undone.',
     ),
   ).toBeInTheDocument();
 
@@ -1054,7 +1124,7 @@ it('does not delete when the confirmation dialog is cancelled', async () => {
 
 Run: `yarn vitest run src/pages/PaymentMethods/index.test.tsx`
 
-Expected: the two new tests FAIL (no 'Delete' button exists yet); the ten existing tests still pass.
+Expected: the two new tests FAIL (no 'Delete' button exists yet); the eleven existing tests still pass.
 
 - [ ] **Step 4: Add the delete button to the row component**
 
@@ -1137,11 +1207,12 @@ import { Alert, Box, Button, Typography } from '@mui/material';
 import B3Dialog from '@/components/B3Dialog';
 import B3Spin from '@/components/spin/B3Spin';
 import { useB3Lang } from '@/lib/lang';
+import { useAppSelector } from '@/store';
 import { snackbar } from '@/utils/b3Tip';
 
 import {
   deleteStoredInstrument,
-  getPaymentMethodsConfig,
+  isPaymentMethodsAvailable,
   listStoredInstruments,
   PaymentMethodsError,
   setDefaultStoredInstrument,
@@ -1153,19 +1224,22 @@ function PaymentMethods() {
   const b3Lang = useB3Lang();
   const queryClient = useQueryClient();
   const [pendingDelete, setPendingDelete] = useState<StoredInstrument | null>(null);
-  const isConfigured = Boolean(getPaymentMethodsConfig());
+  const customerId = useAppSelector(({ company }) => company.customer.id);
+  const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
+  // The JWT identifies the logged-in customer, so a masquerading rep must not manage cards here.
+  const isAvailable = isPaymentMethodsAvailable() && !isAgenting;
 
   const { data, isFetching, isError, error, refetch } = useQuery({
-    queryKey: ['storedInstruments'],
+    queryKey: ['storedInstruments', customerId],
     queryFn: listStoredInstruments,
-    enabled: isConfigured,
+    enabled: isAvailable,
   });
 
   const handleMutationError = (err: unknown) => {
     if (err instanceof PaymentMethodsError) {
       if (err.kind === 'notFound') {
         snackbar.error(b3Lang('paymentMethods.errors.notFound'));
-        queryClient.invalidateQueries({ queryKey: ['storedInstruments'] });
+        queryClient.invalidateQueries({ queryKey: ['storedInstruments', customerId] });
         return;
       }
       if (err.kind === 'rateLimited') {
@@ -1183,7 +1257,7 @@ function PaymentMethods() {
   const setDefaultMutation = useMutation({
     mutationFn: setDefaultStoredInstrument,
     onSuccess: (refreshed) => {
-      queryClient.setQueryData(['storedInstruments'], refreshed);
+      queryClient.setQueryData(['storedInstruments', customerId], refreshed);
       snackbar.success(b3Lang('paymentMethods.defaultUpdated'));
     },
     onError: handleMutationError,
@@ -1192,7 +1266,7 @@ function PaymentMethods() {
   const deleteMutation = useMutation({
     mutationFn: deleteStoredInstrument,
     onSuccess: (refreshed) => {
-      queryClient.setQueryData(['storedInstruments'], refreshed);
+      queryClient.setQueryData(['storedInstruments', customerId], refreshed);
       setPendingDelete(null);
       snackbar.success(b3Lang('paymentMethods.deleted'));
     },
@@ -1202,7 +1276,7 @@ function PaymentMethods() {
     },
   });
 
-  if (!isConfigured) {
+  if (!isAvailable) {
     return (
       <Box>
         <Typography variant="h4">{b3Lang('paymentMethods.title')}</Typography>
@@ -1283,7 +1357,7 @@ export default PaymentMethods;
 
 Run: `yarn vitest run src/pages/PaymentMethods/index.test.tsx`
 
-Expected: PASS, 12 tests. If the dialog-button selection in the first new test is ambiguous (B3Dialog may render its confirm button differently), inspect with `screen.logTestingPlaygroundURL()` and select the confirm button within the dialog via `within(screen.getByRole('dialog'))` instead — `within` is exported from `tests/test-utils`.
+Expected: PASS, 13 tests. If the dialog-button selection in the first new test is ambiguous (B3Dialog may render its confirm button differently), inspect with `screen.logTestingPlaygroundURL()` and select the confirm button within the dialog via `within(screen.getByRole('dialog'))` instead — `within` is exported from `tests/test-utils`.
 
 - [ ] **Step 7: Commit**
 
@@ -1325,19 +1399,31 @@ In `src/shared/routeList.ts`, immediately after the `/manage-subscriptions` entr
   },
 ```
 
-- [ ] **Step 3: Gate the route on BC_CONTEXT**
+- [ ] **Step 3: Gate the route on platform + BC_CONTEXT + agenting**
 
-In `src/shared/routeList.ts`, inside `getAllowedRoutesWithoutComponent`, directly after the line
+In `src/shared/routeList.ts`:
+
+(a) Add to the imports (alongside the existing `@/utils/...` import):
+
+```ts
+import { platform } from '@/utils/basicConfig';
+```
+
+(b) Inside `getAllowedRoutesWithoutComponent`, directly after the line
 
 ```ts
     const { permissions = [], permissionCodes, path } = item;
 ```
 
-add:
+add (`isAgenting` is already destructured at the top of this function):
 
 ```ts
-    // /payment-methods only exists on stores whose host page provides the config.
-    if (path === '/payment-methods' && !window.BC_CONTEXT?.paymentMethods) {
+    // /payment-methods is Stencil-only, host-configured, and hidden while agenting —
+    // the Current Customer JWT identifies the logged-in rep, not the masqueraded buyer.
+    if (
+      path === '/payment-methods' &&
+      (platform !== 'bigcommerce' || !window.BC_CONTEXT?.paymentMethods || isAgenting)
+    ) {
       return false;
     }
 ```
@@ -1368,7 +1454,7 @@ Expected: no errors.
 
 Run: `yarn vitest run src/pages/PaymentMethods`
 
-Expected: PASS — 11 tests in `api.test.ts` + 12 tests in `index.test.tsx` (23 total).
+Expected: PASS — 11 tests in `api.test.ts` + 13 in `index.test.tsx` + 1 in `index.platform.test.tsx` (25 total).
 
 Run: `yarn vitest run`
 
@@ -1378,7 +1464,7 @@ Expected: full suite passes (pre-existing failures, if any, must match a clean c
 
 Run: `yarn lint`
 
-Expected: dependency-cruiser, ESLint (`--max-warnings 0`), and knip all pass. If knip flags an unused export in `src/pages/PaymentMethods/api.ts`, remove the `export` keyword from anything not imported elsewhere (only `StoredInstrument`, `PaymentMethodsError`, `getPaymentMethodsConfig`, and the three endpoint functions should be exported).
+Expected: dependency-cruiser, ESLint (`--max-warnings 0`), and knip all pass. If knip flags an unused export in `src/pages/PaymentMethods/api.ts`, remove the `export` keyword from anything not imported elsewhere (only `StoredInstrument`, `PaymentMethodsError`, `isPaymentMethodsAvailable`, and the three endpoint functions should be exported).
 
 - [ ] **Step 8: Commit**
 
