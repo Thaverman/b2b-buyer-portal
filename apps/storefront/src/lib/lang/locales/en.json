@@ -744,5 +744,15 @@
   "companyHierarchy.dialog.title": "Switch company",
   "companyHierarchy.dialog.content": "Switching to a different company will refresh your shopping cart. Do you want to continue?",
   "companyHierarchy.chip.currentCompany": "Your company",
-  "companyHierarchy.chip.selectCompany": "Representing"
+  "companyHierarchy.chip.selectCompany": "Representing",
+  "paymentMethods.title": "Payment methods",
+  "paymentMethods.cardLabel": "{brand} •••• {last4}",
+  "paymentMethods.expires": "Expires {month}/{year}",
+  "paymentMethods.default": "Default",
+  "paymentMethods.expired": "Expired",
+  "paymentMethods.empty": "You have no saved cards. Cards can be saved during checkout.",
+  "paymentMethods.unavailable": "Payment methods are not available.",
+  "paymentMethods.sessionExpired": "Your session has expired — please sign in again.",
+  "paymentMethods.loadError": "We couldn't load your saved cards.",
+  "paymentMethods.retry": "Try again"
 }
