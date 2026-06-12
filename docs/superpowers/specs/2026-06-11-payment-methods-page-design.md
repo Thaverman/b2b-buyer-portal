@@ -153,7 +153,7 @@ react-query wiring:
 
 | State | Rendering |
 |---|---|
-| Loading | skeleton |
+| Loading | spinner (`B3Spin`) |
 | List | rows with Default / Expired chips; Set-as-default hidden on the default card |
 | Empty | "You have no saved cards. Cards can be saved during checkout." |
 | Error (initial load) | error message + retry button |
