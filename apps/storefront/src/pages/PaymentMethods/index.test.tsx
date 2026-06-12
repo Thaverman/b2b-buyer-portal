@@ -249,3 +249,94 @@ it('refetches the list when set-as-default reports the card no longer exists', a
     expect(listRequests).toHaveBeenCalledTimes(2);
   });
 });
+
+it('deletes a card after confirmation and re-renders from the refreshed list', async () => {
+  const visa = buildStoredInstrumentWith({ brand: 'VISA', last4: '4242', isDefault: true });
+  const amex = buildStoredInstrumentWith({ brand: 'AMEX', last4: '0005', isDefault: false });
+
+  mockJwt();
+  mockList([visa, amex]);
+
+  const requestBody = vi.fn();
+
+  server.use(
+    http.post(`${apiBase}/customers/Customer/DeleteStoredInstrument`, async ({ request }) => {
+      requestBody(await request.json());
+
+      return HttpResponse.json({ customerId: 999, instruments: [visa] });
+    }),
+  );
+
+  const { user } = renderWithProviders(<PaymentMethods />);
+
+  await screen.findByText('AMEX •••• 0005');
+
+  // each row has a Delete button; the second belongs to the AMEX row
+  await user.click(screen.getAllByRole('button', { name: 'Delete' })[1]);
+
+  expect(
+    await screen.findByText(
+      'AMEX •••• 0005 will be permanently removed from your saved cards and from your payment provider, and will no longer be available at checkout. This cannot be undone.',
+    ),
+  ).toBeInTheDocument();
+
+  // the dialog's confirm button is the last "Delete" button in the document
+  const deleteButtons = screen.getAllByRole('button', { name: 'Delete' });
+  await user.click(deleteButtons[deleteButtons.length - 1]);
+
+  await waitFor(() => {
+    expect(snackbar.success).toHaveBeenCalledWith('Card deleted');
+  });
+  expect(requestBody).toHaveBeenCalledWith({ jwt: 'fresh-jwt', token: amex.token });
+  await waitFor(() => {
+    expect(screen.queryByText('AMEX •••• 0005')).not.toBeInTheDocument();
+  });
+});
+
+it('does not delete when the confirmation dialog is cancelled', async () => {
+  const deleteRequests = vi.fn();
+
+  mockJwt();
+  mockList([buildStoredInstrumentWith({ brand: 'VISA', last4: '4242' })]);
+  server.use(
+    http.post(`${apiBase}/customers/Customer/DeleteStoredInstrument`, () => {
+      deleteRequests();
+
+      return HttpResponse.json({ customerId: 999, instruments: [] });
+    }),
+  );
+
+  const { user } = renderWithProviders(<PaymentMethods />);
+
+  await user.click(await screen.findByRole('button', { name: 'Delete' }));
+  await user.click(await screen.findByRole('button', { name: 'Cancel' }));
+
+  expect(deleteRequests).not.toHaveBeenCalled();
+  expect(screen.getByText('VISA •••• 4242')).toBeInTheDocument();
+});
+
+it('closes the dialog and shows an error when the delete fails', async () => {
+  mockJwt();
+  mockList([buildStoredInstrumentWith({ brand: 'VISA', last4: '4242' })]);
+  server.use(
+    http.post(`${apiBase}/customers/Customer/DeleteStoredInstrument`, () =>
+      HttpResponse.json({ error: 'upstream_unavailable' }, { status: 502 }),
+    ),
+  );
+
+  const { user } = renderWithProviders(<PaymentMethods />);
+
+  await user.click(await screen.findByRole('button', { name: 'Delete' }));
+  await screen.findByText('Delete card?');
+
+  const deleteButtons = screen.getAllByRole('button', { name: 'Delete' });
+  await user.click(deleteButtons[deleteButtons.length - 1]);
+
+  await waitFor(() => {
+    expect(snackbar.error).toHaveBeenCalledWith('Something went wrong. Please try again.');
+  });
+  await waitFor(() => {
+    expect(screen.queryByText('Delete card?')).not.toBeInTheDocument();
+  });
+  expect(screen.getByText('VISA •••• 4242')).toBeInTheDocument();
+});

@@ -759,5 +759,11 @@
   "paymentMethods.defaultUpdated": "Default card updated",
   "paymentMethods.errors.notFound": "That card no longer exists.",
   "paymentMethods.errors.rateLimited": "Too many requests — please try again in a minute.",
-  "paymentMethods.errors.generic": "Something went wrong. Please try again."
+  "paymentMethods.errors.generic": "Something went wrong. Please try again.",
+  "paymentMethods.delete": "Delete",
+  "paymentMethods.deleteDialog.title": "Delete card?",
+  "paymentMethods.deleteDialog.content": "{card} will be permanently removed from your saved cards and from your payment provider, and will no longer be available at checkout. This cannot be undone.",
+  "paymentMethods.deleteDialog.cancel": "Cancel",
+  "paymentMethods.deleteDialog.confirm": "Delete",
+  "paymentMethods.deleted": "Card deleted"
 }

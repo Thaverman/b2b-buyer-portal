@@ -8,13 +8,19 @@ interface PaymentMethodRowProps {
   instrument: StoredInstrument;
   disableActions: boolean;
   onSetDefault: () => void;
+  onDelete: () => void;
 }
 
 // A card is valid through the last day of its expiry month.
 const isExpired = ({ expiryYear, expiryMonth }: StoredInstrument) =>
   new Date(expiryYear, expiryMonth, 1) <= new Date();
 
-function PaymentMethodRow({ instrument, disableActions, onSetDefault }: PaymentMethodRowProps) {
+function PaymentMethodRow({
+  instrument,
+  disableActions,
+  onSetDefault,
+  onDelete,
+}: PaymentMethodRowProps) {
   const b3Lang = useB3Lang();
 
   return (
@@ -45,6 +51,9 @@ function PaymentMethodRow({ instrument, disableActions, onSetDefault }: PaymentM
             {b3Lang('paymentMethods.setAsDefault')}
           </Button>
         )}
+        <Button size="small" color="error" disabled={disableActions} onClick={onDelete}>
+          {b3Lang('paymentMethods.delete')}
+        </Button>
       </CardContent>
     </Card>
   );
