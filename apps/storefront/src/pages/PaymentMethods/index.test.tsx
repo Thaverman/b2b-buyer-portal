@@ -56,6 +56,33 @@ afterEach(() => {
   delete window.BC_CONTEXT;
 });
 
+it('renders cards when the backend returns PascalCase keys (.NET serialization)', async () => {
+  mockJwt();
+  server.use(
+    http.post(`${apiBase}/customers/Customer/StoredInstruments`, () =>
+      HttpResponse.json({
+        CustomerId: 999,
+        Instruments: [
+          {
+            Token: 'tok-pascal',
+            Last4: '4242',
+            Brand: 'VISA',
+            ExpiryMonth: 3,
+            ExpiryYear: 2030,
+            Type: 'stored_card',
+            IsDefault: true,
+          },
+        ],
+      }),
+    ),
+  );
+
+  renderWithProviders(<PaymentMethods />);
+
+  expect(await screen.findByText('VISA •••• 4242')).toBeInTheDocument();
+  expect(screen.getByText('Default')).toBeInTheDocument();
+});
+
 it('renders a saved card with brand, last4, expiry and default chip', async () => {
   mockJwt();
   mockList([
