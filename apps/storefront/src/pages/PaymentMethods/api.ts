@@ -17,6 +17,46 @@ interface StoredInstrumentsResponse {
   instruments: StoredInstrument[];
 }
 
+// The CustomerServices backend (.NET/Newtonsoft) serializes PascalCase keys
+// (CustomerId/Instruments/Token/...), so accept either casing and normalize to
+// our camelCase DTO. Tolerant of both so it keeps working whichever the backend emits.
+interface RawInstrument {
+  token?: string;
+  Token?: string;
+  last4?: string;
+  Last4?: string;
+  brand?: string;
+  Brand?: string;
+  expiryMonth?: number;
+  ExpiryMonth?: number;
+  expiryYear?: number;
+  ExpiryYear?: number;
+  type?: string;
+  Type?: string;
+  isDefault?: boolean;
+  IsDefault?: boolean;
+}
+
+interface RawStoredInstrumentsResponse {
+  customerId?: number;
+  CustomerId?: number;
+  instruments?: RawInstrument[];
+  Instruments?: RawInstrument[];
+}
+
+const normalize = (raw: RawStoredInstrumentsResponse): StoredInstrumentsResponse => ({
+  customerId: raw.customerId ?? raw.CustomerId ?? 0,
+  instruments: (raw.instruments ?? raw.Instruments ?? []).map((i) => ({
+    token: i.token ?? i.Token ?? '',
+    last4: i.last4 ?? i.Last4 ?? '',
+    brand: i.brand ?? i.Brand ?? '',
+    expiryMonth: i.expiryMonth ?? i.ExpiryMonth ?? 0,
+    expiryYear: i.expiryYear ?? i.ExpiryYear ?? 0,
+    type: i.type ?? i.Type ?? '',
+    isDefault: i.isDefault ?? i.IsDefault ?? false,
+  })),
+});
+
 type PaymentMethodsErrorKind = 'sessionExpired' | 'notFound' | 'rateLimited' | 'upstream';
 
 export class PaymentMethodsError extends Error {
@@ -67,7 +107,7 @@ const post = async (
   }
 
   if (response.ok) {
-    return response.json();
+    return normalize(await response.json());
   }
   if (response.status === 401) {
     b2bLogger.error(

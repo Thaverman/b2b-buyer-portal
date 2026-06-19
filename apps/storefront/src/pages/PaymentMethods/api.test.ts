@@ -28,6 +28,45 @@ const mockJwt = (jwt = 'fresh-jwt') =>
 
 const emptyList = { customerId: 999, instruments: [] };
 
+it('normalizes a PascalCase backend response (.NET serialization) to camelCase', async () => {
+  mockJwt();
+  server.use(
+    http.post(`${apiBase}/customers/Customer/StoredInstruments`, () =>
+      HttpResponse.json({
+        CustomerId: 999,
+        Instruments: [
+          {
+            Token: 'tok-1',
+            Last4: '1111',
+            Brand: 'VISA',
+            ExpiryMonth: 3,
+            ExpiryYear: 2028,
+            Type: 'stored_card',
+            IsDefault: false,
+          },
+        ],
+      }),
+    ),
+  );
+
+  const result = await listStoredInstruments();
+
+  expect(result).toEqual({
+    customerId: 999,
+    instruments: [
+      {
+        token: 'tok-1',
+        last4: '1111',
+        brand: 'VISA',
+        expiryMonth: 3,
+        expiryYear: 2028,
+        type: 'stored_card',
+        isDefault: false,
+      },
+    ],
+  });
+});
+
 it('listStoredInstruments posts the fresh jwt and returns the instrument list', async () => {
   const requestBody = vi.fn();
 
