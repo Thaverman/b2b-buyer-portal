@@ -788,6 +788,17 @@
   "loyalty.earn.completed": "Completed",
   "loyalty.earn.follow": "Follow",
   "loyalty.earn.followSuccess": "You earned {points} points!",
+  "loyalty.redeem.pointCost": "{points} points",
+  "loyalty.redeem.getReward": "Get reward",
+  "loyalty.redeem.confirmTitle": "Redeem reward?",
+  "loyalty.redeem.confirmContent": "Redeem {reward} for {points} points?",
+  "loyalty.redeem.cancel": "Cancel",
+  "loyalty.redeem.confirm": "Redeem",
+  "loyalty.redeem.couponTitle": "Your reward",
+  "loyalty.redeem.copy": "Copy code",
+  "loyalty.redeem.close": "Close",
+  "loyalty.redeem.copied": "Code copied",
+  "loyalty.redeem.applyAtCheckout": "Apply this code at checkout.",
   "loyalty.errors.rateLimited": "Too many requests — please try again in a minute.",
   "loyalty.errors.generic": "Something went wrong. Please try again."
 }

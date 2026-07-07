@@ -9,6 +9,7 @@ import { useAppSelector } from '@/store';
 import EarnPointsTab from './components/EarnPointsTab';
 import LoyaltyHero from './components/LoyaltyHero';
 import OverviewTab from './components/OverviewTab';
+import RewardsTab from './components/RewardsTab';
 import TiersTab from './components/TiersTab';
 import {
   fetchLoyaltyCustomer,
@@ -147,7 +148,13 @@ function Loyalty() {
             customerQueryKey={['loyaltyCustomer', customerId]}
           />
         )}
-        {tab === 'redeem' && <Box data-testid="loyalty-tab-redeem" />}
+        {tab === 'redeem' && (
+          <RewardsTab
+            identity={identity}
+            pointBalance={customer?.pointBalance ?? 0}
+            customerQueryKey={['loyaltyCustomer', customerId]}
+          />
+        )}
         {tab === 'tiers' && (
           <TiersTab
             tiers={tiers}

@@ -11,12 +11,15 @@ import {
   completeSocialRule,
   fetchEarnRules,
   fetchLoyaltyCustomer,
+  fetchRedeemRules,
   fetchTiers,
   getLoyaltyDigest,
   getSocialCompletionFlag,
+  isRedeemableCatalogRule,
   LoyaltyError,
   LoyaltyIdentity,
   parseThreshold,
+  redeemReward,
 } from './api';
 
 vi.mock('@/utils/b3Logger');
@@ -287,5 +290,103 @@ describe('getSocialCompletionFlag', () => {
     const rule = { id: 'r', title: '', summary: '', earnType: '', templateName, socialUrl };
 
     expect(getSocialCompletionFlag(rule)).toBe(expected);
+  });
+});
+
+describe('fetchRedeemRules and isRedeemableCatalogRule', () => {
+  it('normalizes redeem rules preferring customTitle', async () => {
+    server.use(
+      http.get('https://launcher.api.influence.io/launcher/v1/shop/rules/redeem', ({ request }) => {
+        assertQueryParams(request, { shop: shopKey });
+
+        return HttpResponse.json({
+          rules: [
+            { id: 'rr1', title: 'Free shipping', pointCost: 1000, redeemType: 'freeshipping' },
+            {
+              id: 'rr2',
+              customTitle: '$5 gift card',
+              title: 'Gift card',
+              pointCost: 500,
+              redeemType: 'giftcard',
+              status: 'active',
+            },
+          ],
+        });
+      }),
+    );
+
+    const result = await fetchRedeemRules();
+
+    expect(result).toEqual([
+      {
+        id: 'rr1',
+        title: 'Free shipping',
+        pointCost: 1000,
+        redeemType: 'freeshipping',
+        status: '',
+        minRedeemablePoints: null,
+        maxRedeemablePoints: null,
+      },
+      {
+        id: 'rr2',
+        title: '$5 gift card',
+        pointCost: 500,
+        redeemType: 'giftcard',
+        status: 'active',
+        minRedeemablePoints: null,
+        maxRedeemablePoints: null,
+      },
+    ]);
+  });
+
+  it.each([
+    [{ pointCost: 500, minRedeemablePoints: null, maxRedeemablePoints: null, status: '' }, true],
+    [
+      { pointCost: 500, minRedeemablePoints: null, maxRedeemablePoints: null, status: 'active' },
+      true,
+    ],
+    [
+      { pointCost: 500, minRedeemablePoints: null, maxRedeemablePoints: null, status: 'ACTIVE' },
+      true,
+    ],
+    [{ pointCost: null, minRedeemablePoints: null, maxRedeemablePoints: null, status: '' }, false],
+    [{ pointCost: 500, minRedeemablePoints: 100, maxRedeemablePoints: null, status: '' }, false],
+    [{ pointCost: 500, minRedeemablePoints: null, maxRedeemablePoints: 900, status: '' }, false],
+    [
+      { pointCost: 500, minRedeemablePoints: null, maxRedeemablePoints: null, status: 'paused' },
+      false,
+    ],
+  ])('filters catalog rules: %j -> %j', (partial, expected) => {
+    const rule = { id: 'r', title: 't', redeemType: 'x', ...partial };
+
+    expect(isRedeemableCatalogRule(rule)).toBe(expected);
+  });
+});
+
+describe('redeemReward', () => {
+  it('posts identity, shop, digest, ruleId and redemptionSource in the body', async () => {
+    const requestBody = vi.fn();
+
+    server.use(
+      http.post(
+        'https://launcher.api.influence.io/launcher/v1/customer/redeem',
+        async ({ request }) => {
+          requestBody(await request.json());
+
+          return HttpResponse.json({ success: true, couponCode: 'SAVE-123' });
+        },
+      ),
+    );
+
+    const result = await redeemReward(identity, 'rr1');
+
+    expect(requestBody).toHaveBeenCalledWith({
+      customer: { id: identity.customerId, email: identity.email },
+      shop: shopKey,
+      digest: identity.digest,
+      ruleId: 'rr1',
+      redemptionSource: 'buyer-portal',
+    });
+    expect(result).toEqual({ success: true, couponCode: 'SAVE-123' });
   });
 });

@@ -14,7 +14,7 @@ import {
 
 import { snackbar } from '@/utils/b3Tip';
 
-import { EarnRule, LoyaltyCustomer, LoyaltyIdentity, LoyaltyTier } from './api';
+import { EarnRule, LoyaltyCustomer, LoyaltyIdentity, LoyaltyTier, RedeemRule } from './api';
 import Loyalty from '.';
 
 vi.mock('@/utils/b3Tip', () => ({
@@ -126,6 +126,19 @@ const mockEarnRules = (rules: EarnRule[]) =>
       }),
     ),
   );
+
+const buildRedeemRuleWith = builder<RedeemRule>(() => ({
+  id: faker.string.uuid(),
+  title: faker.commerce.productName(),
+  pointCost: faker.number.int({ min: 100, max: 1000 }),
+  redeemType: faker.helpers.arrayElement(['freeshipping', 'fixedamountdiscount', 'percentageoff']),
+  status: 'active',
+  minRedeemablePoints: null,
+  maxRedeemablePoints: null,
+}));
+
+const mockRedeemRules = (rules: RedeemRule[]) =>
+  server.use(http.get(`${launcherBase}/shop/rules/redeem`, () => HttpResponse.json({ rules })));
 
 it('renders the hero with company name, member-since, and points balance', async () => {
   mockLoyaltyApis(
@@ -403,6 +416,102 @@ it('shows the generic error when the social follow fails upstream', async () => 
 
   await user.click(await screen.findByRole('tab', { name: 'Earn points' }));
   await user.click(await screen.findByRole('button', { name: 'Follow' }));
+
+  await waitFor(() => {
+    expect(snackbar.error).toHaveBeenCalledWith('Something went wrong. Please try again.');
+  });
+});
+
+it('lists redeemable rewards and disables ones costing more than the balance', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 600 }));
+  mockRedeemRules([
+    buildRedeemRuleWith({ title: '$5 discount', pointCost: 500 }),
+    buildRedeemRuleWith({ title: 'Free shipping', pointCost: 1000 }),
+  ]);
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'Rewards' }));
+
+  const cheap = (await screen.findByText('$5 discount')).closest('.MuiCard-root') as HTMLElement;
+  const dear = screen.getByText('Free shipping').closest('.MuiCard-root') as HTMLElement;
+  expect(within(cheap).getByRole('button', { name: 'Get reward' })).toBeEnabled();
+  expect(within(dear).getByRole('button', { name: 'Get reward' })).toBeDisabled();
+});
+
+it('hides increment-type and unknown-status rules from the catalog', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 5000 }));
+  mockRedeemRules([
+    buildRedeemRuleWith({ title: 'Point donation', minRedeemablePoints: 100 }),
+    buildRedeemRuleWith({ title: 'Paused reward', status: 'paused' }),
+    buildRedeemRuleWith({ title: '$5 discount' }),
+  ]);
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'Rewards' }));
+
+  expect(await screen.findByText('$5 discount')).toBeInTheDocument();
+  expect(screen.queryByText('Point donation')).not.toBeInTheDocument();
+  expect(screen.queryByText('Paused reward')).not.toBeInTheDocument();
+});
+
+it('redeems a reward after confirmation and shows the coupon code', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 600 }));
+  mockRedeemRules([buildRedeemRuleWith({ id: 'rr1', title: '$5 discount', pointCost: 500 })]);
+  server.use(
+    http.post(`${launcherBase}/customer/redeem`, () =>
+      HttpResponse.json({ success: true, couponCode: 'SAVE-123' }),
+    ),
+  );
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'Rewards' }));
+  await user.click(await screen.findByRole('button', { name: 'Get reward' }));
+
+  expect(await screen.findByText('Redeem $5 discount for 500 points?')).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'Redeem' }));
+
+  expect(await screen.findByText('SAVE-123')).toBeInTheDocument();
+  expect(screen.getByText('Apply this code at checkout.')).toBeInTheDocument();
+});
+
+it('does not redeem when the confirmation is cancelled', async () => {
+  const redeemRequests = vi.fn();
+
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 600 }));
+  mockRedeemRules([buildRedeemRuleWith({ title: '$5 discount', pointCost: 500 })]);
+  server.use(
+    http.post(`${launcherBase}/customer/redeem`, () => {
+      redeemRequests();
+
+      return HttpResponse.json({ success: true, couponCode: 'SAVE-123' });
+    }),
+  );
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'Rewards' }));
+  await user.click(await screen.findByRole('button', { name: 'Get reward' }));
+  await user.click(await screen.findByRole('button', { name: 'Cancel' }));
+
+  expect(redeemRequests).not.toHaveBeenCalled();
+});
+
+it('shows an error snackbar when the redemption fails', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 600 }));
+  mockRedeemRules([buildRedeemRuleWith({ title: '$5 discount', pointCost: 500 })]);
+  server.use(
+    http.post(`${launcherBase}/customer/redeem`, () => HttpResponse.json({}, { status: 500 })),
+  );
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'Rewards' }));
+  await user.click(await screen.findByRole('button', { name: 'Get reward' }));
+  await user.click(await screen.findByRole('button', { name: 'Redeem' }));
 
   await waitFor(() => {
     expect(snackbar.error).toHaveBeenCalledWith('Something went wrong. Please try again.');

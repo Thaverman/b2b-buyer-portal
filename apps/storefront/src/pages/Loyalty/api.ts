@@ -338,3 +338,82 @@ export const completeSocialRule = async (
     updatedBalance: raw.updatedBalance ?? 0,
   };
 };
+
+export interface RedeemRule {
+  id: string;
+  title: string;
+  pointCost: number | null;
+  redeemType: string;
+  status: string;
+  minRedeemablePoints: number | null;
+  maxRedeemablePoints: number | null;
+}
+
+interface RawRedeemRule {
+  id?: string | number;
+  title?: string;
+  customTitle?: string;
+  pointCost?: number;
+  redeemType?: string;
+  status?: string;
+  minRedeemablePoints?: number;
+  maxRedeemablePoints?: number;
+}
+
+export const fetchRedeemRules = async (): Promise<RedeemRule[]> => {
+  const config = requireConfig();
+  const raw = (await launcherGet('/shop/rules/redeem', { shop: config.shopKey }, 'upstream')) as {
+    rules?: RawRedeemRule[];
+  };
+
+  return (raw.rules ?? []).map((rule) => ({
+    id: String(rule.id ?? ''),
+    title: rule.customTitle ?? rule.title ?? '',
+    pointCost: rule.pointCost ?? null,
+    redeemType: rule.redeemType ?? '',
+    status: rule.status ?? '',
+    minRedeemablePoints: rule.minRedeemablePoints ?? null,
+    maxRedeemablePoints: rule.maxRedeemablePoints ?? null,
+  }));
+};
+
+// v1 handles fixed-cost rules only (spec): increment-type rules (min/max redeemable
+// points) and rules with an unrecognized status are logged and hidden. status enum is
+// undocumented upstream; '' (absent) and 'active' are treated as showable (spec S4).
+export const isRedeemableCatalogRule = (rule: RedeemRule): boolean => {
+  if (rule.pointCost === null) {
+    return false;
+  }
+  if (rule.minRedeemablePoints !== null || rule.maxRedeemablePoints !== null) {
+    b2bLogger.error(
+      `Loyalty: hiding increment-type redeem rule ${rule.id} — variable-amount redemption is not supported in v1`,
+    );
+    return false;
+  }
+  if (rule.status !== '' && rule.status.toLowerCase() !== 'active') {
+    b2bLogger.error(
+      `Loyalty: hiding redeem rule ${rule.id} with unrecognized status "${rule.status}"`,
+    );
+    return false;
+  }
+  return true;
+};
+
+interface RedeemResult {
+  success: boolean;
+  couponCode: string;
+}
+
+export const redeemReward = async (
+  identity: LoyaltyIdentity,
+  ruleId: string,
+): Promise<RedeemResult> => {
+  const config = requireConfig();
+  const raw = (await launcherPost('/customer/redeem', {
+    ...identityBody(config, identity),
+    ruleId,
+    redemptionSource: 'buyer-portal',
+  })) as { success?: boolean; couponCode?: string };
+
+  return { success: raw.success ?? false, couponCode: raw.couponCode ?? '' };
+};
