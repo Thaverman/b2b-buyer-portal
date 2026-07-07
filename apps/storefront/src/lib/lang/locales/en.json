@@ -799,6 +799,8 @@
   "loyalty.redeem.close": "Close",
   "loyalty.redeem.copied": "Code copied",
   "loyalty.redeem.applyAtCheckout": "Apply this code at checkout.",
+  "loyalty.redeem.earnedTitle": "Your earned rewards",
+  "loyalty.loadMore": "Load more",
   "loyalty.errors.rateLimited": "Too many requests — please try again in a minute.",
   "loyalty.errors.generic": "Something went wrong. Please try again."
 }

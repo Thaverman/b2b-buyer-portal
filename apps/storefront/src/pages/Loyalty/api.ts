@@ -417,3 +417,47 @@ export const redeemReward = async (
 
   return { success: raw.success ?? false, couponCode: raw.couponCode ?? '' };
 };
+
+export interface EarnedReward {
+  id: string;
+  couponCode: string;
+  title: string;
+  createdAt: string;
+}
+
+interface EarnedRewardPage {
+  items: EarnedReward[];
+  nextToken: string | null;
+}
+
+interface RawEarnedReward {
+  id?: string | number;
+  couponCode?: string;
+  title?: string;
+  createdAt?: string;
+}
+
+export const fetchEarnedRewards = async (
+  identity: LoyaltyIdentity,
+  nextToken?: string,
+): Promise<EarnedRewardPage> => {
+  const config = requireConfig();
+  const params: Record<string, string> = identityParams(config, identity);
+  if (nextToken) {
+    params.nextToken = nextToken;
+  }
+  const raw = (await launcherGet('/customer/all-rewards', params, 'notEnrolled')) as {
+    items?: RawEarnedReward[];
+    nextToken?: string | null;
+  };
+
+  return {
+    items: (raw.items ?? []).map((item) => ({
+      id: String(item.id ?? ''),
+      couponCode: item.couponCode ?? '',
+      title: item.title ?? '',
+      createdAt: item.createdAt ?? '',
+    })),
+    nextToken: raw.nextToken ?? null,
+  };
+};

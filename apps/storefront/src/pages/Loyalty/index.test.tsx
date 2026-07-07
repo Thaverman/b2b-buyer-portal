@@ -14,7 +14,14 @@ import {
 
 import { snackbar } from '@/utils/b3Tip';
 
-import { EarnRule, LoyaltyCustomer, LoyaltyIdentity, LoyaltyTier, RedeemRule } from './api';
+import {
+  EarnedReward,
+  EarnRule,
+  LoyaltyCustomer,
+  LoyaltyIdentity,
+  LoyaltyTier,
+  RedeemRule,
+} from './api';
 import Loyalty from '.';
 
 vi.mock('@/utils/b3Tip', () => ({
@@ -139,6 +146,13 @@ const buildRedeemRuleWith = builder<RedeemRule>(() => ({
 
 const mockRedeemRules = (rules: RedeemRule[]) =>
   server.use(http.get(`${launcherBase}/shop/rules/redeem`, () => HttpResponse.json({ rules })));
+
+const buildEarnedRewardWith = builder<EarnedReward>(() => ({
+  id: faker.string.uuid(),
+  couponCode: faker.string.alphanumeric(8).toUpperCase(),
+  title: faker.commerce.productName(),
+  createdAt: faker.date.past().toISOString(),
+}));
 
 it('renders the hero with company name, member-since, and points balance', async () => {
   mockLoyaltyApis(
@@ -541,4 +555,32 @@ it('shows an error snackbar when the redemption fails', async () => {
   await waitFor(() => {
     expect(snackbar.error).toHaveBeenCalledWith('Something went wrong. Please try again.');
   });
+});
+
+it('lists previously earned coupon codes and loads more pages', async () => {
+  const first = buildEarnedRewardWith({ couponCode: 'FIRST-CODE' });
+  const second = buildEarnedRewardWith({ couponCode: 'SECOND-CODE' });
+
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockRedeemRules([]);
+  server.use(
+    http.get(`${launcherBase}/customer/all-rewards`, ({ request }) => {
+      const token = new URL(request.url).searchParams.get('nextToken');
+      if (token === 'page-2') {
+        return HttpResponse.json({ items: [second], nextToken: null });
+      }
+      return HttpResponse.json({ items: [first], nextToken: 'page-2' });
+    }),
+  );
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'Rewards' }));
+
+  expect(await screen.findByText('FIRST-CODE')).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
+
+  expect(await screen.findByText('SECOND-CODE')).toBeInTheDocument();
+  expect(screen.getByText('FIRST-CODE')).toBeInTheDocument();
 });

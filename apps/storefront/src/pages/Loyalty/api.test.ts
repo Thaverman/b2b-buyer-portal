@@ -9,6 +9,7 @@ import {
 
 import {
   completeSocialRule,
+  fetchEarnedRewards,
   fetchEarnRules,
   fetchLoyaltyCustomer,
   fetchRedeemRules,
@@ -388,5 +389,38 @@ describe('redeemReward', () => {
       redemptionSource: 'buyer-portal',
     });
     expect(result).toEqual({ success: true, couponCode: 'SAVE-123' });
+  });
+});
+
+describe('fetchEarnedRewards', () => {
+  it('sends identity as query params, forwards nextToken, and normalizes the page', async () => {
+    server.use(
+      http.get(
+        'https://launcher.api.influence.io/launcher/v1/customer/all-rewards',
+        ({ request }) => {
+          assertQueryParams(request, {
+            shop: shopKey,
+            customer_id: identity.customerId,
+            customer_email: identity.email,
+            digest: identity.digest,
+            nextToken: 'page-2',
+          });
+
+          return HttpResponse.json({
+            items: [
+              { id: 'w1', couponCode: 'SAVE-123', title: '$5 discount', createdAt: '2026-06-01' },
+            ],
+            nextToken: null,
+          });
+        },
+      ),
+    );
+
+    const result = await fetchEarnedRewards(identity, 'page-2');
+
+    expect(result).toEqual({
+      items: [{ id: 'w1', couponCode: 'SAVE-123', title: '$5 discount', createdAt: '2026-06-01' }],
+      nextToken: null,
+    });
   });
 });
