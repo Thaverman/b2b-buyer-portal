@@ -7,6 +7,7 @@ import { useB3Lang } from '@/lib/lang';
 import { useAppSelector } from '@/store';
 
 import LoyaltyHero from './components/LoyaltyHero';
+import OverviewTab from './components/OverviewTab';
 import TiersTab from './components/TiersTab';
 import {
   fetchLoyaltyCustomer,
@@ -137,7 +138,7 @@ function Loyalty() {
           <Tab value="tiers" label={b3Lang('loyalty.tabs.tiers')} />
           <Tab value="history" label={b3Lang('loyalty.tabs.history')} />
         </Tabs>
-        {tab === 'overview' && <Box data-testid="loyalty-tab-overview" />}
+        {tab === 'overview' && <OverviewTab customer={customer} tiers={tiers} />}
         {tab === 'earn' && <Box data-testid="loyalty-tab-earn" />}
         {tab === 'redeem' && <Box data-testid="loyalty-tab-redeem" />}
         {tab === 'tiers' && (

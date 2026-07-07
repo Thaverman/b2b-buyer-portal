@@ -262,3 +262,28 @@ it('hides the tier progress bar when a threshold is not numeric', async () => {
   expect(await screen.findByText('Current tier: Select')).toBeInTheDocument();
   expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
 });
+
+it('shows the current tier benefits and points summary on the Your rewards tab', async () => {
+  const select = buildTierWith({
+    id: 't1',
+    title: 'Select',
+    threshold: '0',
+    perks: ['5% credit on every order', 'Free ground shipping over $300'],
+  });
+
+  mockLoyaltyApis(
+    buildLoyaltyCustomerWith({
+      pointBalance: 2465,
+      currentLoyaltyTierId: 't1',
+      currentLoyaltyTierProgress: 240,
+    }),
+  );
+  mockTiers([select, buildTierWith({ id: 't2', title: 'Elite', threshold: '300' })]);
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('Your Select benefits')).toBeInTheDocument();
+  expect(screen.getByText('5% credit on every order')).toBeInTheDocument();
+  expect(screen.getByText('Free ground shipping over $300')).toBeInTheDocument();
+  expect(screen.getByText('240 / 300')).toBeInTheDocument();
+});
