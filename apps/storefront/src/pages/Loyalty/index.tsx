@@ -7,6 +7,7 @@ import { useB3Lang } from '@/lib/lang';
 import { useAppSelector } from '@/store';
 
 import EarnPointsTab from './components/EarnPointsTab';
+import HistoryTab from './components/HistoryTab';
 import LoyaltyHero from './components/LoyaltyHero';
 import OverviewTab from './components/OverviewTab';
 import RewardsTab from './components/RewardsTab';
@@ -162,7 +163,7 @@ function Loyalty() {
             currentTierProgress={customer?.currentLoyaltyTierProgress ?? null}
           />
         )}
-        {tab === 'history' && <Box data-testid="loyalty-tab-history" />}
+        {tab === 'history' && <HistoryTab identity={identity} />}
       </Box>
     </B3Spin>
   );

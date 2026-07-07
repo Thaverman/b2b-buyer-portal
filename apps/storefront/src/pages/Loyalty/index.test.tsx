@@ -20,6 +20,7 @@ import {
   LoyaltyCustomer,
   LoyaltyIdentity,
   LoyaltyTier,
+  PointActivity,
   RedeemRule,
 } from './api';
 import Loyalty from '.';
@@ -152,6 +153,15 @@ const buildEarnedRewardWith = builder<EarnedReward>(() => ({
   couponCode: faker.string.alphanumeric(8).toUpperCase(),
   title: faker.commerce.productName(),
   createdAt: faker.date.past().toISOString(),
+}));
+
+const buildPointActivityWith = builder<PointActivity>(() => ({
+  id: faker.string.uuid(),
+  action: faker.helpers.arrayElement(['earned', 'redeemed']),
+  status: 'approved',
+  points: faker.number.int({ min: -500, max: 500 }),
+  createdAt: faker.date.past().toISOString(),
+  customDescription: faker.company.catchPhrase(),
 }));
 
 it('renders the hero with company name, member-since, and points balance', async () => {
@@ -583,4 +593,44 @@ it('lists previously earned coupon codes and loads more pages', async () => {
 
   expect(await screen.findByText('SECOND-CODE')).toBeInTheDocument();
   expect(screen.getByText('FIRST-CODE')).toBeInTheDocument();
+});
+
+it('lists points history and loads more pages', async () => {
+  const first = buildPointActivityWith({ customDescription: 'Order #1001', points: 50 });
+  const second = buildPointActivityWith({ customDescription: 'Order #1002', points: 80 });
+
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  server.use(
+    http.get(`${launcherBase}/customer/points`, ({ request }) => {
+      const token = new URL(request.url).searchParams.get('nextToken');
+      if (token === 'page-2') {
+        return HttpResponse.json({ items: [second], nextToken: null });
+      }
+      return HttpResponse.json({ items: [first], nextToken: 'page-2' });
+    }),
+  );
+
+  const { user } = renderWithProviders(<Loyalty />, {
+    initialEntries: [{ search: '?tab=history' }],
+  });
+
+  expect(await screen.findByText('Order #1001')).toBeInTheDocument();
+  expect(screen.getByText('+50')).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
+
+  expect(await screen.findByText('Order #1002')).toBeInTheDocument();
+});
+
+it('shows the empty history state', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  server.use(
+    http.get(`${launcherBase}/customer/points`, () =>
+      HttpResponse.json({ items: [], nextToken: null }),
+    ),
+  );
+
+  renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=history' }] });
+
+  expect(await screen.findByText('No points activity yet.')).toBeInTheDocument();
 });

@@ -461,3 +461,53 @@ export const fetchEarnedRewards = async (
     nextToken: raw.nextToken ?? null,
   };
 };
+
+export interface PointActivity {
+  id: string;
+  action: string;
+  status: string;
+  points: number;
+  createdAt: string;
+  customDescription: string;
+}
+
+interface PointActivityPage {
+  items: PointActivity[];
+  nextToken: string | null;
+}
+
+interface RawPointActivity {
+  id?: string | number;
+  action?: string;
+  status?: string;
+  points?: number;
+  createdAt?: string;
+  customDescription?: string;
+}
+
+export const fetchPointsHistory = async (
+  identity: LoyaltyIdentity,
+  nextToken?: string,
+): Promise<PointActivityPage> => {
+  const config = requireConfig();
+  const params: Record<string, string> = { ...identityParams(config, identity), limit: '10' };
+  if (nextToken) {
+    params.nextToken = nextToken;
+  }
+  const raw = (await launcherGet('/customer/points', params, 'notEnrolled')) as {
+    items?: RawPointActivity[];
+    nextToken?: string | null;
+  };
+
+  return {
+    items: (raw.items ?? []).map((item) => ({
+      id: String(item.id ?? ''),
+      action: item.action ?? '',
+      status: item.status ?? '',
+      points: item.points ?? 0,
+      createdAt: item.createdAt ?? '',
+      customDescription: item.customDescription ?? '',
+    })),
+    nextToken: raw.nextToken ?? null,
+  };
+};
