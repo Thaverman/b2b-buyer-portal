@@ -9,7 +9,7 @@ import {
   startMockServer,
 } from 'tests/test-utils';
 
-import { LoyaltyCustomer } from './api';
+import { LoyaltyCustomer, LoyaltyIdentity } from './api';
 import Loyalty from '.';
 
 vi.mock('@/utils/b3Tip', () => ({
@@ -24,7 +24,13 @@ const shopKey = 'store-key';
 const apiBase = 'https://ssw.example.com/customers';
 const appClientId = 'ssw-app-client-id';
 const launcherBase = 'https://launcher.api.influence.io/launcher/v1';
-const identity = { digest: 'digest-abc', customerId: '123', email: 'buyer@example.com' };
+const buildLoyaltyIdentityWith = builder<LoyaltyIdentity>(() => ({
+  digest: faker.string.hexadecimal({ length: 64, prefix: '' }).toLowerCase(),
+  customerId: faker.number.int({ min: 1, max: 99999 }).toString(),
+  email: faker.internet.email().toLowerCase(),
+}));
+
+const identity = buildLoyaltyIdentityWith('WHATEVER_VALUES');
 
 const buildLoyaltyCustomerWith = builder<LoyaltyCustomer>(() => ({
   pointBalance: faker.number.int({ min: 0, max: 9999 }),
@@ -38,6 +44,9 @@ const buildLoyaltyCustomerWith = builder<LoyaltyCustomer>(() => ({
 }));
 
 beforeEach(() => {
+  // The Loyalty page is CSS-responsive only (wrapping flex + scrollable tabs) and has no
+  // viewport-conditional JS yet, so this 500px mock changes nothing today. It pins the
+  // repo's mobile-test convention so any future useMobile() branching gets exercised here.
   vi.spyOn(document.body, 'clientWidth', 'get').mockReturnValue(500);
   window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId } };
 });
