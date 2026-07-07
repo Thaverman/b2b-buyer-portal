@@ -22,10 +22,12 @@ const getLoyaltyConfig = (): LoyaltyConfig | undefined => {
 // which would misrender as "session expired"; gate the feature out instead.
 export const isLoyaltyAvailable = () => platform === 'bigcommerce' && Boolean(getLoyaltyConfig());
 
-// @ts-expect-error - Intentionally unused; reserved for future API versions or multi-endpoint routing.
-const LAUNCHER_API_BASE = 'https://launcher.api.influence.io/launcher/v1';
-
-type LoyaltyErrorKind = 'sessionExpired' | 'notEnrolled' | 'misconfigured' | 'rateLimited' | 'upstream';
+type LoyaltyErrorKind =
+  | 'sessionExpired'
+  | 'notEnrolled'
+  | 'misconfigured'
+  | 'rateLimited'
+  | 'upstream';
 
 export class LoyaltyError extends Error {
   kind: LoyaltyErrorKind;
