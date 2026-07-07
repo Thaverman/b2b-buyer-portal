@@ -164,3 +164,45 @@ it('recovers from a load error via the retry button', async () => {
 
   expect(await screen.findByText('You have 100 points')).toBeInTheDocument();
 });
+
+it('renders the five tabs with mockup labels and defaults to Your rewards', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  renderWithProviders(<Loyalty />);
+
+  expect(
+    await screen.findByRole('tab', { name: 'Your rewards', selected: true }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'Earn points' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'Rewards' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'Tiers' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'History' })).toBeInTheDocument();
+});
+
+it('selects the tab named by the URL search param', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=history' }] });
+
+  expect(await screen.findByRole('tab', { name: 'History', selected: true })).toBeInTheDocument();
+});
+
+it('falls back to Your rewards for an unknown tab param', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=bogus' }] });
+
+  expect(
+    await screen.findByRole('tab', { name: 'Your rewards', selected: true }),
+  ).toBeInTheDocument();
+});
+
+it('switches tabs on click', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'Tiers' }));
+
+  expect(screen.getByRole('tab', { name: 'Tiers', selected: true })).toBeInTheDocument();
+});

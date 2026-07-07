@@ -776,5 +776,10 @@
   "loyalty.hero.welcome": "Welcome back",
   "loyalty.hero.memberSince": "Member since {date}",
   "loyalty.hero.currentTier": "Current tier",
-  "loyalty.hero.points": "You have {points} points"
+  "loyalty.hero.points": "You have {points} points",
+  "loyalty.tabs.overview": "Your rewards",
+  "loyalty.tabs.earn": "Earn points",
+  "loyalty.tabs.redeem": "Rewards",
+  "loyalty.tabs.tiers": "Tiers",
+  "loyalty.tabs.history": "History"
 }

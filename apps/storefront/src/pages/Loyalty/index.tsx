@@ -1,4 +1,5 @@
-import { Alert, Box, Button, Typography } from '@mui/material';
+import { useSearchParams } from 'react-router-dom';
+import { Alert, Box, Button, Tab, Tabs, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 
 import B3Spin from '@/components/spin/B3Spin';
@@ -7,6 +8,12 @@ import { useAppSelector } from '@/store';
 
 import LoyaltyHero from './components/LoyaltyHero';
 import { fetchLoyaltyCustomer, getLoyaltyDigest, isLoyaltyAvailable, LoyaltyError } from './api';
+
+const LOYALTY_TABS = ['overview', 'earn', 'redeem', 'tiers', 'history'] as const;
+type LoyaltyTab = (typeof LOYALTY_TABS)[number];
+
+const toLoyaltyTab = (value: string | null): LoyaltyTab =>
+  LOYALTY_TABS.includes(value as LoyaltyTab) ? (value as LoyaltyTab) : 'overview';
 
 const formatMemberSince = (createdAt: string): string | null => {
   const date = new Date(createdAt);
@@ -23,6 +30,9 @@ function Loyalty() {
   const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
   // The digest identifies the logged-in customer, so a masquerading rep must not see points here.
   const isAvailable = isLoyaltyAvailable() && !isAgenting;
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = toLoyaltyTab(searchParams.get('tab'));
 
   const digestQuery = useQuery({
     queryKey: ['loyaltyDigest', customerId],
@@ -94,6 +104,24 @@ function Loyalty() {
             {b3Lang('loyalty.loadError')}
           </Alert>
         )}
+        <Tabs
+          value={tab}
+          onChange={(_, newTab: LoyaltyTab) => setSearchParams({ tab: newTab })}
+          variant="scrollable"
+          allowScrollButtonsMobile
+          sx={{ mb: 2 }}
+        >
+          <Tab value="overview" label={b3Lang('loyalty.tabs.overview')} />
+          <Tab value="earn" label={b3Lang('loyalty.tabs.earn')} />
+          <Tab value="redeem" label={b3Lang('loyalty.tabs.redeem')} />
+          <Tab value="tiers" label={b3Lang('loyalty.tabs.tiers')} />
+          <Tab value="history" label={b3Lang('loyalty.tabs.history')} />
+        </Tabs>
+        {tab === 'overview' && <Box data-testid="loyalty-tab-overview" />}
+        {tab === 'earn' && <Box data-testid="loyalty-tab-earn" />}
+        {tab === 'redeem' && <Box data-testid="loyalty-tab-redeem" />}
+        {tab === 'tiers' && <Box data-testid="loyalty-tab-tiers" />}
+        {tab === 'history' && <Box data-testid="loyalty-tab-history" />}
       </Box>
     </B3Spin>
   );
