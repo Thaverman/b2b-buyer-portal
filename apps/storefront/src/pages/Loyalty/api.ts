@@ -10,6 +10,8 @@ interface LoyaltyConfig {
   appClientId: string;
 }
 
+const LAUNCHER_API_BASE = 'https://launcher.api.influence.io/launcher/v1';
+
 const getLoyaltyConfig = (): LoyaltyConfig | undefined => {
   const config = window.BC_CONTEXT?.loyalty;
   if (!config?.shopKey || !config?.apiBase || !config?.appClientId) {
@@ -105,4 +107,98 @@ export const getLoyaltyDigest = async (): Promise<LoyaltyIdentity> => {
     throw new LoyaltyError('rateLimited');
   }
   throw new LoyaltyError('upstream');
+};
+
+export interface LoyaltyCustomer {
+  pointBalance: number;
+  currentLoyaltyTierId: string | null;
+  currentLoyaltyTierProgress: number | null;
+  createdAt: string;
+  followInstagram: boolean;
+  followTikTok: boolean;
+  followTwitter: boolean;
+  likeFacebook: boolean;
+}
+
+interface RawLoyaltyCustomer {
+  pointBalance?: number;
+  currentLoyaltyTierId?: string;
+  currentLoyaltyTierProgress?: number;
+  createdAt?: string;
+  followInstagram?: boolean;
+  followTikTok?: boolean;
+  followTwitter?: boolean;
+  likeFacebook?: boolean;
+}
+
+const identityParams = (config: LoyaltyConfig, identity: LoyaltyIdentity) => ({
+  shop: config.shopKey,
+  customer_id: identity.customerId,
+  customer_email: identity.email,
+  digest: identity.digest,
+});
+
+const launcherStatusToError = (
+  status: number,
+  notFoundKind: 'notEnrolled' | 'upstream',
+): LoyaltyError => {
+  if (status === 401) {
+    // The digest is a timeless HMAC of stable inputs — a Launcher 401 means the identity
+    // keying or shop key is wrong, never an expired session; re-login cannot fix it.
+    b2bLogger.error(
+      'Loyalty: Launcher API rejected the digest (401) — identity keying or shop key mismatch',
+    );
+    return new LoyaltyError('misconfigured');
+  }
+  if (status === 404) {
+    if (notFoundKind === 'notEnrolled') {
+      // Ambiguous upstream: genuinely unknown customer OR a digest identity that does not
+      // match Influence.io records (see spec S1/Q3) — log so a systemic bug is visible.
+      b2bLogger.error(
+        'Loyalty: Launcher API returned 404 for this customer — not enrolled, or digest identity does not match Influence.io records',
+      );
+    }
+    return new LoyaltyError(notFoundKind);
+  }
+  if (status === 429) {
+    return new LoyaltyError('rateLimited');
+  }
+  return new LoyaltyError('upstream');
+};
+
+const launcherGet = async (
+  path: string,
+  params: Record<string, string>,
+  notFoundKind: 'notEnrolled' | 'upstream',
+): Promise<unknown> => {
+  let response: Response;
+  try {
+    response = await fetch(`${LAUNCHER_API_BASE}${path}?${new URLSearchParams(params)}`);
+  } catch {
+    throw new LoyaltyError('upstream');
+  }
+  if (!response.ok) {
+    throw launcherStatusToError(response.status, notFoundKind);
+  }
+  return response.json();
+};
+
+export const fetchLoyaltyCustomer = async (identity: LoyaltyIdentity): Promise<LoyaltyCustomer> => {
+  const config = requireConfig();
+  const raw = (await launcherGet(
+    '/customer',
+    identityParams(config, identity),
+    'notEnrolled',
+  )) as RawLoyaltyCustomer;
+
+  return {
+    pointBalance: raw.pointBalance ?? 0,
+    currentLoyaltyTierId: raw.currentLoyaltyTierId ?? null,
+    currentLoyaltyTierProgress: raw.currentLoyaltyTierProgress ?? null,
+    createdAt: raw.createdAt ?? '',
+    followInstagram: raw.followInstagram ?? false,
+    followTikTok: raw.followTikTok ?? false,
+    followTwitter: raw.followTwitter ?? false,
+    likeFacebook: raw.likeFacebook ?? false,
+  };
 };

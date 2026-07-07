@@ -1,10 +1,16 @@
 import {
   buildB2BFeaturesStateWith,
+  buildCompanyStateWith,
+  builder,
+  faker,
+  http,
+  HttpResponse,
   renderWithProviders,
   screen,
   startMockServer,
 } from 'tests/test-utils';
 
+import { LoyaltyCustomer } from './api';
 import Loyalty from '.';
 
 vi.mock('@/utils/b3Tip', () => ({
@@ -13,7 +19,7 @@ vi.mock('@/utils/b3Tip', () => ({
 
 vi.mock('@/utils/b3Logger');
 
-startMockServer();
+const { server } = startMockServer();
 
 const shopKey = 'store-key';
 const apiBase = 'https://ssw.example.com/customers';
@@ -51,4 +57,104 @@ it('shows the unavailable state while a sales rep is masquerading', () => {
   });
 
   expect(screen.getByText('Rewards are not available.')).toBeInTheDocument();
+});
+
+const currentJwtUrl = 'http://localhost:3000/customer/current.jwt';
+const digestUrl = `${apiBase}/loyalty/digest`;
+const launcherBase = 'https://launcher.api.influence.io/launcher/v1';
+
+const identity = { digest: 'digest-abc', customerId: '123', email: 'buyer@example.com' };
+
+const buildLoyaltyCustomerWith = builder<LoyaltyCustomer>(() => ({
+  pointBalance: faker.number.int({ min: 0, max: 9999 }),
+  currentLoyaltyTierId: faker.string.uuid(),
+  currentLoyaltyTierProgress: faker.number.int({ min: 0, max: 500 }),
+  createdAt: faker.date.past().toISOString(),
+  followInstagram: faker.datatype.boolean(),
+  followTikTok: faker.datatype.boolean(),
+  followTwitter: faker.datatype.boolean(),
+  likeFacebook: faker.datatype.boolean(),
+}));
+
+const mockJwt = () => server.use(http.get(currentJwtUrl, () => HttpResponse.text('fresh-jwt')));
+
+const mockDigest = () => server.use(http.post(digestUrl, () => HttpResponse.json(identity)));
+
+const mockCustomer = (customer: LoyaltyCustomer) =>
+  server.use(http.get(`${launcherBase}/customer`, () => HttpResponse.json(customer)));
+
+const mockLoyaltyApis = (customer: LoyaltyCustomer) => {
+  mockJwt();
+  mockDigest();
+  mockCustomer(customer);
+};
+
+it('renders the hero with company name, member-since, and points balance', async () => {
+  mockLoyaltyApis(
+    buildLoyaltyCustomerWith({ pointBalance: 2465, createdAt: '2026-01-15T00:00:00.000Z' }),
+  );
+
+  renderWithProviders(<Loyalty />, {
+    preloadedState: {
+      company: buildCompanyStateWith({
+        customer: { id: 123 },
+        companyInfo: { companyName: 'Riverside Hardware Co.' },
+      }),
+    },
+  });
+
+  expect(await screen.findByText('Riverside Hardware Co.')).toBeInTheDocument();
+  expect(await screen.findByText('Member since Jan 2026')).toBeInTheDocument();
+  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
+});
+
+it('shows the session-expired state when the jwt fetch fails', async () => {
+  server.use(http.get(currentJwtUrl, () => HttpResponse.text('{"errors":[]}', { status: 401 })));
+
+  renderWithProviders(<Loyalty />);
+
+  expect(
+    await screen.findByText('Your session has expired — please sign in again.'),
+  ).toBeInTheDocument();
+});
+
+it('shows a generic error without a re-login prompt when the Launcher API rejects the digest', async () => {
+  mockJwt();
+  mockDigest();
+  server.use(http.get(`${launcherBase}/customer`, () => HttpResponse.json({}, { status: 401 })));
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText("We couldn't load your rewards.")).toBeInTheDocument();
+  expect(
+    screen.queryByText('Your session has expired — please sign in again.'),
+  ).not.toBeInTheDocument();
+});
+
+it('shows the not-enrolled invite when the customer is unknown to Influence.io', async () => {
+  mockJwt();
+  mockDigest();
+  server.use(http.get(`${launcherBase}/customer`, () => HttpResponse.json({}, { status: 404 })));
+
+  renderWithProviders(<Loyalty />);
+
+  expect(
+    await screen.findByText('Start earning points with your first order.'),
+  ).toBeInTheDocument();
+});
+
+it('recovers from a load error via the retry button', async () => {
+  mockJwt();
+  mockDigest();
+  server.use(http.get(`${launcherBase}/customer`, () => HttpResponse.json({}, { status: 502 })));
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText("We couldn't load your rewards.")).toBeInTheDocument();
+
+  mockCustomer(buildLoyaltyCustomerWith({ pointBalance: 100 }));
+
+  await user.click(screen.getByRole('button', { name: 'Try again' }));
+
+  expect(await screen.findByText('You have 100 points')).toBeInTheDocument();
 });

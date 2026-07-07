@@ -1,6 +1,6 @@
 import { assertQueryParams, http, HttpResponse, startMockServer } from 'tests/test-utils';
 
-import { getLoyaltyDigest, LoyaltyError } from './api';
+import { fetchLoyaltyCustomer, getLoyaltyDigest, LoyaltyError } from './api';
 
 vi.mock('@/utils/b3Logger');
 
@@ -96,5 +96,57 @@ describe('getLoyaltyDigest', () => {
 
     expect(error).toBeInstanceOf(LoyaltyError);
     expect(error.kind).toBe('upstream');
+  });
+});
+
+const launcherCustomerUrl = 'https://launcher.api.influence.io/launcher/v1/customer';
+
+describe('fetchLoyaltyCustomer', () => {
+  it('sends the identity trio and digest as query params and normalizes the response', async () => {
+    server.use(
+      http.get(launcherCustomerUrl, ({ request }) => {
+        assertQueryParams(request, {
+          shop: shopKey,
+          customer_id: identity.customerId,
+          customer_email: identity.email,
+          digest: identity.digest,
+        });
+
+        return HttpResponse.json({
+          pointBalance: 2465,
+          currentLoyaltyTierId: 'tier-2',
+          currentLoyaltyTierProgress: 240,
+          createdAt: '2026-01-15T00:00:00.000Z',
+          followInstagram: true,
+        });
+      }),
+    );
+
+    const result = await fetchLoyaltyCustomer(identity);
+
+    expect(result).toEqual({
+      pointBalance: 2465,
+      currentLoyaltyTierId: 'tier-2',
+      currentLoyaltyTierProgress: 240,
+      createdAt: '2026-01-15T00:00:00.000Z',
+      followInstagram: true,
+      followTikTok: false,
+      followTwitter: false,
+      likeFacebook: false,
+    });
+  });
+
+  it.each([
+    [401, 'misconfigured'],
+    [404, 'notEnrolled'],
+    [429, 'rateLimited'],
+    [500, 'upstream'],
+  ])('maps Launcher status %i to %s', async (status, kind) => {
+    server.use(http.get(launcherCustomerUrl, () => HttpResponse.json({}, { status })));
+
+    const error = await fetchLoyaltyCustomer(identity).catch((e) => e);
+
+    expect(error).toBeInstanceOf(LoyaltyError);
+    expect(error.kind).toBe(kind);
   });
 });
