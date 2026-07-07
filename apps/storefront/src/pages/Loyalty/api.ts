@@ -141,6 +141,7 @@ const identityParams = (config: LoyaltyConfig, identity: LoyaltyIdentity) => ({
 const launcherStatusToError = (
   status: number,
   notFoundKind: 'notEnrolled' | 'upstream',
+  customerId?: string,
 ): LoyaltyError => {
   if (status === 401) {
     // The digest is a timeless HMAC of stable inputs — a Launcher 401 means the identity
@@ -154,8 +155,9 @@ const launcherStatusToError = (
     if (notFoundKind === 'notEnrolled') {
       // Ambiguous upstream: genuinely unknown customer OR a digest identity that does not
       // match Influence.io records (see spec S1/Q3) — log so a systemic bug is visible.
+      // NEVER log the digest here — it's a stable HMAC identity secret.
       b2bLogger.error(
-        'Loyalty: Launcher API returned 404 for this customer — not enrolled, or digest identity does not match Influence.io records',
+        `Loyalty: Launcher API returned 404 for customer ${customerId ?? 'unknown'} — not enrolled, or digest identity does not match Influence.io records`,
       );
     }
     return new LoyaltyError(notFoundKind);
@@ -178,7 +180,7 @@ const launcherGet = async (
     throw new LoyaltyError('upstream');
   }
   if (!response.ok) {
-    throw launcherStatusToError(response.status, notFoundKind);
+    throw launcherStatusToError(response.status, notFoundKind, params.customer_id);
   }
   return response.json();
 };

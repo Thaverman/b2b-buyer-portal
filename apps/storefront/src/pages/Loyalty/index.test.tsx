@@ -567,6 +567,25 @@ it('shows an error snackbar when the redemption fails', async () => {
   });
 });
 
+it('shows an error snackbar when redemption succeeds without a coupon code', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 600 }));
+  mockRedeemRules([buildRedeemRuleWith({ title: '$5 discount', pointCost: 500 })]);
+  server.use(
+    http.post(`${launcherBase}/customer/redeem`, () => HttpResponse.json({ success: false })),
+  );
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'Rewards' }));
+  await user.click(await screen.findByRole('button', { name: 'Get reward' }));
+  await user.click(await screen.findByRole('button', { name: 'Redeem' }));
+
+  await waitFor(() => {
+    expect(snackbar.error).toHaveBeenCalledWith('Something went wrong. Please try again.');
+  });
+  expect(screen.queryByText('Apply this code at checkout.')).not.toBeInTheDocument();
+});
+
 it('lists previously earned coupon codes and loads more pages', async () => {
   const first = buildEarnedRewardWith({ couponCode: 'FIRST-CODE' });
   const second = buildEarnedRewardWith({ couponCode: 'SECOND-CODE' });

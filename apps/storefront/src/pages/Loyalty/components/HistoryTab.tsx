@@ -31,7 +31,9 @@ function HistoryTab({ identity }: HistoryTabProps) {
       return fetchPointsHistory(identity, pageParam);
     },
     initialPageParam: undefined as string | undefined,
-    getNextPageParam: (last) => last.nextToken ?? undefined,
+    // || not ??: an empty-string token would count as "has next page" while the
+    // fetcher drops it from the request — refetching page 1 forever.
+    getNextPageParam: (last) => last.nextToken || undefined,
     enabled: Boolean(identity),
   });
   const activities: PointActivity[] = historyQuery.data?.pages.flatMap((page) => page.items) ?? [];

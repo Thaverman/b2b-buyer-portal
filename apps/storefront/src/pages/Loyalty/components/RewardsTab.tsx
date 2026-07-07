@@ -45,10 +45,16 @@ function RewardsTab({ identity, pointBalance, customerQueryKey }: RewardsTabProp
     },
     onSuccess: (result) => {
       setPendingRedeem(null);
-      setCouponCode(result.couponCode);
+      // Invalidate regardless of outcome: upstream may have deducted points even
+      // when it returns no coupon code, so refetch the truth.
       queryClient.invalidateQueries({ queryKey: customerQueryKey });
       queryClient.invalidateQueries({ queryKey: ['loyaltyHistory'] });
       queryClient.invalidateQueries({ queryKey: ['loyaltyRewards'] });
+      if (!result.couponCode) {
+        snackbar.error(b3Lang('loyalty.errors.generic'));
+        return;
+      }
+      setCouponCode(result.couponCode);
     },
     onError: (err) => {
       setPendingRedeem(null);
@@ -70,7 +76,9 @@ function RewardsTab({ identity, pointBalance, customerQueryKey }: RewardsTabProp
     },
     // v5 requires initialPageParam; undefined = first page (no nextToken param sent).
     initialPageParam: undefined as string | undefined,
-    getNextPageParam: (last) => last.nextToken ?? undefined,
+    // || not ??: an empty-string token would count as "has next page" while the
+    // fetcher drops it from the request — refetching page 1 forever.
+    getNextPageParam: (last) => last.nextToken || undefined,
     enabled: Boolean(identity),
   });
   const earnedRewards: EarnedReward[] = earnedQuery.data?.pages.flatMap((page) => page.items) ?? [];

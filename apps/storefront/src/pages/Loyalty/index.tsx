@@ -130,7 +130,7 @@ function Loyalty() {
         )}
         <Tabs
           value={tab}
-          onChange={(_, newTab: LoyaltyTab) => setSearchParams({ tab: newTab })}
+          onChange={(_, newTab: LoyaltyTab) => setSearchParams({ tab: newTab }, { replace: true })}
           variant="scrollable"
           allowScrollButtonsMobile
           sx={{ mb: 2 }}
