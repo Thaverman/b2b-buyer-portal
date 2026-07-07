@@ -1,6 +1,13 @@
-import { assertQueryParams, http, HttpResponse, startMockServer } from 'tests/test-utils';
+import {
+  assertQueryParams,
+  builder,
+  faker,
+  http,
+  HttpResponse,
+  startMockServer,
+} from 'tests/test-utils';
 
-import { fetchLoyaltyCustomer, getLoyaltyDigest, LoyaltyError } from './api';
+import { fetchLoyaltyCustomer, getLoyaltyDigest, LoyaltyError, LoyaltyIdentity } from './api';
 
 vi.mock('@/utils/b3Logger');
 
@@ -12,7 +19,13 @@ const appClientId = 'ssw-app-client-id';
 const currentJwtUrl = 'http://localhost:3000/customer/current.jwt';
 const digestUrl = `${apiBase}/loyalty/digest`;
 
-const identity = { digest: 'digest-abc', customerId: '123', email: 'buyer@example.com' };
+const buildLoyaltyIdentityWith = builder<LoyaltyIdentity>(() => ({
+  digest: faker.string.hexadecimal({ length: 64, prefix: '' }).toLowerCase(),
+  customerId: faker.number.int({ min: 1, max: 99999 }).toString(),
+  email: faker.internet.email().toLowerCase(),
+}));
+
+const identity = buildLoyaltyIdentityWith({});
 
 beforeEach(() => {
   window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId } };
@@ -54,7 +67,11 @@ describe('getLoyaltyDigest', () => {
     mockJwt();
     server.use(
       http.post(digestUrl, () =>
-        HttpResponse.json({ Digest: 'digest-abc', CustomerId: 123, Email: 'buyer@example.com' }),
+        HttpResponse.json({
+          Digest: identity.digest,
+          CustomerId: Number(identity.customerId),
+          Email: identity.email,
+        }),
       ),
     );
 

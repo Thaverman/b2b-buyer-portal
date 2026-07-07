@@ -10,7 +10,7 @@ import {
   startMockServer,
 } from 'tests/test-utils';
 
-import { LoyaltyCustomer } from './api';
+import { LoyaltyCustomer, LoyaltyIdentity } from './api';
 import Loyalty from '.';
 
 vi.mock('@/utils/b3Tip', () => ({
@@ -63,7 +63,13 @@ const currentJwtUrl = 'http://localhost:3000/customer/current.jwt';
 const digestUrl = `${apiBase}/loyalty/digest`;
 const launcherBase = 'https://launcher.api.influence.io/launcher/v1';
 
-const identity = { digest: 'digest-abc', customerId: '123', email: 'buyer@example.com' };
+const buildLoyaltyIdentityWith = builder<LoyaltyIdentity>(() => ({
+  digest: faker.string.hexadecimal({ length: 64, prefix: '' }).toLowerCase(),
+  customerId: faker.number.int({ min: 1, max: 99999 }).toString(),
+  email: faker.internet.email().toLowerCase(),
+}));
+
+const identity = buildLoyaltyIdentityWith({});
 
 const buildLoyaltyCustomerWith = builder<LoyaltyCustomer>(() => ({
   pointBalance: faker.number.int({ min: 0, max: 9999 }),
