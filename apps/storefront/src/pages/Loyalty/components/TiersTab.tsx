@@ -2,7 +2,8 @@ import { Box, Card, CardContent, LinearProgress, Typography } from '@mui/materia
 
 import { useB3Lang } from '@/lib/lang';
 
-import { LoyaltyTier, parseThreshold } from '../api';
+import { LoyaltyTier } from '../api';
+import { findNextTier } from '../tierProgress';
 
 interface TiersTabProps {
   tiers: LoyaltyTier[];
@@ -10,26 +11,9 @@ interface TiersTabProps {
   currentTierProgress: number | null;
 }
 
-const findNextTier = (
-  tiers: LoyaltyTier[],
-  progress: number,
-): { tier: LoyaltyTier; threshold: number } | null => {
-  const parsed = tiers
-    .map((tier) => ({ tier, threshold: parseThreshold(tier.threshold) }))
-    .filter((entry): entry is { tier: LoyaltyTier; threshold: number } => entry.threshold !== null)
-    .sort((a, b) => a.threshold - b.threshold);
-
-  // Defensive: if ANY tier threshold fails to parse, the units are suspect — hide progress.
-  if (parsed.length !== tiers.length) {
-    return null;
-  }
-
-  return parsed.find((entry) => entry.threshold > progress) ?? null;
-};
-
 function TiersTab({ tiers, currentTierId, currentTierProgress }: TiersTabProps) {
   const b3Lang = useB3Lang();
-  const next = currentTierProgress === null ? null : findNextTier(tiers, currentTierProgress);
+  const next = findNextTier(tiers, currentTierProgress);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
