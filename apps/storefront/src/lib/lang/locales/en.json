@@ -781,5 +781,7 @@
   "loyalty.tabs.earn": "Earn points",
   "loyalty.tabs.redeem": "Rewards",
   "loyalty.tabs.tiers": "Tiers",
-  "loyalty.tabs.history": "History"
+  "loyalty.tabs.history": "History",
+  "loyalty.tiers.currentTier": "Current tier: {tier}",
+  "loyalty.tiers.progressTo": "Progress to {tier}"
 }

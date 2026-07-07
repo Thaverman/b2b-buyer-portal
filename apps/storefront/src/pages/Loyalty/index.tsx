@@ -7,7 +7,14 @@ import { useB3Lang } from '@/lib/lang';
 import { useAppSelector } from '@/store';
 
 import LoyaltyHero from './components/LoyaltyHero';
-import { fetchLoyaltyCustomer, getLoyaltyDigest, isLoyaltyAvailable, LoyaltyError } from './api';
+import TiersTab from './components/TiersTab';
+import {
+  fetchLoyaltyCustomer,
+  fetchTiers,
+  getLoyaltyDigest,
+  isLoyaltyAvailable,
+  LoyaltyError,
+} from './api';
 
 const LOYALTY_TABS = ['overview', 'earn', 'redeem', 'tiers', 'history'] as const;
 type LoyaltyTab = (typeof LOYALTY_TABS)[number];
@@ -56,6 +63,14 @@ function Loyalty() {
   });
   const customer = customerQuery.data;
 
+  const tiersQuery = useQuery({
+    queryKey: ['loyaltyTiers'],
+    queryFn: fetchTiers,
+    enabled: isAvailable,
+    staleTime: Infinity,
+  });
+  const tiers = tiersQuery.data ?? [];
+
   if (!isAvailable) {
     return (
       <Box>
@@ -75,13 +90,18 @@ function Loyalty() {
   const isSessionExpired = errorKind === 'sessionExpired';
   const isLoadError = Boolean(errorKind) && !isNotEnrolled && !isSessionExpired;
 
+  const tierTitle =
+    (customer?.currentLoyaltyTierId &&
+      tiers.find((tier) => tier.id === customer.currentLoyaltyTierId)?.title) ||
+    null;
+
   return (
     <B3Spin isSpinning={digestQuery.isFetching || customerQuery.isFetching}>
       <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, width: '100%' }}>
         <LoyaltyHero
           companyName={companyName}
           memberSince={customer ? formatMemberSince(customer.createdAt) : null}
-          tierTitle={null}
+          tierTitle={tierTitle}
           pointBalance={customer ? customer.pointBalance : null}
         />
         {isSessionExpired && <Alert severity="warning">{b3Lang('loyalty.sessionExpired')}</Alert>}
@@ -120,7 +140,13 @@ function Loyalty() {
         {tab === 'overview' && <Box data-testid="loyalty-tab-overview" />}
         {tab === 'earn' && <Box data-testid="loyalty-tab-earn" />}
         {tab === 'redeem' && <Box data-testid="loyalty-tab-redeem" />}
-        {tab === 'tiers' && <Box data-testid="loyalty-tab-tiers" />}
+        {tab === 'tiers' && (
+          <TiersTab
+            tiers={tiers}
+            currentTierId={customer?.currentLoyaltyTierId ?? null}
+            currentTierProgress={customer?.currentLoyaltyTierProgress ?? null}
+          />
+        )}
         {tab === 'history' && <Box data-testid="loyalty-tab-history" />}
       </Box>
     </B3Spin>

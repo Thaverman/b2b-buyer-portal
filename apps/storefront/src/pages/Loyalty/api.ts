@@ -202,3 +202,40 @@ export const fetchLoyaltyCustomer = async (identity: LoyaltyIdentity): Promise<L
     likeFacebook: raw.likeFacebook ?? false,
   };
 };
+
+export interface LoyaltyTier {
+  id: string;
+  title: string;
+  threshold: string;
+  perks: string[];
+}
+
+interface RawTier {
+  id?: string | number;
+  title?: string;
+  threshold?: string | number;
+  perks?: string[];
+}
+
+// Tier thresholds are strings with no documented unit (spec S3) — parse defensively.
+export const parseThreshold = (threshold: string): number | null => {
+  if (threshold.trim() === '') {
+    return null;
+  }
+  const value = Number(threshold);
+  return Number.isFinite(value) ? value : null;
+};
+
+export const fetchTiers = async (): Promise<LoyaltyTier[]> => {
+  const config = requireConfig();
+  const raw = (await launcherGet('/shop/tiers', { shop: config.shopKey }, 'upstream')) as {
+    rules?: RawTier[];
+  };
+
+  return (raw.rules ?? []).map((tier) => ({
+    id: String(tier.id ?? ''),
+    title: tier.title ?? '',
+    threshold: String(tier.threshold ?? ''),
+    perks: tier.perks ?? [],
+  }));
+};

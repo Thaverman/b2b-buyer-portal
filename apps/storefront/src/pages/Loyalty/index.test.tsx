@@ -8,9 +8,10 @@ import {
   renderWithProviders,
   screen,
   startMockServer,
+  within,
 } from 'tests/test-utils';
 
-import { LoyaltyCustomer, LoyaltyIdentity } from './api';
+import { LoyaltyCustomer, LoyaltyIdentity, LoyaltyTier } from './api';
 import Loyalty from '.';
 
 vi.mock('@/utils/b3Tip', () => ({
@@ -94,6 +95,16 @@ const mockLoyaltyApis = (customer: LoyaltyCustomer) => {
   mockDigest();
   mockCustomer(customer);
 };
+
+const buildTierWith = builder<LoyaltyTier>(() => ({
+  id: faker.string.uuid(),
+  title: faker.commerce.productAdjective(),
+  threshold: String(faker.number.int({ min: 0, max: 1000 })),
+  perks: [faker.company.catchPhrase()],
+}));
+
+const mockTiers = (tiers: LoyaltyTier[]) =>
+  server.use(http.get(`${launcherBase}/shop/tiers`, () => HttpResponse.json({ rules: tiers })));
 
 it('renders the hero with company name, member-since, and points balance', async () => {
   mockLoyaltyApis(
@@ -205,4 +216,49 @@ it('switches tabs on click', async () => {
   await user.click(await screen.findByRole('tab', { name: 'Tiers' }));
 
   expect(screen.getByRole('tab', { name: 'Tiers', selected: true })).toBeInTheDocument();
+});
+
+it('renders the tier list with the current tier highlighted and its title in the hero', async () => {
+  const select = buildTierWith({ id: 't1', title: 'Select', threshold: '0' });
+  const elite = buildTierWith({ id: 't2', title: 'Elite', threshold: '300' });
+
+  mockLoyaltyApis(
+    buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't1', currentLoyaltyTierProgress: 240 }),
+  );
+  mockTiers([select, elite]);
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  // hero shows the resolved tier title
+  expect(await screen.findByText('Current tier')).toBeInTheDocument();
+  expect(await screen.findByText('Select')).toBeInTheDocument();
+
+  await user.click(screen.getByRole('tab', { name: 'Tiers' }));
+
+  const currentCard = (await screen.findByText('Current tier: Select')).closest(
+    '.MuiCard-root',
+  ) as HTMLElement;
+  expect(within(currentCard).getByText(select.perks[0])).toBeInTheDocument();
+  expect(screen.getByText('Elite')).toBeInTheDocument();
+  // progress toward Elite: 240 of 300
+  expect(screen.getByText('240 / 300')).toBeInTheDocument();
+  expect(screen.getByRole('progressbar')).toBeInTheDocument();
+});
+
+it('hides the tier progress bar when a threshold is not numeric', async () => {
+  mockLoyaltyApis(
+    buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't1', currentLoyaltyTierProgress: 240 }),
+  );
+  mockTiers([
+    buildTierWith({ id: 't1', title: 'Select', threshold: '0' }),
+    buildTierWith({ id: 't2', title: 'Elite', threshold: 'Gold Status' }),
+  ]);
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'Tiers' }));
+
+  // wait for the tier list to render, then confirm no progress bar was attempted
+  expect(await screen.findByText('Current tier: Select')).toBeInTheDocument();
+  expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
 });

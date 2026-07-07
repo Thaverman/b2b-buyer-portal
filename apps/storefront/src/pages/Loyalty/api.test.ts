@@ -7,7 +7,14 @@ import {
   startMockServer,
 } from 'tests/test-utils';
 
-import { fetchLoyaltyCustomer, getLoyaltyDigest, LoyaltyError, LoyaltyIdentity } from './api';
+import {
+  fetchLoyaltyCustomer,
+  fetchTiers,
+  getLoyaltyDigest,
+  LoyaltyError,
+  LoyaltyIdentity,
+  parseThreshold,
+} from './api';
 
 vi.mock('@/utils/b3Logger');
 
@@ -165,5 +172,40 @@ describe('fetchLoyaltyCustomer', () => {
 
     expect(error).toBeInstanceOf(LoyaltyError);
     expect(error.kind).toBe(kind);
+  });
+});
+
+describe('fetchTiers', () => {
+  it('fetches shop tiers with only the shop key and normalizes them', async () => {
+    server.use(
+      http.get('https://launcher.api.influence.io/launcher/v1/shop/tiers', ({ request }) => {
+        assertQueryParams(request, { shop: shopKey });
+
+        return HttpResponse.json({
+          rules: [
+            { id: 't1', title: 'Select', threshold: '0', perks: ['5% credit on every order'] },
+            { id: 't2', title: 'Elite', threshold: '300' },
+          ],
+        });
+      }),
+    );
+
+    const result = await fetchTiers();
+
+    expect(result).toEqual([
+      { id: 't1', title: 'Select', threshold: '0', perks: ['5% credit on every order'] },
+      { id: 't2', title: 'Elite', threshold: '300', perks: [] },
+    ]);
+  });
+});
+
+describe('parseThreshold', () => {
+  it.each([
+    ['300', 300],
+    ['0', 0],
+    ['not-a-number', null],
+    ['', null],
+  ])('parses %j to %j', (input, expected) => {
+    expect(parseThreshold(input)).toBe(expected);
   });
 });
