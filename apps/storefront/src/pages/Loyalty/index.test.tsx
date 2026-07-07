@@ -620,6 +620,7 @@ it('lists points history and loads more pages', async () => {
   await user.click(screen.getByRole('button', { name: 'Load more' }));
 
   expect(await screen.findByText('Order #1002')).toBeInTheDocument();
+  expect(screen.getByText('Order #1001')).toBeInTheDocument();
 });
 
 it('shows the empty history state', async () => {
