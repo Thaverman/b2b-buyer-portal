@@ -8,9 +8,12 @@ import {
 } from 'tests/test-utils';
 
 import {
+  completeSocialRule,
+  fetchEarnRules,
   fetchLoyaltyCustomer,
   fetchTiers,
   getLoyaltyDigest,
+  getSocialCompletionFlag,
   LoyaltyError,
   LoyaltyIdentity,
   parseThreshold,
@@ -207,5 +210,82 @@ describe('parseThreshold', () => {
     ['', null],
   ])('parses %j to %j', (input, expected) => {
     expect(parseThreshold(input)).toBe(expected);
+  });
+});
+
+describe('fetchEarnRules', () => {
+  it('fetches earn rules with only the shop key and maps customTitle to title', async () => {
+    server.use(
+      http.get('https://launcher.api.influence.io/launcher/v1/shop/rules/earn', ({ request }) => {
+        assertQueryParams(request, { shop: shopKey });
+
+        return HttpResponse.json({
+          rules: [
+            {
+              id: 'r1',
+              customTitle: 'Make a purchase',
+              summary: '2 points per $1',
+              earnType: 'order',
+              templateName: 'purchase',
+            },
+          ],
+        });
+      }),
+    );
+
+    const result = await fetchEarnRules();
+
+    expect(result).toEqual([
+      {
+        id: 'r1',
+        title: 'Make a purchase',
+        summary: '2 points per $1',
+        earnType: 'order',
+        templateName: 'purchase',
+        socialUrl: '',
+      },
+    ]);
+  });
+});
+
+describe('completeSocialRule', () => {
+  it('posts identity, shop, digest and ruleId in the body', async () => {
+    const requestBody = vi.fn();
+
+    server.use(
+      http.post(
+        'https://launcher.api.influence.io/launcher/v1/customer/social',
+        async ({ request }) => {
+          requestBody(await request.json());
+
+          return HttpResponse.json({ success: true, points: 100, updatedBalance: 2565 });
+        },
+      ),
+    );
+
+    const result = await completeSocialRule(identity, 'r-social');
+
+    expect(requestBody).toHaveBeenCalledWith({
+      customer: { id: identity.customerId, email: identity.email },
+      shop: shopKey,
+      digest: identity.digest,
+      ruleId: 'r-social',
+    });
+    expect(result).toEqual({ success: true, points: 100, updatedBalance: 2565 });
+  });
+});
+
+describe('getSocialCompletionFlag', () => {
+  it.each([
+    ['instagram_follow', '', 'followInstagram'],
+    ['', 'https://instagram.com/LoyaltyLionHQ', 'followInstagram'],
+    ['tiktok_follow', '', 'followTikTok'],
+    ['twitter_follow', '', 'followTwitter'],
+    ['facebook_like', '', 'likeFacebook'],
+    ['purchase', '', null],
+  ])('maps templateName %j / socialUrl %j to %j', (templateName, socialUrl, expected) => {
+    const rule = { id: 'r', title: '', summary: '', earnType: '', templateName, socialUrl };
+
+    expect(getSocialCompletionFlag(rule)).toBe(expected);
   });
 });

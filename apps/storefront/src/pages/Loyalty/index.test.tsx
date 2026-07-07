@@ -8,10 +8,13 @@ import {
   renderWithProviders,
   screen,
   startMockServer,
+  waitFor,
   within,
 } from 'tests/test-utils';
 
-import { LoyaltyCustomer, LoyaltyIdentity, LoyaltyTier } from './api';
+import { snackbar } from '@/utils/b3Tip';
+
+import { EarnRule, LoyaltyCustomer, LoyaltyIdentity, LoyaltyTier } from './api';
 import Loyalty from '.';
 
 vi.mock('@/utils/b3Tip', () => ({
@@ -105,6 +108,24 @@ const buildTierWith = builder<LoyaltyTier>(() => ({
 
 const mockTiers = (tiers: LoyaltyTier[]) =>
   server.use(http.get(`${launcherBase}/shop/tiers`, () => HttpResponse.json({ rules: tiers })));
+
+const buildEarnRuleWith = builder<EarnRule>(() => ({
+  id: faker.string.uuid(),
+  title: faker.commerce.productName(),
+  summary: faker.company.catchPhrase(),
+  earnType: 'custom',
+  templateName: 'custom',
+  socialUrl: '',
+}));
+
+const mockEarnRules = (rules: EarnRule[]) =>
+  server.use(
+    http.get(`${launcherBase}/shop/rules/earn`, () =>
+      HttpResponse.json({
+        rules: rules.map(({ title, ...rest }) => ({ ...rest, customTitle: title })),
+      }),
+    ),
+  );
 
 it('renders the hero with company name, member-since, and points balance', async () => {
   mockLoyaltyApis(
@@ -286,4 +307,66 @@ it('shows the current tier benefits and points summary on the Your rewards tab',
   expect(screen.getByText('5% credit on every order')).toBeInTheDocument();
   expect(screen.getByText('Free ground shipping over $300')).toBeInTheDocument();
   expect(screen.getByText('240 / 300')).toBeInTheDocument();
+});
+
+it('renders earn rules with title and summary', async () => {
+  const rule = buildEarnRuleWith({ title: 'Make a purchase', summary: '2 points per $1' });
+
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockEarnRules([rule]);
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'Earn points' }));
+
+  expect(await screen.findByText('Make a purchase')).toBeInTheDocument();
+  expect(screen.getByText('2 points per $1')).toBeInTheDocument();
+});
+
+it('shows a completed chip on a social rule the customer already did', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ followInstagram: true }));
+  mockEarnRules([buildEarnRuleWith({ templateName: 'instagram_follow', title: 'Follow us' })]);
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'Earn points' }));
+
+  expect(await screen.findByText('Completed')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Follow' })).not.toBeInTheDocument();
+});
+
+it('awards points through the social follow button', async () => {
+  const requestBody = vi.fn();
+
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ followInstagram: false, pointBalance: 100 }));
+  mockEarnRules([
+    buildEarnRuleWith({
+      id: 'r-ig',
+      templateName: 'instagram_follow',
+      socialUrl: 'https://instagram.com/example',
+      title: 'Follow us on Instagram',
+    }),
+  ]);
+  server.use(
+    http.post(`${launcherBase}/customer/social`, async ({ request }) => {
+      requestBody(await request.json());
+
+      return HttpResponse.json({ success: true, points: 100, updatedBalance: 200 });
+    }),
+  );
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'Earn points' }));
+  await user.click(await screen.findByRole('button', { name: 'Follow' }));
+
+  await waitFor(() => {
+    expect(snackbar.success).toHaveBeenCalledWith('You earned 100 points!');
+  });
+  expect(requestBody).toHaveBeenCalledWith({
+    customer: { id: identity.customerId, email: identity.email },
+    shop: shopKey,
+    digest: identity.digest,
+    ruleId: 'r-ig',
+  });
 });

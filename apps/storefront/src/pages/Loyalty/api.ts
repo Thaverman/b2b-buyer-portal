@@ -239,3 +239,102 @@ export const fetchTiers = async (): Promise<LoyaltyTier[]> => {
     perks: tier.perks ?? [],
   }));
 };
+
+export interface EarnRule {
+  id: string;
+  title: string;
+  summary: string;
+  earnType: string;
+  templateName: string;
+  socialUrl: string;
+}
+
+interface RawEarnRule {
+  id?: string | number;
+  customTitle?: string;
+  summary?: string;
+  earnType?: string;
+  templateName?: string;
+  socialUrl?: string;
+}
+
+export const fetchEarnRules = async (): Promise<EarnRule[]> => {
+  const config = requireConfig();
+  const raw = (await launcherGet('/shop/rules/earn', { shop: config.shopKey }, 'upstream')) as {
+    rules?: RawEarnRule[];
+  };
+
+  return (raw.rules ?? []).map((rule) => ({
+    id: String(rule.id ?? ''),
+    title: rule.customTitle ?? '',
+    summary: rule.summary ?? '',
+    earnType: rule.earnType ?? '',
+    templateName: rule.templateName ?? '',
+    socialUrl: rule.socialUrl ?? '',
+  }));
+};
+
+type SocialFlag = keyof Pick<
+  LoyaltyCustomer,
+  'followInstagram' | 'followTikTok' | 'followTwitter' | 'likeFacebook'
+>;
+
+const SOCIAL_MATCHERS: { match: string; flag: SocialFlag }[] = [
+  { match: 'instagram', flag: 'followInstagram' },
+  { match: 'tiktok', flag: 'followTikTok' },
+  { match: 'twitter', flag: 'followTwitter' },
+  { match: 'facebook', flag: 'likeFacebook' },
+];
+
+// earnType/templateName enums are undocumented upstream (spec S4) — match heuristically
+// on the rule's template name or social URL; unmatched rules render informational-only.
+export const getSocialCompletionFlag = (rule: EarnRule): SocialFlag | null => {
+  const haystack = `${rule.templateName} ${rule.socialUrl}`.toLowerCase();
+  return SOCIAL_MATCHERS.find((matcher) => haystack.includes(matcher.match))?.flag ?? null;
+};
+
+interface SocialResult {
+  success: boolean;
+  points: number;
+  updatedBalance: number;
+}
+
+const launcherPost = async (path: string, body: Record<string, unknown>): Promise<unknown> => {
+  let response: Response;
+  try {
+    response = await fetch(`${LAUNCHER_API_BASE}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new LoyaltyError('upstream');
+  }
+  if (!response.ok) {
+    throw launcherStatusToError(response.status, 'upstream');
+  }
+  return response.json();
+};
+
+const identityBody = (config: LoyaltyConfig, identity: LoyaltyIdentity) => ({
+  customer: { id: identity.customerId, email: identity.email },
+  shop: config.shopKey,
+  digest: identity.digest,
+});
+
+export const completeSocialRule = async (
+  identity: LoyaltyIdentity,
+  ruleId: string,
+): Promise<SocialResult> => {
+  const config = requireConfig();
+  const raw = (await launcherPost('/customer/social', {
+    ...identityBody(config, identity),
+    ruleId,
+  })) as { success?: boolean; points?: number; updatedBalance?: number };
+
+  return {
+    success: raw.success ?? false,
+    points: raw.points ?? 0,
+    updatedBalance: raw.updatedBalance ?? 0,
+  };
+};

@@ -6,6 +6,7 @@ import B3Spin from '@/components/spin/B3Spin';
 import { useB3Lang } from '@/lib/lang';
 import { useAppSelector } from '@/store';
 
+import EarnPointsTab from './components/EarnPointsTab';
 import LoyaltyHero from './components/LoyaltyHero';
 import OverviewTab from './components/OverviewTab';
 import TiersTab from './components/TiersTab';
@@ -139,7 +140,13 @@ function Loyalty() {
           <Tab value="history" label={b3Lang('loyalty.tabs.history')} />
         </Tabs>
         {tab === 'overview' && <OverviewTab customer={customer} tiers={tiers} />}
-        {tab === 'earn' && <Box data-testid="loyalty-tab-earn" />}
+        {tab === 'earn' && (
+          <EarnPointsTab
+            identity={identity}
+            customer={customer}
+            customerQueryKey={['loyaltyCustomer', customerId]}
+          />
+        )}
         {tab === 'redeem' && <Box data-testid="loyalty-tab-redeem" />}
         {tab === 'tiers' && (
           <TiersTab
