@@ -59,9 +59,14 @@ function RewardsTab({ identity, pointBalance, customerQueryKey }: RewardsTabProp
   });
 
   const handleCopy = async () => {
-    if (couponCode) {
+    if (!couponCode) {
+      return;
+    }
+    try {
       await navigator.clipboard.writeText(couponCode);
       snackbar.success(b3Lang('loyalty.redeem.copied'));
+    } catch {
+      snackbar.error(b3Lang('loyalty.errors.generic'));
     }
   };
 

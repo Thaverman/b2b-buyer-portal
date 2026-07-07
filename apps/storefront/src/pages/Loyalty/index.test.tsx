@@ -478,6 +478,31 @@ it('redeems a reward after confirmation and shows the coupon code', async () => 
   expect(screen.getByText('Apply this code at checkout.')).toBeInTheDocument();
 });
 
+it('copies the coupon code to the clipboard', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 600 }));
+  mockRedeemRules([buildRedeemRuleWith({ title: '$5 discount', pointCost: 500 })]);
+  server.use(
+    http.post(`${launcherBase}/customer/redeem`, () =>
+      HttpResponse.json({ success: true, couponCode: 'SAVE-123' }),
+    ),
+  );
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'Rewards' }));
+  await user.click(await screen.findByRole('button', { name: 'Get reward' }));
+  await user.click(await screen.findByRole('button', { name: 'Redeem' }));
+
+  expect(await screen.findByText('SAVE-123')).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'Copy code' }));
+
+  await waitFor(() => {
+    expect(snackbar.success).toHaveBeenCalledWith('Code copied');
+  });
+  expect(await window.navigator.clipboard.readText()).toBe('SAVE-123');
+});
+
 it('does not redeem when the confirmation is cancelled', async () => {
   const redeemRequests = vi.fn();
 
