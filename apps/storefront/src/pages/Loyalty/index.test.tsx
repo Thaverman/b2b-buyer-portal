@@ -321,6 +321,8 @@ it('renders earn rules with title and summary', async () => {
 
   expect(await screen.findByText('Make a purchase')).toBeInTheDocument();
   expect(screen.getByText('2 points per $1')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Follow' })).not.toBeInTheDocument();
+  expect(screen.queryByText('Completed')).not.toBeInTheDocument();
 });
 
 it('shows a completed chip on a social rule the customer already did', async () => {
@@ -368,5 +370,41 @@ it('awards points through the social follow button', async () => {
     shop: shopKey,
     digest: identity.digest,
     ruleId: 'r-ig',
+  });
+});
+
+it('shows the rate-limited error when the social follow is throttled', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ followInstagram: false }));
+  mockEarnRules([buildEarnRuleWith({ templateName: 'instagram_follow', title: 'Follow us' })]);
+  server.use(
+    http.post(`${launcherBase}/customer/social`, () => HttpResponse.json({}, { status: 429 })),
+  );
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'Earn points' }));
+  await user.click(await screen.findByRole('button', { name: 'Follow' }));
+
+  await waitFor(() => {
+    expect(snackbar.error).toHaveBeenCalledWith(
+      'Too many requests — please try again in a minute.',
+    );
+  });
+});
+
+it('shows the generic error when the social follow fails upstream', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ followInstagram: false }));
+  mockEarnRules([buildEarnRuleWith({ templateName: 'instagram_follow', title: 'Follow us' })]);
+  server.use(
+    http.post(`${launcherBase}/customer/social`, () => HttpResponse.json({}, { status: 500 })),
+  );
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'Earn points' }));
+  await user.click(await screen.findByRole('button', { name: 'Follow' }));
+
+  await waitFor(() => {
+    expect(snackbar.error).toHaveBeenCalledWith('Something went wrong. Please try again.');
   });
 });
