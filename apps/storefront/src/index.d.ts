@@ -65,6 +65,15 @@ declare global {
         apiBase: string;
         appClientId: string;
       };
+      /** Gates the /loyalty page; absent (or any field missing) = feature off. */
+      loyalty?: {
+        /** Influence.io shop key (public). */
+        shopKey: string;
+        /** SSW digest-endpoint host, e.g. https://<gateway>/customers */
+        apiBase: string;
+        /** SSW app client id used to mint the Current Customer JWT. */
+        appClientId: string;
+      };
     };
     B3: {
       setting: {

@@ -30,6 +30,7 @@ const HomePage = lazy(() => import('@/pages/HomePage'));
 const Invoice = lazy(() => import('@/pages/Invoice'));
 const InvoicePayment = lazy(() => import('@/pages/InvoicePayment'));
 const Login = lazy(() => import('@/pages/Login'));
+const Loyalty = lazy(() => import('@/pages/Loyalty'));
 const OrderDetail = lazy(() => import('@/pages/OrderDetail'));
 const MyOrders = lazy(() => import('@/pages/MyOrders'));
 const PaymentMethods = lazy(() => import('@/pages/PaymentMethods'));
@@ -64,6 +65,7 @@ const routesMap: Record<string, LazyExoticComponent<(props: PageProps) => ReactE
   '/company-hierarchy': CompanyHierarchy,
   '/manage-subscriptions': ManageSubscriptions,
   '/payment-methods': PaymentMethods,
+  '/loyalty': Loyalty,
 };
 
 function addComponentToRoutes(routes: BuyerPortalRoute[]): RouteItem[] {

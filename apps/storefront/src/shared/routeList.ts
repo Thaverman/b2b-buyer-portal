@@ -233,6 +233,15 @@ export const routeList: (BuyerPortalRoute | RouteItem)[] = [
     idLang: 'global.navMenu.paymentMethods',
   },
   {
+    path: '/loyalty',
+    name: 'Rewards',
+    wsKey: 'loyalty',
+    isMenuItem: true,
+    permissions: accountSettingPermissions,
+    isTokenLogin: true,
+    idLang: 'global.navMenu.loyalty',
+  },
+  {
     path: '/company-hierarchy',
     name: 'Company hierarchy',
     subsidiariesCompanyKey: 'companyHierarchy',
@@ -281,6 +290,15 @@ export const getAllowedRoutesWithoutComponent = (globalState: GlobalState): Buye
     if (
       path === '/payment-methods' &&
       (platform !== 'bigcommerce' || !window.BC_CONTEXT?.paymentMethods || isAgenting)
+    ) {
+      return false;
+    }
+
+    // /loyalty is Stencil-only, host-configured, and hidden while agenting —
+    // the loyalty digest identifies the logged-in rep, not the masqueraded buyer.
+    if (
+      path === '/loyalty' &&
+      (platform !== 'bigcommerce' || !window.BC_CONTEXT?.loyalty || isAgenting)
     ) {
       return false;
     }
