@@ -365,6 +365,44 @@ it('renders earn rules with title and summary', async () => {
   expect(screen.queryByText('Completed')).not.toBeInTheDocument();
 });
 
+it('shows a per-dollar points line for increments earn rules', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockEarnRules([
+    buildEarnRuleWith({ title: 'Place an order', earnType: 'increments', earnValue: 3 }),
+  ]);
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'Earn points' }));
+
+  expect(await screen.findByText('Place an order')).toBeInTheDocument();
+  expect(screen.getByText('Earn 3 points per $1 spent')).toBeInTheDocument();
+});
+
+it('shows a flat points line for non-increments earn rules', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockEarnRules([buildEarnRuleWith({ title: 'Sign up', earnType: '', earnValue: 10 })]);
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'Earn points' }));
+
+  expect(await screen.findByText('Sign up')).toBeInTheDocument();
+  expect(screen.getByText('Earn 10 points')).toBeInTheDocument();
+});
+
+it('omits the points line when earnValue is 0', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockEarnRules([buildEarnRuleWith({ title: 'Mystery rule', earnValue: 0 })]);
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'Earn points' }));
+
+  expect(await screen.findByText('Mystery rule')).toBeInTheDocument();
+  expect(screen.queryByText('Earn 0 points')).not.toBeInTheDocument();
+});
+
 it('shows a completed chip on a social rule the customer already did', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith({ followInstagram: true }));
   mockEarnRules([buildEarnRuleWith({ templateName: 'instagram_follow', title: 'Follow us' })]);

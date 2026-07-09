@@ -82,6 +82,13 @@ function EarnPointsTab({ identity, customer, customerQueryKey }: EarnPointsTabPr
             <Typography variant="body2" sx={{ mb: 1 }}>
               {rule.summary}
             </Typography>
+            {rule.earnValue > 0 && (
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                {rule.earnType === 'increments'
+                  ? b3Lang('loyalty.earn.perDollar', { points: rule.earnValue })
+                  : b3Lang('loyalty.earn.flat', { points: rule.earnValue })}
+              </Typography>
+            )}
             {renderAction(rule)}
           </CardContent>
         </Card>
