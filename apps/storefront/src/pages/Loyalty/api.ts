@@ -254,6 +254,7 @@ export interface EarnRule {
 interface RawEarnRule {
   id?: string | number;
   customTitle?: string;
+  title?: string;
   summary?: string;
   earnType?: string;
   templateName?: string;
@@ -268,7 +269,7 @@ export const fetchEarnRules = async (): Promise<EarnRule[]> => {
 
   return (raw.rules ?? []).map((rule) => ({
     id: String(rule.id ?? ''),
-    title: rule.customTitle ?? '',
+    title: rule.customTitle ?? rule.title ?? '',
     summary: rule.summary ?? '',
     earnType: rule.earnType ?? '',
     templateName: rule.templateName ?? '',

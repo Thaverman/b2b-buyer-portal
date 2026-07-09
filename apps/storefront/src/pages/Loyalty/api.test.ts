@@ -251,6 +251,31 @@ describe('fetchEarnRules', () => {
       },
     ]);
   });
+
+  it('falls back to title when customTitle is absent (real Launcher payload shape)', async () => {
+    server.use(
+      http.get('https://launcher.api.influence.io/launcher/v1/shop/rules/earn', () =>
+        HttpResponse.json({
+          rules: [
+            { id: 'r2', title: 'Place an order', earnType: 'increments', templateName: 'placeorder' },
+          ],
+        }),
+      ),
+    );
+
+    const result = await fetchEarnRules();
+
+    expect(result).toEqual([
+      {
+        id: 'r2',
+        title: 'Place an order',
+        summary: '',
+        earnType: 'increments',
+        templateName: 'placeorder',
+        socialUrl: '',
+      },
+    ]);
+  });
 });
 
 describe('completeSocialRule', () => {
