@@ -9,6 +9,7 @@ import {
 
 import {
   completeSocialRule,
+  EarnRule,
   fetchEarnedRewards,
   fetchEarnRules,
   fetchLoyaltyCustomer,
@@ -17,6 +18,7 @@ import {
   fetchTiers,
   getLoyaltyDigest,
   getSocialCompletionFlag,
+  isEarnRuleForTier,
   isRedeemableCatalogRule,
   LoyaltyError,
   LoyaltyIdentity,
@@ -38,6 +40,18 @@ const buildLoyaltyIdentityWith = builder<LoyaltyIdentity>(() => ({
   digest: faker.string.hexadecimal({ length: 64, prefix: '' }).toLowerCase(),
   customerId: faker.number.int({ min: 1, max: 99999 }).toString(),
   email: faker.internet.email().toLowerCase(),
+}));
+
+const buildEarnRuleWith = builder<EarnRule>(() => ({
+  id: faker.string.uuid(),
+  title: faker.commerce.productName(),
+  summary: '',
+  earnType: '',
+  templateName: '',
+  socialUrl: '',
+  earnValue: 0,
+  limitTiers: false,
+  loyaltyTierIds: [],
 }));
 
 const identity = buildLoyaltyIdentityWith({});
@@ -375,6 +389,22 @@ describe('getSocialCompletionFlag', () => {
 
     expect(getSocialCompletionFlag(rule)).toBe(expected);
   });
+});
+
+describe('isEarnRuleForTier', () => {
+  it.each([
+    [false, [], 'tier-select', true],
+    [true, ['tier-select'], 'tier-select', true],
+    [true, ['tier-select'], 'tier-signature', false],
+    [true, ['tier-select'], null, false],
+  ] as [boolean, string[], string | null, boolean][])(
+    'limitTiers=%j tierIds=%j currentTier=%j → %j',
+    (limitTiers, loyaltyTierIds, currentTierId, expected) => {
+      const rule = buildEarnRuleWith({ limitTiers, loyaltyTierIds });
+
+      expect(isEarnRuleForTier(rule, currentTierId)).toBe(expected);
+    },
+  );
 });
 
 describe('fetchRedeemRules and isRedeemableCatalogRule', () => {

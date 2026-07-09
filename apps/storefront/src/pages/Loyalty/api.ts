@@ -305,6 +305,18 @@ export const getSocialCompletionFlag = (rule: EarnRule): SocialFlag | null => {
   return SOCIAL_MATCHERS.find((matcher) => haystack.includes(matcher.match))?.flag ?? null;
 };
 
+// Tier-gated rules (limitTiers) only apply to customers in one of the listed tiers;
+// with no known tier we hide them rather than show a rate the customer may not get.
+export const isEarnRuleForTier = (rule: EarnRule, currentTierId: string | null): boolean => {
+  if (!rule.limitTiers) {
+    return true;
+  }
+  if (!currentTierId) {
+    return false;
+  }
+  return rule.loyaltyTierIds.includes(currentTierId);
+};
+
 interface SocialResult {
   success: boolean;
   points: number;
