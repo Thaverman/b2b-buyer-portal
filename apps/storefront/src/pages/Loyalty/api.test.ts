@@ -248,6 +248,9 @@ describe('fetchEarnRules', () => {
         earnType: 'order',
         templateName: 'purchase',
         socialUrl: '',
+        earnValue: 0,
+        limitTiers: false,
+        loyaltyTierIds: [],
       },
     ]);
   });
@@ -257,7 +260,12 @@ describe('fetchEarnRules', () => {
       http.get('https://launcher.api.influence.io/launcher/v1/shop/rules/earn', () =>
         HttpResponse.json({
           rules: [
-            { id: 'r2', title: 'Place an order', earnType: 'increments', templateName: 'placeorder' },
+            {
+              id: 'r2',
+              title: 'Place an order',
+              earnType: 'increments',
+              templateName: 'placeorder',
+            },
           ],
         }),
       ),
@@ -273,6 +281,45 @@ describe('fetchEarnRules', () => {
         earnType: 'increments',
         templateName: 'placeorder',
         socialUrl: '',
+        earnValue: 0,
+        limitTiers: false,
+        loyaltyTierIds: [],
+      },
+    ]);
+  });
+
+  it('maps earnValue, limitTiers and loyaltyTierIds', async () => {
+    server.use(
+      http.get('https://launcher.api.influence.io/launcher/v1/shop/rules/earn', () =>
+        HttpResponse.json({
+          rules: [
+            {
+              id: 'r3',
+              title: 'Place an order',
+              earnType: 'increments',
+              earnValue: 3,
+              templateName: 'placeorder',
+              limitTiers: true,
+              loyaltyTierIds: ['29777d36-e455-44aa-a711-62f7c0ddad85'],
+            },
+          ],
+        }),
+      ),
+    );
+
+    const result = await fetchEarnRules();
+
+    expect(result).toEqual([
+      {
+        id: 'r3',
+        title: 'Place an order',
+        summary: '',
+        earnType: 'increments',
+        templateName: 'placeorder',
+        socialUrl: '',
+        earnValue: 3,
+        limitTiers: true,
+        loyaltyTierIds: ['29777d36-e455-44aa-a711-62f7c0ddad85'],
       },
     ]);
   });
@@ -314,7 +361,17 @@ describe('getSocialCompletionFlag', () => {
     ['facebook_like', '', 'likeFacebook'],
     ['purchase', '', null],
   ])('maps templateName %j / socialUrl %j to %j', (templateName, socialUrl, expected) => {
-    const rule = { id: 'r', title: '', summary: '', earnType: '', templateName, socialUrl };
+    const rule = {
+      id: 'r',
+      title: '',
+      summary: '',
+      earnType: '',
+      templateName,
+      socialUrl,
+      earnValue: 0,
+      limitTiers: false,
+      loyaltyTierIds: [],
+    };
 
     expect(getSocialCompletionFlag(rule)).toBe(expected);
   });

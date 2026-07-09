@@ -249,6 +249,9 @@ export interface EarnRule {
   earnType: string;
   templateName: string;
   socialUrl: string;
+  earnValue: number;
+  limitTiers: boolean;
+  loyaltyTierIds: string[];
 }
 
 interface RawEarnRule {
@@ -259,6 +262,9 @@ interface RawEarnRule {
   earnType?: string;
   templateName?: string;
   socialUrl?: string;
+  earnValue?: number;
+  limitTiers?: boolean;
+  loyaltyTierIds?: (string | number)[];
 }
 
 export const fetchEarnRules = async (): Promise<EarnRule[]> => {
@@ -274,6 +280,9 @@ export const fetchEarnRules = async (): Promise<EarnRule[]> => {
     earnType: rule.earnType ?? '',
     templateName: rule.templateName ?? '',
     socialUrl: rule.socialUrl ?? '',
+    earnValue: rule.earnValue ?? 0,
+    limitTiers: rule.limitTiers ?? false,
+    loyaltyTierIds: (rule.loyaltyTierIds ?? []).map(String),
   }));
 };
 

@@ -124,6 +124,9 @@ const buildEarnRuleWith = builder<EarnRule>(() => ({
   earnType: 'custom',
   templateName: 'custom',
   socialUrl: '',
+  earnValue: 0,
+  limitTiers: false,
+  loyaltyTierIds: [],
 }));
 
 const mockEarnRules = (rules: EarnRule[]) =>
