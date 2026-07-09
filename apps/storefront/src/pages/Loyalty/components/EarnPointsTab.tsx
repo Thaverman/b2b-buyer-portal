@@ -9,6 +9,7 @@ import {
   EarnRule,
   fetchEarnRules,
   getSocialCompletionFlag,
+  isEarnRuleForTier,
   LoyaltyCustomer,
   LoyaltyError,
   LoyaltyIdentity,
@@ -29,7 +30,9 @@ function EarnPointsTab({ identity, customer, customerQueryKey }: EarnPointsTabPr
     queryFn: fetchEarnRules,
     staleTime: Infinity,
   });
-  const rules = rulesQuery.data ?? [];
+  const rules = (rulesQuery.data ?? []).filter((rule) =>
+    isEarnRuleForTier(rule, customer?.currentLoyaltyTierId ?? null),
+  );
 
   const socialMutation = useMutation({
     mutationFn: (ruleId: string) => {

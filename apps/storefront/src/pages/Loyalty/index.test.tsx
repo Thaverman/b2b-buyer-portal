@@ -403,6 +403,36 @@ it('omits the points line when earnValue is 0', async () => {
   expect(screen.queryByText('Earn 0 points')).not.toBeInTheDocument();
 });
 
+it('shows only the earn rules for the customer current tier', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 'tier-signature' }));
+  mockEarnRules([
+    buildEarnRuleWith({
+      title: 'Place an order',
+      earnType: 'increments',
+      earnValue: 3,
+      limitTiers: true,
+      loyaltyTierIds: ['tier-signature'],
+    }),
+    buildEarnRuleWith({
+      title: 'Place an order',
+      earnType: 'increments',
+      earnValue: 2,
+      limitTiers: true,
+      loyaltyTierIds: ['tier-select'],
+    }),
+    buildEarnRuleWith({ title: 'Sign up', earnValue: 10 }),
+  ]);
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'Earn points' }));
+
+  expect(await screen.findByText('Sign up')).toBeInTheDocument();
+  expect(screen.getAllByText('Place an order')).toHaveLength(1);
+  expect(screen.getByText('Earn 3 points per $1 spent')).toBeInTheDocument();
+  expect(screen.queryByText('Earn 2 points per $1 spent')).not.toBeInTheDocument();
+});
+
 it('shows a completed chip on a social rule the customer already did', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith({ followInstagram: true }));
   mockEarnRules([buildEarnRuleWith({ templateName: 'instagram_follow', title: 'Follow us' })]);
