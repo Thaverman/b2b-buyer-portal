@@ -16,6 +16,9 @@ import {
   redeemReward,
   RedeemRule,
 } from '../api';
+import { redeemRuleIcon } from '../loyaltyIcons';
+
+import SectionHeader from './SectionHeader';
 
 interface RewardsTabProps {
   identity: LoyaltyIdentity | undefined;
@@ -96,95 +99,108 @@ function RewardsTab({ identity, pointBalance, customerQueryKey }: RewardsTabProp
   };
 
   return (
-    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-      {catalog.map((rule) => (
-        <Card key={rule.id} sx={{ minWidth: 240, flex: '1 1 40%' }}>
-          <CardContent sx={{ textAlign: 'center' }}>
-            <Typography variant="subtitle1">{rule.title}</Typography>
-            <Typography variant="body2" sx={{ mb: 1 }}>
-              {b3Lang('loyalty.redeem.pointCost', {
-                points: (rule.pointCost ?? 0).toLocaleString(),
-              })}
-            </Typography>
-            <Button
+    <Box>
+      <SectionHeader>{b3Lang('loyalty.tabs.redeem')}</SectionHeader>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+        {catalog.map((rule) => {
+          const Icon = redeemRuleIcon(rule);
+          return (
+            <Card
+              key={rule.id}
               variant="outlined"
-              size="small"
-              disabled={redeemMutation.isPending || (rule.pointCost ?? 0) > pointBalance}
-              onClick={() => setPendingRedeem(rule)}
+              sx={{ minWidth: 240, flex: '1 1 40%', borderRadius: 2 }}
             >
-              {b3Lang('loyalty.redeem.getReward')}
-            </Button>
-          </CardContent>
-        </Card>
-      ))}
-      <B3Dialog
-        isOpen={Boolean(pendingRedeem)}
-        title={b3Lang('loyalty.redeem.confirmTitle')}
-        leftSizeBtn={b3Lang('loyalty.redeem.cancel')}
-        rightSizeBtn={b3Lang('loyalty.redeem.confirm')}
-        loading={redeemMutation.isPending}
-        handleLeftClick={() => {
-          if (!redeemMutation.isPending) {
-            setPendingRedeem(null);
-          }
-        }}
-        handRightClick={() => {
-          if (pendingRedeem) {
-            redeemMutation.mutate(pendingRedeem.id);
-          }
-        }}
-      >
-        <Box>
-          {pendingRedeem &&
-            b3Lang('loyalty.redeem.confirmContent', {
-              reward: pendingRedeem.title,
-              points: (pendingRedeem.pointCost ?? 0).toLocaleString(),
-            })}
-        </Box>
-      </B3Dialog>
-      <B3Dialog
-        isOpen={Boolean(couponCode)}
-        title={b3Lang('loyalty.redeem.couponTitle')}
-        leftSizeBtn={b3Lang('loyalty.redeem.copy')}
-        rightSizeBtn={b3Lang('loyalty.redeem.close')}
-        handleLeftClick={handleCopy}
-        handRightClick={() => setCouponCode(null)}
-      >
-        <Box sx={{ textAlign: 'center' }}>
-          <Typography variant="h5" sx={{ mb: 1 }}>
-            {couponCode}
-          </Typography>
-          <Typography variant="body2">{b3Lang('loyalty.redeem.applyAtCheckout')}</Typography>
-        </Box>
-      </B3Dialog>
-      {earnedRewards.length > 0 && (
-        <Box sx={{ width: '100%', mt: 2 }}>
-          <Typography variant="h6" sx={{ mb: 1 }}>
-            {b3Lang('loyalty.redeem.earnedTitle')}
-          </Typography>
-          {earnedRewards.map((reward) => (
-            <Card key={reward.id} sx={{ mb: 1 }}>
-              <CardContent
-                sx={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap' }}
-              >
-                <Typography variant="body2">{reward.title}</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                  {reward.couponCode}
+              <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                <Icon color="primary" sx={{ fontSize: 32, mb: 1 }} />
+                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                  {rule.title}
                 </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  {b3Lang('loyalty.redeem.pointCost', {
+                    points: (rule.pointCost ?? 0).toLocaleString(),
+                  })}
+                </Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={redeemMutation.isPending || (rule.pointCost ?? 0) > pointBalance}
+                  onClick={() => setPendingRedeem(rule)}
+                >
+                  {b3Lang('loyalty.redeem.getReward')}
+                </Button>
               </CardContent>
             </Card>
-          ))}
-          {earnedQuery.hasNextPage && (
-            <Button
-              size="small"
-              disabled={earnedQuery.isFetchingNextPage}
-              onClick={() => earnedQuery.fetchNextPage()}
-            >
-              {b3Lang('loyalty.loadMore')}
-            </Button>
-          )}
-        </Box>
-      )}
+          );
+        })}
+        <B3Dialog
+          isOpen={Boolean(pendingRedeem)}
+          title={b3Lang('loyalty.redeem.confirmTitle')}
+          leftSizeBtn={b3Lang('loyalty.redeem.cancel')}
+          rightSizeBtn={b3Lang('loyalty.redeem.confirm')}
+          loading={redeemMutation.isPending}
+          handleLeftClick={() => {
+            if (!redeemMutation.isPending) {
+              setPendingRedeem(null);
+            }
+          }}
+          handRightClick={() => {
+            if (pendingRedeem) {
+              redeemMutation.mutate(pendingRedeem.id);
+            }
+          }}
+        >
+          <Box>
+            {pendingRedeem &&
+              b3Lang('loyalty.redeem.confirmContent', {
+                reward: pendingRedeem.title,
+                points: (pendingRedeem.pointCost ?? 0).toLocaleString(),
+              })}
+          </Box>
+        </B3Dialog>
+        <B3Dialog
+          isOpen={Boolean(couponCode)}
+          title={b3Lang('loyalty.redeem.couponTitle')}
+          leftSizeBtn={b3Lang('loyalty.redeem.copy')}
+          rightSizeBtn={b3Lang('loyalty.redeem.close')}
+          handleLeftClick={handleCopy}
+          handRightClick={() => setCouponCode(null)}
+        >
+          <Box sx={{ textAlign: 'center' }}>
+            <Typography variant="h5" sx={{ mb: 1 }}>
+              {couponCode}
+            </Typography>
+            <Typography variant="body2">{b3Lang('loyalty.redeem.applyAtCheckout')}</Typography>
+          </Box>
+        </B3Dialog>
+        {earnedRewards.length > 0 && (
+          <Box sx={{ width: '100%', mt: 2 }}>
+            <Typography variant="h6" sx={{ mb: 1 }}>
+              {b3Lang('loyalty.redeem.earnedTitle')}
+            </Typography>
+            {earnedRewards.map((reward) => (
+              <Card key={reward.id} variant="outlined" sx={{ mb: 1, borderRadius: 2 }}>
+                <CardContent
+                  sx={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap' }}
+                >
+                  <Typography variant="body2">{reward.title}</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                    {reward.couponCode}
+                  </Typography>
+                </CardContent>
+              </Card>
+            ))}
+            {earnedQuery.hasNextPage && (
+              <Button
+                size="small"
+                disabled={earnedQuery.isFetchingNextPage}
+                onClick={() => earnedQuery.fetchNextPage()}
+              >
+                {b3Lang('loyalty.loadMore')}
+              </Button>
+            )}
+          </Box>
+        )}
+      </Box>
     </Box>
   );
 }
