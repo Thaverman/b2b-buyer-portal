@@ -102,7 +102,17 @@ function Loyalty() {
 
   return (
     <B3Spin isSpinning={digestQuery.isFetching || customerQuery.isFetching}>
-      <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, width: '100%' }}>
+      {/* pb clears host-page overlays (company-hierarchy bar, loyalty launcher) that float
+          above the portal iframe at the bottom of small screens. */}
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          flex: 1,
+          width: '100%',
+          pb: { xs: 15, md: 0 },
+        }}
+      >
         <LoyaltyHero
           companyName={companyName}
           memberSince={customer ? formatMemberSince(customer.createdAt) : null}
@@ -134,7 +144,14 @@ function Loyalty() {
           onChange={(_, newTab: LoyaltyTab) => setSearchParams({ tab: newTab }, { replace: true })}
           variant="scrollable"
           allowScrollButtonsMobile
-          sx={{ mb: 2 }}
+          // Auto margins center the tab group when it fits and resolve to 0 on overflow,
+          // keeping start-aligned scrolling. (justify-content 'safe center' is parsed but
+          // ignored by Chromium <115 / Safari <17.6, where it would clip the first tabs.)
+          sx={{
+            mb: 2,
+            '& .MuiTabs-flexContainer > :first-of-type': { ml: 'auto' },
+            '& .MuiTabs-flexContainer > :last-of-type': { mr: 'auto' },
+          }}
         >
           <Tab
             value="overview"

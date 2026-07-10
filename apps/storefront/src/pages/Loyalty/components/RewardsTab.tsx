@@ -132,46 +132,6 @@ function RewardsTab({ identity, pointBalance, customerQueryKey }: RewardsTabProp
             </Card>
           );
         })}
-        <B3Dialog
-          isOpen={Boolean(pendingRedeem)}
-          title={b3Lang('loyalty.redeem.confirmTitle')}
-          leftSizeBtn={b3Lang('loyalty.redeem.cancel')}
-          rightSizeBtn={b3Lang('loyalty.redeem.confirm')}
-          loading={redeemMutation.isPending}
-          handleLeftClick={() => {
-            if (!redeemMutation.isPending) {
-              setPendingRedeem(null);
-            }
-          }}
-          handRightClick={() => {
-            if (pendingRedeem) {
-              redeemMutation.mutate(pendingRedeem.id);
-            }
-          }}
-        >
-          <Box>
-            {pendingRedeem &&
-              b3Lang('loyalty.redeem.confirmContent', {
-                reward: pendingRedeem.title,
-                points: (pendingRedeem.pointCost ?? 0).toLocaleString(),
-              })}
-          </Box>
-        </B3Dialog>
-        <B3Dialog
-          isOpen={Boolean(couponCode)}
-          title={b3Lang('loyalty.redeem.couponTitle')}
-          leftSizeBtn={b3Lang('loyalty.redeem.copy')}
-          rightSizeBtn={b3Lang('loyalty.redeem.close')}
-          handleLeftClick={handleCopy}
-          handRightClick={() => setCouponCode(null)}
-        >
-          <Box sx={{ textAlign: 'center' }}>
-            <Typography variant="h5" sx={{ mb: 1 }}>
-              {couponCode}
-            </Typography>
-            <Typography variant="body2">{b3Lang('loyalty.redeem.applyAtCheckout')}</Typography>
-          </Box>
-        </B3Dialog>
         {earnedRewards.length > 0 && (
           <Box sx={{ width: '100%', mt: 2 }}>
             <Typography variant="h6" sx={{ mb: 1 }}>
@@ -201,6 +161,48 @@ function RewardsTab({ identity, pointBalance, customerQueryKey }: RewardsTabProp
           </Box>
         )}
       </Box>
+      {/* Dialogs live outside the card grid: B3Dialog renders an in-flow wrapper even
+          when closed, and as a flex item it consumes grid gap, shrinking the last card. */}
+      <B3Dialog
+        isOpen={Boolean(pendingRedeem)}
+        title={b3Lang('loyalty.redeem.confirmTitle')}
+        leftSizeBtn={b3Lang('loyalty.redeem.cancel')}
+        rightSizeBtn={b3Lang('loyalty.redeem.confirm')}
+        loading={redeemMutation.isPending}
+        handleLeftClick={() => {
+          if (!redeemMutation.isPending) {
+            setPendingRedeem(null);
+          }
+        }}
+        handRightClick={() => {
+          if (pendingRedeem) {
+            redeemMutation.mutate(pendingRedeem.id);
+          }
+        }}
+      >
+        <Box>
+          {pendingRedeem &&
+            b3Lang('loyalty.redeem.confirmContent', {
+              reward: pendingRedeem.title,
+              points: (pendingRedeem.pointCost ?? 0).toLocaleString(),
+            })}
+        </Box>
+      </B3Dialog>
+      <B3Dialog
+        isOpen={Boolean(couponCode)}
+        title={b3Lang('loyalty.redeem.couponTitle')}
+        leftSizeBtn={b3Lang('loyalty.redeem.copy')}
+        rightSizeBtn={b3Lang('loyalty.redeem.close')}
+        handleLeftClick={handleCopy}
+        handRightClick={() => setCouponCode(null)}
+      >
+        <Box sx={{ textAlign: 'center' }}>
+          <Typography variant="h5" sx={{ mb: 1 }}>
+            {couponCode}
+          </Typography>
+          <Typography variant="body2">{b3Lang('loyalty.redeem.applyAtCheckout')}</Typography>
+        </Box>
+      </B3Dialog>
     </Box>
   );
 }
