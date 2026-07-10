@@ -14,6 +14,9 @@ import {
   LoyaltyError,
   LoyaltyIdentity,
 } from '../api';
+import { earnRuleIcon } from '../loyaltyIcons';
+
+import SectionHeader from './SectionHeader';
 
 interface EarnPointsTabProps {
   identity: LoyaltyIdentity | undefined;
@@ -77,25 +80,38 @@ function EarnPointsTab({ identity, customer, customerQueryKey }: EarnPointsTabPr
   };
 
   return (
-    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-      {rules.map((rule) => (
-        <Card key={rule.id} sx={{ minWidth: 240, flex: '1 1 40%' }}>
-          <CardContent sx={{ textAlign: 'center' }}>
-            <Typography variant="subtitle1">{rule.title}</Typography>
-            <Typography variant="body2" sx={{ mb: 1 }}>
-              {rule.summary}
-            </Typography>
-            {rule.earnValue > 0 && (
-              <Typography variant="body2" sx={{ mb: 1 }}>
-                {rule.earnType === 'increments'
-                  ? b3Lang('loyalty.earn.perDollar', { points: rule.earnValue })
-                  : b3Lang('loyalty.earn.flat', { points: rule.earnValue })}
-              </Typography>
-            )}
-            {renderAction(rule)}
-          </CardContent>
-        </Card>
-      ))}
+    <Box>
+      <SectionHeader>{b3Lang('loyalty.tabs.earn')}</SectionHeader>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+        {rules.map((rule) => {
+          const Icon = earnRuleIcon(rule);
+          return (
+            <Card
+              key={rule.id}
+              variant="outlined"
+              sx={{ minWidth: 240, flex: '1 1 40%', borderRadius: 2 }}
+            >
+              <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                <Icon color="primary" sx={{ fontSize: 32, mb: 1 }} />
+                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                  {rule.title}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  {rule.summary}
+                </Typography>
+                {rule.earnValue > 0 && (
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    {rule.earnType === 'increments'
+                      ? b3Lang('loyalty.earn.perDollar', { points: rule.earnValue })
+                      : b3Lang('loyalty.earn.flat', { points: rule.earnValue })}
+                  </Typography>
+                )}
+                {renderAction(rule)}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </Box>
     </Box>
   );
 }
