@@ -5,6 +5,8 @@ import { useB3Lang } from '@/lib/lang';
 
 import { fetchPointsHistory, LoyaltyIdentity, PointActivity } from '../api';
 
+import SectionHeader from './SectionHeader';
+
 interface HistoryTabProps {
   identity: LoyaltyIdentity | undefined;
 }
@@ -37,21 +39,22 @@ function HistoryTab({ identity }: HistoryTabProps) {
     enabled: Boolean(identity),
   });
   const activities: PointActivity[] = historyQuery.data?.pages.flatMap((page) => page.items) ?? [];
-
-  if (historyQuery.isSuccess && activities.length === 0) {
-    return <Typography>{b3Lang('loyalty.history.empty')}</Typography>;
-  }
+  const showEmpty = historyQuery.isSuccess && activities.length === 0;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <SectionHeader>{b3Lang('loyalty.tabs.history')}</SectionHeader>
+      {showEmpty && <Typography>{b3Lang('loyalty.history.empty')}</Typography>}
       {activities.map((activity) => (
-        <Card key={activity.id}>
+        <Card key={activity.id} variant="outlined" sx={{ borderRadius: 2 }}>
           <CardContent sx={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap' }}>
             <Box>
               <Typography variant="body2">
                 {activity.customDescription || activity.action}
               </Typography>
-              <Typography variant="caption">{formatDate(activity.createdAt)}</Typography>
+              <Typography variant="caption" color="text.secondary">
+                {formatDate(activity.createdAt)}
+              </Typography>
             </Box>
             <Typography variant="body2" sx={{ fontWeight: 700 }}>
               {formatPoints(activity.points)}
