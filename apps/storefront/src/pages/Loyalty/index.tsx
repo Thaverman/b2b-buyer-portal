@@ -1,4 +1,5 @@
 import { useSearchParams } from 'react-router-dom';
+import { CardGiftcard, FavoriteBorder, Layers, Schedule, StarBorder } from '@mui/icons-material';
 import { Alert, Box, Button, Tab, Tabs, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 
@@ -135,11 +136,36 @@ function Loyalty() {
           allowScrollButtonsMobile
           sx={{ mb: 2 }}
         >
-          <Tab value="overview" label={b3Lang('loyalty.tabs.overview')} />
-          <Tab value="earn" label={b3Lang('loyalty.tabs.earn')} />
-          <Tab value="redeem" label={b3Lang('loyalty.tabs.redeem')} />
-          <Tab value="tiers" label={b3Lang('loyalty.tabs.tiers')} />
-          <Tab value="history" label={b3Lang('loyalty.tabs.history')} />
+          <Tab
+            value="overview"
+            icon={<FavoriteBorder />}
+            iconPosition="start"
+            label={b3Lang('loyalty.tabs.overview')}
+          />
+          <Tab
+            value="earn"
+            icon={<StarBorder />}
+            iconPosition="start"
+            label={b3Lang('loyalty.tabs.earn')}
+          />
+          <Tab
+            value="redeem"
+            icon={<CardGiftcard />}
+            iconPosition="start"
+            label={b3Lang('loyalty.tabs.redeem')}
+          />
+          <Tab
+            value="tiers"
+            icon={<Layers />}
+            iconPosition="start"
+            label={b3Lang('loyalty.tabs.tiers')}
+          />
+          <Tab
+            value="history"
+            icon={<Schedule />}
+            iconPosition="start"
+            label={b3Lang('loyalty.tabs.history')}
+          />
         </Tabs>
         {tab === 'overview' && <OverviewTab customer={customer} tiers={tiers} />}
         {tab === 'earn' && (
