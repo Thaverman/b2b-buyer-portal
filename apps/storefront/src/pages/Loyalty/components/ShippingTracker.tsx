@@ -13,6 +13,9 @@ function ShippingTracker() {
     queryKey: ['loyaltyShipping'],
     queryFn: getShippingCalculation,
     enabled: isShippingTrackerAvailable(),
+    // The app-level QueryClient disables refetchOnWindowFocus; this query opts back in
+    // so the bar refreshes when the shopper returns after editing their cart elsewhere.
+    refetchOnWindowFocus: true,
   });
   const calculation = shippingQuery.data;
 

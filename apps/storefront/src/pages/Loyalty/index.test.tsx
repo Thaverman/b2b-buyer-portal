@@ -868,3 +868,22 @@ it('hides the shipping tracker when the resolved threshold is zero', async () =>
   expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
   expect(screen.queryByText(/away from FREE shipping/)).not.toBeInTheDocument();
 });
+
+it('shows a zero bar with the full threshold remaining for an empty cart', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 2465 }));
+  mockShippingTracker(
+    buildRawShippingCalculationWith({
+      qualifies: false,
+      threshold: 300,
+      eligibleSubtotal: 0,
+      remaining: 300,
+    }),
+  );
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('$300.00 away from FREE shipping')).toBeInTheDocument();
+  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
+  expect(screen.getByText('$0.00 / $300.00')).toBeInTheDocument();
+  expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
+});

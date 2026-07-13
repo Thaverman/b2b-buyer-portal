@@ -96,8 +96,10 @@ Normalization in `getShippingCalculation` (defensive defaults):
 Self-contained (owns its query, like EarnPointsTab/RewardsTab/HistoryTab):
 
 - `useQuery({ queryKey: ['loyaltyShipping'], queryFn: getShippingCalculation,
-  enabled: isShippingTrackerAvailable() })` — no polling; react-query's default
-  refetch-on-window-focus gives a free refresh after cart edits in another tab.
+  enabled: isShippingTrackerAvailable(), refetchOnWindowFocus: true })` — no
+  polling. The explicit `refetchOnWindowFocus: true` is required because the
+  app-level QueryClient disables it globally (`react-setup.tsx`); it restores
+  the free refresh after cart edits in another tab.
 - Returns `null` unless the query has data (loading, error, gate-off → nothing).
 - Rendered by `LoyaltyHero` at the bottom of the blue hero Box (after the tier
   chip block), styled on the hero's contrast color; bar `height: 8,
