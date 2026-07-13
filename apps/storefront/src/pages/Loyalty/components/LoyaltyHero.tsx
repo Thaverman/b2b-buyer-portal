@@ -3,6 +3,8 @@ import { Box, Chip, Typography } from '@mui/material';
 
 import { useB3Lang } from '@/lib/lang';
 
+import ShippingTracker from './ShippingTracker';
+
 interface LoyaltyHeroProps {
   companyName: string;
   memberSince: string | null;
@@ -59,6 +61,7 @@ function LoyaltyHero({ companyName, memberSince, tierTitle, pointBalance }: Loya
             />
           </Box>
         )}
+        <ShippingTracker />
       </Box>
       {pointBalance !== null && (
         <Typography sx={{ textAlign: 'center', mb: 2, color: 'text.secondary' }}>

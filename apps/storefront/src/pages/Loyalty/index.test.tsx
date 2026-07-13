@@ -43,6 +43,8 @@ beforeEach(() => {
 
 afterEach(() => {
   delete window.BC_CONTEXT;
+  delete window.loyaltyShippingConfig;
+  delete window.getLoyaltyShippingCalculation;
 });
 
 it('shows the unavailable state when BC_CONTEXT is not configured', () => {
@@ -166,6 +168,30 @@ const buildPointActivityWith = builder<PointActivity>(() => ({
   createdAt: faker.date.past().toISOString(),
   customDescription: faker.company.catchPhrase(),
 }));
+
+type RawShippingCalculation = Awaited<
+  ReturnType<NonNullable<Window['getLoyaltyShippingCalculation']>>
+>;
+
+const buildRawShippingCalculationWith = builder<RawShippingCalculation>(() => ({
+  qualifies: faker.datatype.boolean(),
+  threshold: faker.number.int({ min: 100, max: 999 }),
+  eligibleSubtotal: faker.number.float({ min: 0, max: 999, fractionDigits: 2 }),
+  remaining: faker.number.float({ min: 0, max: 999, fractionDigits: 2 }),
+  excludedByProduct: [],
+  excludedByCategory: [],
+  ltlItems: [],
+}));
+
+const mockShippingTracker = (
+  result: RawShippingCalculation | Error,
+  config = { threshold: 300, excludedProductIds: '', excludedCategoryIds: '' },
+) => {
+  window.loyaltyShippingConfig = config;
+  window.getLoyaltyShippingCalculation = vi.fn(() =>
+    result instanceof Error ? Promise.reject(result) : Promise.resolve(result),
+  );
+};
 
 it('renders the hero with company name, member-since, and points balance', async () => {
   mockLoyaltyApis(
@@ -724,4 +750,119 @@ it('shows the empty history state', async () => {
   renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=history' }] });
 
   expect(await screen.findByText('No points activity yet.')).toBeInTheDocument();
+});
+
+it('shows the free-shipping progress bar with remaining amount and caption', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockShippingTracker(
+    buildRawShippingCalculationWith({
+      qualifies: false,
+      threshold: 300,
+      eligibleSubtotal: 130.85,
+      remaining: 169.15,
+    }),
+  );
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('$169.15 away from FREE shipping')).toBeInTheDocument();
+  expect(screen.getByText('$130.85 / $300.00')).toBeInTheDocument();
+  expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '44');
+});
+
+it('shows the qualified state with a full bar', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockShippingTracker(
+    buildRawShippingCalculationWith({
+      qualifies: true,
+      threshold: 300,
+      eligibleSubtotal: 350.1,
+      remaining: 0,
+    }),
+  );
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText("You've earned FREE shipping!")).toBeInTheDocument();
+  expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '100');
+});
+
+it('falls back to the config threshold when the calculation omits it', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockShippingTracker(
+    {
+      qualifies: false,
+      threshold: undefined,
+      eligibleSubtotal: 130.85,
+      remaining: undefined,
+      excludedByProduct: [],
+      excludedByCategory: [],
+      ltlItems: [],
+    } as RawShippingCalculation,
+    { threshold: 500, excludedProductIds: '', excludedCategoryIds: '' },
+  );
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('$369.15 away from FREE shipping')).toBeInTheDocument();
+  expect(screen.getByText('$130.85 / $500.00')).toBeInTheDocument();
+});
+
+it('hides the shipping tracker when the theme config is absent', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 2465 }));
+  window.getLoyaltyShippingCalculation = vi
+    .fn()
+    .mockResolvedValue(buildRawShippingCalculationWith({}));
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
+  expect(screen.queryByText(/away from FREE shipping/)).not.toBeInTheDocument();
+  expect(window.getLoyaltyShippingCalculation).not.toHaveBeenCalled();
+});
+
+it('hides the shipping tracker when the theme function is absent', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 2465 }));
+  window.loyaltyShippingConfig = {
+    threshold: 300,
+    excludedProductIds: '',
+    excludedCategoryIds: '',
+  };
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
+  expect(screen.queryByText(/away from FREE shipping/)).not.toBeInTheDocument();
+});
+
+it('hides the shipping tracker when the calculation rejects', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 2465 }));
+  mockShippingTracker(new Error('cart api down'));
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
+  expect(screen.queryByText(/away from FREE shipping/)).not.toBeInTheDocument();
+  expect(screen.queryByText("You've earned FREE shipping!")).not.toBeInTheDocument();
+});
+
+it('hides the shipping tracker when the resolved threshold is zero', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 2465 }));
+  mockShippingTracker(
+    {
+      qualifies: false,
+      threshold: undefined,
+      eligibleSubtotal: 100,
+      remaining: undefined,
+      excludedByProduct: [],
+      excludedByCategory: [],
+      ltlItems: [],
+    } as RawShippingCalculation,
+    { threshold: 0, excludedProductIds: '', excludedCategoryIds: '' },
+  );
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
+  expect(screen.queryByText(/away from FREE shipping/)).not.toBeInTheDocument();
 });
