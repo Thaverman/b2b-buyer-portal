@@ -753,7 +753,7 @@ it('shows the empty history state', async () => {
 });
 
 it('shows the free-shipping progress bar with remaining amount and caption', async () => {
-  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 2465 }));
   mockShippingTracker(
     buildRawShippingCalculationWith({
       qualifies: false,
@@ -767,11 +767,12 @@ it('shows the free-shipping progress bar with remaining amount and caption', asy
 
   expect(await screen.findByText('$169.15 away from FREE shipping')).toBeInTheDocument();
   expect(screen.getByText('$130.85 / $300.00')).toBeInTheDocument();
+  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
   expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '44');
 });
 
 it('shows the qualified state with a full bar', async () => {
-  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 2465 }));
   mockShippingTracker(
     buildRawShippingCalculationWith({
       qualifies: true,
@@ -784,6 +785,7 @@ it('shows the qualified state with a full bar', async () => {
   renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText("You've earned FREE shipping!")).toBeInTheDocument();
+  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
   expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '100');
 });
 
