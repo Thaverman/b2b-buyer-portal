@@ -12,6 +12,7 @@ memoryType: gotcha
 durable: true
 status: active
 project: b2b-buyer-portal
+mongoId: 6a554485d5f00733c128a18c
 codeRefs:
   - kind: ts-react
     package: apps/storefront
