@@ -75,6 +75,22 @@ declare global {
         appClientId: string;
       };
     };
+    /** Theme-set free-shipping config; absent = shipping tracker off. */
+    loyaltyShippingConfig?: {
+      threshold: number;
+      excludedProductIds: string;
+      excludedCategoryIds: string;
+    };
+    /** Theme-provided cart shipping-eligibility calculation; absent until the theme ships it. */
+    getLoyaltyShippingCalculation?: () => Promise<{
+      qualifies?: boolean;
+      threshold?: number;
+      eligibleSubtotal?: number;
+      remaining?: number;
+      excludedByProduct?: unknown[];
+      excludedByCategory?: unknown[];
+      ltlItems?: unknown[];
+    }>;
     B3: {
       setting: {
         channel_id: number;

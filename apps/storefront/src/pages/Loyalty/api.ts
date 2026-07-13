@@ -535,3 +535,38 @@ export const fetchPointsHistory = async (
     nextToken: raw.nextToken ?? null,
   };
 };
+
+interface ShippingCalculation {
+  qualifies: boolean;
+  threshold: number;
+  eligibleSubtotal: number;
+  remaining: number;
+}
+
+// The theme owns the eligibility math (excluded products/categories, LTL);
+// the portal only renders. Both globals are absent until the theme ships them.
+export const isShippingTrackerAvailable = (): boolean =>
+  Boolean(window.loyaltyShippingConfig) &&
+  typeof window.getLoyaltyShippingCalculation === 'function';
+
+export const getShippingCalculation = async (): Promise<ShippingCalculation> => {
+  const calculate = window.getLoyaltyShippingCalculation;
+  if (!calculate) {
+    throw new Error('Loyalty shipping calculation is not available on this store');
+  }
+  let raw: Awaited<ReturnType<typeof calculate>>;
+  try {
+    raw = await calculate();
+  } catch (error) {
+    b2bLogger.error(`Loyalty: shipping calculation failed — ${String(error)}`);
+    throw new LoyaltyError('upstream');
+  }
+  const threshold = raw.threshold ?? window.loyaltyShippingConfig?.threshold ?? 0;
+  const eligibleSubtotal = raw.eligibleSubtotal ?? 0;
+  return {
+    qualifies: raw.qualifies ?? false,
+    threshold,
+    eligibleSubtotal,
+    remaining: raw.remaining ?? Math.max(0, threshold - eligibleSubtotal),
+  };
+};

@@ -7,6 +7,8 @@ import {
   startMockServer,
 } from 'tests/test-utils';
 
+import b2bLogger from '@/utils/b3Logger';
+
 import {
   completeSocialRule,
   EarnRule,
@@ -17,9 +19,11 @@ import {
   fetchRedeemRules,
   fetchTiers,
   getLoyaltyDigest,
+  getShippingCalculation,
   getSocialCompletionFlag,
   isEarnRuleForTier,
   isRedeemableCatalogRule,
+  isShippingTrackerAvailable,
   LoyaltyError,
   LoyaltyIdentity,
   parseThreshold,
@@ -62,6 +66,8 @@ beforeEach(() => {
 
 afterEach(() => {
   delete window.BC_CONTEXT;
+  delete window.loyaltyShippingConfig;
+  delete window.getLoyaltyShippingCalculation;
 });
 
 const mockJwt = (jwt = 'fresh-jwt') =>
@@ -581,5 +587,108 @@ describe('fetchPointsHistory', () => {
       ],
       nextToken: 'page-2',
     });
+  });
+});
+
+const shippingConfig = { threshold: 300, excludedProductIds: '', excludedCategoryIds: '' };
+
+type RawShippingCalculation = Awaited<
+  ReturnType<NonNullable<Window['getLoyaltyShippingCalculation']>>
+>;
+
+const buildRawShippingCalculationWith = builder<RawShippingCalculation>(() => ({
+  qualifies: faker.datatype.boolean(),
+  threshold: faker.number.int({ min: 100, max: 999 }),
+  eligibleSubtotal: faker.number.float({ min: 0, max: 999, fractionDigits: 2 }),
+  remaining: faker.number.float({ min: 0, max: 999, fractionDigits: 2 }),
+  excludedByProduct: [],
+  excludedByCategory: [],
+  ltlItems: [],
+}));
+
+describe('isShippingTrackerAvailable', () => {
+  it('is false when loyaltyShippingConfig is absent', () => {
+    window.getLoyaltyShippingCalculation = vi.fn();
+
+    expect(isShippingTrackerAvailable()).toBe(false);
+  });
+
+  it('is false when getLoyaltyShippingCalculation is absent', () => {
+    window.loyaltyShippingConfig = shippingConfig;
+
+    expect(isShippingTrackerAvailable()).toBe(false);
+  });
+
+  it('is true when both theme globals are present', () => {
+    window.loyaltyShippingConfig = shippingConfig;
+    window.getLoyaltyShippingCalculation = vi.fn();
+
+    expect(isShippingTrackerAvailable()).toBe(true);
+  });
+});
+
+describe('getShippingCalculation', () => {
+  it('normalizes a complete calculation result', async () => {
+    window.loyaltyShippingConfig = shippingConfig;
+    window.getLoyaltyShippingCalculation = vi.fn().mockResolvedValue(
+      buildRawShippingCalculationWith({
+        qualifies: false,
+        threshold: 300,
+        eligibleSubtotal: 130.85,
+        remaining: 169.15,
+      }),
+    );
+
+    const result = await getShippingCalculation();
+
+    expect(result).toEqual({
+      qualifies: false,
+      threshold: 300,
+      eligibleSubtotal: 130.85,
+      remaining: 169.15,
+    });
+  });
+
+  it('defaults missing fields, falling back to the config threshold', async () => {
+    window.loyaltyShippingConfig = { ...shippingConfig, threshold: 500 };
+    window.getLoyaltyShippingCalculation = vi.fn().mockResolvedValue({
+      eligibleSubtotal: 130.85,
+    });
+
+    const result = await getShippingCalculation();
+
+    expect(result).toEqual({
+      qualifies: false,
+      threshold: 500,
+      eligibleSubtotal: 130.85,
+      remaining: 369.15,
+    });
+  });
+
+  it('defaults everything to zero on an empty result with no config', async () => {
+    window.getLoyaltyShippingCalculation = vi.fn().mockResolvedValue({});
+
+    const result = await getShippingCalculation();
+
+    expect(result).toEqual({ qualifies: false, threshold: 0, eligibleSubtotal: 0, remaining: 0 });
+  });
+
+  it('logs and maps a rejection to upstream', async () => {
+    window.loyaltyShippingConfig = shippingConfig;
+    window.getLoyaltyShippingCalculation = vi.fn().mockRejectedValue(new Error('cart api down'));
+
+    const error = await getShippingCalculation().catch((e) => e);
+
+    expect(error).toBeInstanceOf(LoyaltyError);
+    expect(error.kind).toBe('upstream');
+    expect(b2bLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('Loyalty: shipping calculation failed'),
+    );
+  });
+
+  it('throws when the theme function is absent', async () => {
+    const error = await getShippingCalculation().catch((e) => e);
+
+    expect(error).toBeInstanceOf(Error);
   });
 });
