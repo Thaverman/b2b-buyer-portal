@@ -945,6 +945,7 @@ it('fails closed to unavailable when the tiers lookup fails while the allowlist 
   renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('Rewards are not available.')).toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: 'Earn points' })).not.toBeInTheDocument();
 });
 
 it('treats an empty allowedTiers string as lever-off (current behavior)', async () => {
@@ -954,4 +955,17 @@ it('treats an empty allowedTiers string as lever-off (current behavior)', async 
   renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
+});
+
+it('fails closed to unavailable on an upstream digest failure while the allowlist is set', async () => {
+  window.loyaltyRolloutConfig = { allowedTiers: 'signature' };
+  mockJwt();
+  server.use(http.post(digestUrl, () => HttpResponse.json({}, { status: 500 })));
+  mockTiers([buildTierWith({ id: 't-sig', title: 'SIGNATURE' })]);
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('Rewards are not available.')).toBeInTheDocument();
+  expect(screen.queryByText("We couldn't load your rewards.")).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
 });
