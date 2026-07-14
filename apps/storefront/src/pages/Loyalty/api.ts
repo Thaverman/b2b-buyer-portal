@@ -570,3 +570,28 @@ export const getShippingCalculation = async (): Promise<ShippingCalculation> => 
     remaining: raw.remaining ?? Math.max(0, threshold - eligibleSubtotal),
   };
 };
+
+// Rollout gate: mirrors the theme's parseAllowedTiers/isTierAllowed canon
+// (influence-client.js) EXACTLY — CSV of tier names, trimmed, lowercased, blanks
+// dropped; empty list = everyone; a null/blank tier title never matches a
+// non-empty list (fail closed).
+export const parseAllowedTiers = (csv: string | undefined): string[] =>
+  (csv ?? '')
+    .split(',')
+    .map((name) => name.trim().toLowerCase())
+    .filter((name) => name !== '');
+
+export const isTierAllowed = (tierTitle: string | null | undefined, allowed: string[]): boolean => {
+  if (allowed.length === 0) {
+    return true;
+  }
+  if (!tierTitle) {
+    return false;
+  }
+  return allowed.includes(tierTitle.trim().toLowerCase());
+};
+
+// The `|| {}` mirrors the theme's cart-panel guard: a missing/blocked global
+// degrades to an empty allowlist (fail open), never a throw.
+export const getAllowedTiers = (): string[] =>
+  parseAllowedTiers((window.loyaltyRolloutConfig || {}).allowedTiers);

@@ -18,14 +18,17 @@ import {
   fetchPointsHistory,
   fetchRedeemRules,
   fetchTiers,
+  getAllowedTiers,
   getLoyaltyDigest,
   getShippingCalculation,
   getSocialCompletionFlag,
   isEarnRuleForTier,
   isRedeemableCatalogRule,
   isShippingTrackerAvailable,
+  isTierAllowed,
   LoyaltyError,
   LoyaltyIdentity,
+  parseAllowedTiers,
   parseThreshold,
   redeemReward,
 } from './api';
@@ -68,6 +71,7 @@ afterEach(() => {
   delete window.BC_CONTEXT;
   delete window.loyaltyShippingConfig;
   delete window.getLoyaltyShippingCalculation;
+  delete window.loyaltyRolloutConfig;
 });
 
 const mockJwt = (jwt = 'fresh-jwt') =>
@@ -690,5 +694,47 @@ describe('getShippingCalculation', () => {
     const error = await getShippingCalculation().catch((e) => e);
 
     expect(error).toBeInstanceOf(Error);
+  });
+});
+
+describe('parseAllowedTiers', () => {
+  it.each([
+    [undefined, []],
+    ['', []],
+    [' , ,', []],
+    ['ESSENTIAL,SELECT,SIGNATURE', ['essential', 'select', 'signature']],
+    ['  Signature , select ', ['signature', 'select']],
+  ] as [string | undefined, string[]][])('parses %j to %j', (csv, expected) => {
+    expect(parseAllowedTiers(csv)).toEqual(expected);
+  });
+});
+
+describe('isTierAllowed', () => {
+  it.each([
+    ['SIGNATURE', [], true],
+    [null, [], true],
+    ['SIGNATURE', ['signature'], true],
+    ['  Signature ', ['signature'], true],
+    ['ELITE', ['signature', 'select'], false],
+    [null, ['signature'], false],
+    [undefined, ['signature'], false],
+    ['', ['signature'], false],
+  ] as [string | null | undefined, string[], boolean][])(
+    'tier %j vs list %j → %j',
+    (tierTitle, allowed, expected) => {
+      expect(isTierAllowed(tierTitle, allowed)).toBe(expected);
+    },
+  );
+});
+
+describe('getAllowedTiers', () => {
+  it('degrades a missing rollout global to an empty allowlist (fail open)', () => {
+    expect(getAllowedTiers()).toEqual([]);
+  });
+
+  it('reads and parses the theme rollout global', () => {
+    window.loyaltyRolloutConfig = { allowedTiers: 'ESSENTIAL,SELECT,SIGNATURE' };
+
+    expect(getAllowedTiers()).toEqual(['essential', 'select', 'signature']);
   });
 });

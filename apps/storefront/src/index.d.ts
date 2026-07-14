@@ -91,6 +91,10 @@ declare global {
       excludedByCategory?: unknown[];
       ltlItems?: unknown[];
     }>;
+    /** Theme-set rollout gate; absent (older theme deploys) = empty allowlist = everyone. */
+    loyaltyRolloutConfig?: {
+      allowedTiers?: string;
+    };
     B3: {
       setting: {
         channel_id: number;
