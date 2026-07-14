@@ -16,8 +16,10 @@ import TiersTab from './components/TiersTab';
 import {
   fetchLoyaltyCustomer,
   fetchTiers,
+  getAllowedTiers,
   getLoyaltyDigest,
   isLoyaltyAvailable,
+  isTierAllowed,
   LoyaltyError,
 } from './api';
 
@@ -84,6 +86,42 @@ function Loyalty() {
     );
   }
 
+  const tierTitle =
+    (customer?.currentLoyaltyTierId &&
+      tiers.find((tier) => tier.id === customer.currentLoyaltyTierId)?.title) ||
+    null;
+
+  // Theme rollout gate (spec 2026-07-14): with a non-empty allowlist every
+  // unverifiable state fails CLOSED — matching the theme's four enforcement
+  // points. With an empty list (or missing global) behavior is unchanged.
+  const allowedTiers = getAllowedTiers();
+  let tierVerdict: 'allowed' | 'denied' | 'pending' = 'allowed';
+  if (allowedTiers.length > 0) {
+    if (digestQuery.isError || customerQuery.isError || tiersQuery.isError) {
+      tierVerdict = 'denied';
+    } else if (customerQuery.isSuccess && tiersQuery.isSuccess) {
+      tierVerdict = isTierAllowed(tierTitle, allowedTiers) ? 'allowed' : 'denied';
+    } else {
+      tierVerdict = 'pending';
+    }
+  }
+
+  if (tierVerdict === 'pending') {
+    // No hero/tabs flash to a possibly-denied member (theme hidden-shell principle).
+    return (
+      <B3Spin isSpinning>
+        <Box sx={{ flex: 1, width: '100%', minHeight: 200 }} />
+      </B3Spin>
+    );
+  }
+  if (tierVerdict === 'denied') {
+    return (
+      <Box>
+        <Typography sx={{ mt: 2 }}>{b3Lang('loyalty.unavailable')}</Typography>
+      </Box>
+    );
+  }
+
   const error = digestQuery.error ?? customerQuery.error;
   let errorKind: string | null = null;
   if (error instanceof LoyaltyError) {
@@ -94,11 +132,6 @@ function Loyalty() {
   const isNotEnrolled = errorKind === 'notEnrolled';
   const isSessionExpired = errorKind === 'sessionExpired';
   const isLoadError = Boolean(errorKind) && !isNotEnrolled && !isSessionExpired;
-
-  const tierTitle =
-    (customer?.currentLoyaltyTierId &&
-      tiers.find((tier) => tier.id === customer.currentLoyaltyTierId)?.title) ||
-    null;
 
   return (
     <B3Spin isSpinning={digestQuery.isFetching || customerQuery.isFetching}>

@@ -45,6 +45,7 @@ afterEach(() => {
   delete window.BC_CONTEXT;
   delete window.loyaltyShippingConfig;
   delete window.getLoyaltyShippingCalculation;
+  delete window.loyaltyRolloutConfig;
 });
 
 it('shows the unavailable state when BC_CONTEXT is not configured', () => {
@@ -886,4 +887,71 @@ it('shows a zero bar with the full threshold remaining for an empty cart', async
   expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
   expect(screen.getByText('$0.00 / $300.00')).toBeInTheDocument();
   expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
+});
+
+it('renders the page when the customer tier is on the rollout allowlist', async () => {
+  window.loyaltyRolloutConfig = { allowedTiers: 'ESSENTIAL,SELECT,SIGNATURE' };
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't-sig', pointBalance: 2465 }));
+  mockTiers([buildTierWith({ id: 't-sig', title: 'SIGNATURE' })]);
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'Earn points' })).toBeInTheDocument();
+});
+
+it('shows the unavailable state when the customer tier is not on the allowlist', async () => {
+  window.loyaltyRolloutConfig = { allowedTiers: 'essential,select' };
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't-sig' }));
+  mockTiers([buildTierWith({ id: 't-sig', title: 'SIGNATURE' })]);
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('Rewards are not available.')).toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: 'Earn points' })).not.toBeInTheDocument();
+});
+
+it('fails closed to unavailable on a digest failure while the allowlist is set', async () => {
+  window.loyaltyRolloutConfig = { allowedTiers: 'signature' };
+  server.use(http.get(currentJwtUrl, () => HttpResponse.text('{"errors":[]}', { status: 401 })));
+  mockTiers([buildTierWith({ id: 't-sig', title: 'SIGNATURE' })]);
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('Rewards are not available.')).toBeInTheDocument();
+  expect(
+    screen.queryByText('Your session has expired — please sign in again.'),
+  ).not.toBeInTheDocument();
+});
+
+it('fails closed to unavailable when the customer is not enrolled while the allowlist is set', async () => {
+  window.loyaltyRolloutConfig = { allowedTiers: 'signature' };
+  mockJwt();
+  mockDigest();
+  server.use(http.get(`${launcherBase}/customer`, () => HttpResponse.json({}, { status: 404 })));
+  mockTiers([buildTierWith({ id: 't-sig', title: 'SIGNATURE' })]);
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('Rewards are not available.')).toBeInTheDocument();
+  expect(screen.queryByText('Start earning points with your first order.')).not.toBeInTheDocument();
+});
+
+it('fails closed to unavailable when the tiers lookup fails while the allowlist is set', async () => {
+  window.loyaltyRolloutConfig = { allowedTiers: 'signature' };
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't-sig' }));
+  server.use(http.get(`${launcherBase}/shop/tiers`, () => HttpResponse.json({}, { status: 500 })));
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('Rewards are not available.')).toBeInTheDocument();
+});
+
+it('treats an empty allowedTiers string as lever-off (current behavior)', async () => {
+  window.loyaltyRolloutConfig = { allowedTiers: '' };
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 2465 }));
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
 });
