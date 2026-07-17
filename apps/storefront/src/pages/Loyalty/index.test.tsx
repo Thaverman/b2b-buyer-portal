@@ -19,6 +19,7 @@ import {
   EarnRule,
   LoyaltyCustomer,
   LoyaltyIdentity,
+  LoyaltyMembership,
   LoyaltyTier,
   PointActivity,
   RedeemRule,
@@ -119,6 +120,18 @@ const buildTierWith = builder<LoyaltyTier>(() => ({
 
 const mockTiers = (tiers: LoyaltyTier[]) =>
   server.use(http.get(`${launcherBase}/shop/tiers`, () => HttpResponse.json({ rules: tiers })));
+
+const buildMembershipWith = builder<LoyaltyMembership>(() => ({
+  id: faker.string.uuid(),
+  title: faker.commerce.productName(),
+  description: faker.company.catchPhrase(),
+  perks: [faker.company.catchPhrase()],
+}));
+
+const mockMemberships = (memberships: LoyaltyMembership[]) =>
+  server.use(
+    http.get(`${launcherBase}/shop/memberships`, () => HttpResponse.json({ memberships })),
+  );
 
 const buildEarnRuleWith = builder<EarnRule>(() => ({
   id: faker.string.uuid(),
@@ -349,6 +362,62 @@ it('hides the tier progress bar when a threshold is not numeric', async () => {
   // wait for the tier list to render, then confirm no progress bar was attempted
   expect(await screen.findByText('Current tier: Select')).toBeInTheDocument();
   expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+});
+
+it('shows the Memberships tab and lists membership cards when the store has memberships', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockMemberships([
+    buildMembershipWith({
+      title: 'VIP Gold',
+      description: 'Our premium program',
+      perks: ['Free expedited shipping', 'Early access to sales'],
+    }),
+  ]);
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'Memberships' }));
+
+  expect(await screen.findByText('VIP Gold')).toBeInTheDocument();
+  expect(screen.getByText('Our premium program')).toBeInTheDocument();
+  expect(screen.getByText('Free expedited shipping')).toBeInTheDocument();
+  expect(screen.getByText('Early access to sales')).toBeInTheDocument();
+});
+
+it('hides the Memberships tab when the store has no memberships', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockMemberships([]);
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByRole('tab', { name: 'Your rewards' })).toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: 'Memberships' })).not.toBeInTheDocument();
+});
+
+it('falls back to Your rewards when ?tab=memberships but the store has none', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockMemberships([]);
+
+  renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=memberships' }] });
+
+  expect(
+    await screen.findByRole('tab', { name: 'Your rewards', selected: true }),
+  ).toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: 'Memberships' })).not.toBeInTheDocument();
+});
+
+it('omits the description line for a membership with no description', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockMemberships([
+    buildMembershipWith({ title: 'Trade Pro', description: '', perks: ['Net-30 terms'] }),
+  ]);
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'Memberships' }));
+
+  expect(await screen.findByText('Trade Pro')).toBeInTheDocument();
+  expect(screen.getByText('Net-30 terms')).toBeInTheDocument();
 });
 
 it('shows the current tier benefits and points summary on the Your rewards tab', async () => {

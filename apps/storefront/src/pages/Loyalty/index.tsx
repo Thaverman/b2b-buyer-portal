@@ -1,5 +1,12 @@
 import { useSearchParams } from 'react-router-dom';
-import { CardGiftcard, FavoriteBorder, Layers, Schedule, StarBorder } from '@mui/icons-material';
+import {
+  CardGiftcard,
+  CardMembership,
+  FavoriteBorder,
+  Layers,
+  Schedule,
+  StarBorder,
+} from '@mui/icons-material';
 import { Alert, Box, Button, Tab, Tabs, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 
@@ -10,11 +17,13 @@ import { useAppSelector } from '@/store';
 import EarnPointsTab from './components/EarnPointsTab';
 import HistoryTab from './components/HistoryTab';
 import LoyaltyHero from './components/LoyaltyHero';
+import MembershipsTab from './components/MembershipsTab';
 import OverviewTab from './components/OverviewTab';
 import RewardsTab from './components/RewardsTab';
 import TiersTab from './components/TiersTab';
 import {
   fetchLoyaltyCustomer,
+  fetchMemberships,
   fetchTiers,
   getAllowedTiers,
   getLoyaltyDigest,
@@ -23,7 +32,7 @@ import {
   LoyaltyError,
 } from './api';
 
-const LOYALTY_TABS = ['overview', 'earn', 'redeem', 'tiers', 'history'] as const;
+const LOYALTY_TABS = ['overview', 'earn', 'redeem', 'tiers', 'memberships', 'history'] as const;
 type LoyaltyTab = (typeof LOYALTY_TABS)[number];
 
 const toLoyaltyTab = (value: string | null): LoyaltyTab =>
@@ -77,6 +86,14 @@ function Loyalty() {
     staleTime: Infinity,
   });
   const tiers = tiersQuery.data ?? [];
+
+  const membershipsQuery = useQuery({
+    queryKey: ['loyaltyMemberships'],
+    queryFn: fetchMemberships,
+    enabled: isAvailable,
+    staleTime: Infinity,
+  });
+  const memberships = membershipsQuery.data ?? [];
 
   if (!isAvailable) {
     return (
@@ -133,6 +150,9 @@ function Loyalty() {
   const isSessionExpired = errorKind === 'sessionExpired';
   const isLoadError = Boolean(errorKind) && !isNotEnrolled && !isSessionExpired;
 
+  const hasMemberships = memberships.length > 0;
+  const activeTab = tab === 'memberships' && !hasMemberships ? 'overview' : tab;
+
   return (
     <B3Spin isSpinning={digestQuery.isFetching || customerQuery.isFetching}>
       {/* pb clears host-page overlays (company-hierarchy bar, loyalty launcher) that float
@@ -173,7 +193,7 @@ function Loyalty() {
           </Alert>
         )}
         <Tabs
-          value={tab}
+          value={activeTab}
           onChange={(_, newTab: LoyaltyTab) => setSearchParams({ tab: newTab }, { replace: true })}
           variant="scrollable"
           allowScrollButtonsMobile
@@ -210,6 +230,14 @@ function Loyalty() {
             iconPosition="start"
             label={b3Lang('loyalty.tabs.tiers')}
           />
+          {hasMemberships && (
+            <Tab
+              value="memberships"
+              icon={<CardMembership />}
+              iconPosition="start"
+              label={b3Lang('loyalty.tabs.memberships')}
+            />
+          )}
           <Tab
             value="history"
             icon={<Schedule />}
@@ -217,29 +245,30 @@ function Loyalty() {
             label={b3Lang('loyalty.tabs.history')}
           />
         </Tabs>
-        {tab === 'overview' && <OverviewTab customer={customer} tiers={tiers} />}
-        {tab === 'earn' && (
+        {activeTab === 'overview' && <OverviewTab customer={customer} tiers={tiers} />}
+        {activeTab === 'earn' && (
           <EarnPointsTab
             identity={identity}
             customer={customer}
             customerQueryKey={['loyaltyCustomer', customerId]}
           />
         )}
-        {tab === 'redeem' && (
+        {activeTab === 'redeem' && (
           <RewardsTab
             identity={identity}
             pointBalance={customer?.pointBalance ?? 0}
             customerQueryKey={['loyaltyCustomer', customerId]}
           />
         )}
-        {tab === 'tiers' && (
+        {activeTab === 'tiers' && (
           <TiersTab
             tiers={tiers}
             currentTierId={customer?.currentLoyaltyTierId ?? null}
             currentTierProgress={customer?.currentLoyaltyTierProgress ?? null}
           />
         )}
-        {tab === 'history' && <HistoryTab identity={identity} />}
+        {activeTab === 'memberships' && <MembershipsTab memberships={memberships} />}
+        {activeTab === 'history' && <HistoryTab identity={identity} />}
       </Box>
     </B3Spin>
   );
