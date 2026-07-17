@@ -15,6 +15,7 @@ import {
   fetchEarnedRewards,
   fetchEarnRules,
   fetchLoyaltyCustomer,
+  fetchMemberships,
   fetchPointsHistory,
   fetchRedeemRules,
   fetchTiers,
@@ -228,6 +229,59 @@ describe('fetchTiers', () => {
       { id: 't1', title: 'Select', threshold: '0', perks: ['5% credit on every order'] },
       { id: 't2', title: 'Elite', threshold: '300', perks: [] },
     ]);
+  });
+});
+
+describe('fetchMemberships', () => {
+  const membershipsUrl = 'https://launcher.api.influence.io/launcher/v1/shop/memberships';
+
+  it('fetches memberships with only the shop key and normalizes them', async () => {
+    server.use(
+      http.get(membershipsUrl, ({ request }) => {
+        assertQueryParams(request, { shop: shopKey });
+
+        return HttpResponse.json({
+          memberships: [
+            {
+              id: 'm1',
+              title: 'VIP Gold',
+              description: 'Our premium program',
+              customerCount: 1240,
+              perks: ['Free expedited shipping', 'Early access'],
+            },
+            { id: 'm2', title: 'Trade Pro' },
+          ],
+        });
+      }),
+    );
+
+    const result = await fetchMemberships();
+
+    // customerCount is intentionally dropped (not buyer-facing)
+    expect(result).toEqual([
+      {
+        id: 'm1',
+        title: 'VIP Gold',
+        description: 'Our premium program',
+        perks: ['Free expedited shipping', 'Early access'],
+      },
+      { id: 'm2', title: 'Trade Pro', description: '', perks: [] },
+    ]);
+  });
+
+  it('returns an empty list when the payload has no memberships array', async () => {
+    server.use(http.get(membershipsUrl, () => HttpResponse.json({})));
+
+    expect(await fetchMemberships()).toEqual([]);
+  });
+
+  it('maps a 404 to an upstream error (shop-key misconfig, not per-customer)', async () => {
+    server.use(http.get(membershipsUrl, () => HttpResponse.json({}, { status: 404 })));
+
+    const error = await fetchMemberships().catch((e) => e);
+
+    expect(error).toBeInstanceOf(LoyaltyError);
+    expect(error.kind).toBe('upstream');
   });
 });
 

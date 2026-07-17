@@ -242,6 +242,34 @@ export const fetchTiers = async (): Promise<LoyaltyTier[]> => {
   }));
 };
 
+export interface LoyaltyMembership {
+  id: string;
+  title: string;
+  description: string;
+  perks: string[];
+}
+
+interface RawMembership {
+  id?: string | number;
+  title?: string;
+  description?: string;
+  perks?: string[];
+}
+
+export const fetchMemberships = async (): Promise<LoyaltyMembership[]> => {
+  const config = requireConfig();
+  const raw = (await launcherGet('/shop/memberships', { shop: config.shopKey }, 'upstream')) as {
+    memberships?: RawMembership[];
+  };
+
+  return (raw.memberships ?? []).map((membership) => ({
+    id: String(membership.id ?? ''),
+    title: membership.title ?? '',
+    description: membership.description ?? '',
+    perks: membership.perks ?? [],
+  }));
+};
+
 export interface EarnRule {
   id: string;
   title: string;
