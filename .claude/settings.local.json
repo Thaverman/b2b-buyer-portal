@@ -30,11 +30,19 @@
       "Bash(git branch *)",
       "Bash(npx vitest *)",
       "Bash(echo \"exit=$?\")",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "mcp__MCP_DOCKER__find",
+      "mcp__MCP_DOCKER__insert-many",
+      "mcp__MCP_DOCKER__update-many",
+      "mcp__MCP_DOCKER__obsidian_get_file_contents",
+      "mcp__MCP_DOCKER__obsidian_patch_content",
+      "mcp__MCP_DOCKER__obsidian_append_content"
     ]
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
-    "squad-coordinator"
+    "squad-coordinator",
+    "MCP_DOCKER",
+    "obsidian"
   ]
 }

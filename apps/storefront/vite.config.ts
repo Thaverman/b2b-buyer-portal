@@ -85,7 +85,7 @@ export default defineConfig(({ mode }): UserConfig & Pick<ViteUserConfig, 'test'
     build: {
       manifest: true,
       minify: true,
-      sourcemap: true,
+      sourcemap: false,
       rollupOptions: {
         input: {
           index: 'src/main.ts',

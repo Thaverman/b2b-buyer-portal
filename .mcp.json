@@ -3,6 +3,16 @@
     "squad-coordinator": {
       "type": "http",
       "url": "http://localhost:8070/"
+    },
+    "MCP_DOCKER": {
+      "command": "docker",
+      "args": ["mcp", "gateway", "run"]
+    },"obsidian": {
+      "type": "https",
+      "url": "https://127.0.0.1:27124/mcp/",
+      "headers": {
+        "Authorization": "Bearer 8300ef5c2b9f2a54fcda63fbc44237b48f7f5c38a8bfb3e8351fd3913e0250a2"
+      }
     }
   }
 }
