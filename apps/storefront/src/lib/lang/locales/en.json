@@ -789,6 +789,7 @@
   "loyalty.tiers.currentTier": "Current tier: {tier}",
   "loyalty.tiers.progressTo": "Progress to {tier}",
   "loyalty.overview.benefitsTitle": "Your {tier} benefits",
+  "loyalty.overview.membershipBenefitsTitle": "Your {membership} membership benefits",
   "loyalty.earn.completed": "Completed",
   "loyalty.earn.flat": "Earn {points} points",
   "loyalty.earn.follow": "Follow",

@@ -41,6 +41,7 @@ const buildLoyaltyCustomerWith = builder<LoyaltyCustomer>(() => ({
   followTikTok: faker.datatype.boolean(),
   followTwitter: faker.datatype.boolean(),
   likeFacebook: faker.datatype.boolean(),
+  currentMembership: null,
 }));
 
 beforeEach(() => {

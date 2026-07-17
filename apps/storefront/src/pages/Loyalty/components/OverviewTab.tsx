@@ -53,6 +53,35 @@ function OverviewTab({ customer, tiers }: OverviewTabProps) {
           </Box>
         </Box>
       )}
+      {customer.currentMembership && customer.currentMembership.perks.length > 0 && (
+        <Box
+          sx={{
+            bgcolor: 'primary.main',
+            color: 'primary.contrastText',
+            borderRadius: 2,
+            p: { xs: 3, sm: 4 },
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 2,
+          }}
+        >
+          <Typography
+            variant="h6"
+            sx={{ fontWeight: 800, textTransform: 'uppercase', flex: '1 1 40%' }}
+          >
+            {b3Lang('loyalty.overview.membershipBenefitsTitle', {
+              membership: customer.currentMembership.title,
+            })}
+          </Typography>
+          <Box sx={{ flex: '1 1 50%' }}>
+            {customer.currentMembership.perks.map((perk) => (
+              <Typography key={perk} variant="body2" sx={{ mb: 0.5 }}>
+                {perk}
+              </Typography>
+            ))}
+          </Box>
+        </Box>
+      )}
       {nextTier && progress !== null && (
         <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 2, p: 3 }}>
           <Typography variant="subtitle2" color="text.secondary">

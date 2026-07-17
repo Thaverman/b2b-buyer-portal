@@ -109,6 +109,12 @@ export const getLoyaltyDigest = async (): Promise<LoyaltyIdentity> => {
   throw new LoyaltyError('upstream');
 };
 
+export interface LoyaltyMembershipSummary {
+  id: string;
+  title: string;
+  perks: string[];
+}
+
 export interface LoyaltyCustomer {
   pointBalance: number;
   currentLoyaltyTierId: string | null;
@@ -118,6 +124,7 @@ export interface LoyaltyCustomer {
   followTikTok: boolean;
   followTwitter: boolean;
   likeFacebook: boolean;
+  currentMembership: LoyaltyMembershipSummary | null;
 }
 
 interface RawLoyaltyCustomer {
@@ -129,6 +136,7 @@ interface RawLoyaltyCustomer {
   followTikTok?: boolean;
   followTwitter?: boolean;
   likeFacebook?: boolean;
+  currentMembership?: { id?: string | number; title?: string; perks?: string[] };
 }
 
 const identityParams = (config: LoyaltyConfig, identity: LoyaltyIdentity) => ({
@@ -202,6 +210,13 @@ export const fetchLoyaltyCustomer = async (identity: LoyaltyIdentity): Promise<L
     followTikTok: raw.followTikTok ?? false,
     followTwitter: raw.followTwitter ?? false,
     likeFacebook: raw.likeFacebook ?? false,
+    currentMembership: raw.currentMembership
+      ? {
+          id: String(raw.currentMembership.id ?? ''),
+          title: raw.currentMembership.title ?? '',
+          perks: raw.currentMembership.perks ?? [],
+        }
+      : null,
   };
 };
 

@@ -96,6 +96,7 @@ const buildLoyaltyCustomerWith = builder<LoyaltyCustomer>(() => ({
   followTikTok: faker.datatype.boolean(),
   followTwitter: faker.datatype.boolean(),
   likeFacebook: faker.datatype.boolean(),
+  currentMembership: null,
 }));
 
 const mockJwt = () => server.use(http.get(currentJwtUrl, () => HttpResponse.text('fresh-jwt')));
@@ -443,6 +444,33 @@ it('shows the current tier benefits and points summary on the Your rewards tab',
   expect(screen.getByText('5% credit on every order')).toBeInTheDocument();
   expect(screen.getByText('Free ground shipping over $300')).toBeInTheDocument();
   expect(screen.getByText('240 / 300')).toBeInTheDocument();
+});
+
+it('shows the current membership benefits on the Your rewards tab', async () => {
+  mockLoyaltyApis(
+    buildLoyaltyCustomerWith({
+      currentMembership: {
+        id: 'm1',
+        title: 'VIP Gold',
+        perks: ['Free expedited shipping', 'Early access'],
+      },
+    }),
+  );
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('Your VIP Gold membership benefits')).toBeInTheDocument();
+  expect(screen.getByText('Free expedited shipping')).toBeInTheDocument();
+  expect(screen.getByText('Early access')).toBeInTheDocument();
+});
+
+it('omits the membership benefits block when the customer has no membership', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentMembership: null, pointBalance: 100 }));
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('You have 100 points')).toBeInTheDocument();
+  expect(screen.queryByText(/membership benefits/)).not.toBeInTheDocument();
 });
 
 it('renders earn rules with title and summary', async () => {

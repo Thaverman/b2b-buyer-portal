@@ -190,6 +190,7 @@ describe('fetchLoyaltyCustomer', () => {
       followTikTok: false,
       followTwitter: false,
       likeFacebook: false,
+      currentMembership: null,
     });
   });
 
@@ -205,6 +206,29 @@ describe('fetchLoyaltyCustomer', () => {
 
     expect(error).toBeInstanceOf(LoyaltyError);
     expect(error.kind).toBe(kind);
+  });
+
+  it('maps the currentMembership object when present', async () => {
+    server.use(
+      http.get(launcherCustomerUrl, () =>
+        HttpResponse.json({
+          pointBalance: 100,
+          currentMembership: {
+            id: 'm1',
+            title: 'VIP Gold',
+            perks: ['Free expedited shipping', 'Early access'],
+          },
+        }),
+      ),
+    );
+
+    const result = await fetchLoyaltyCustomer(identity);
+
+    expect(result.currentMembership).toEqual({
+      id: 'm1',
+      title: 'VIP Gold',
+      perks: ['Free expedited shipping', 'Early access'],
+    });
   });
 });
 
