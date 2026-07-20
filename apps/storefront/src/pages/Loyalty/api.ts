@@ -8,6 +8,7 @@ interface LoyaltyConfig {
   shopKey: string;
   apiBase: string;
   appClientId: string;
+  progressSite?: string;
 }
 
 const LAUNCHER_API_BASE = 'https://launcher.api.influence.io/launcher/v1';
@@ -23,6 +24,9 @@ const getLoyaltyConfig = (): LoyaltyConfig | undefined => {
 // Stencil-only: getCurrentCustomerJWT early-returns undefined on every other platform,
 // which would misrender as "session expired"; gate the feature out instead.
 export const isLoyaltyAvailable = () => platform === 'bigcommerce' && Boolean(getLoyaltyConfig());
+
+export const isTierProgressAvailable = (): boolean =>
+  isLoyaltyAvailable() && Boolean(getLoyaltyConfig()?.progressSite);
 
 type LoyaltyErrorKind =
   | 'sessionExpired'
@@ -283,6 +287,84 @@ export const fetchMemberships = async (): Promise<LoyaltyMembership[]> => {
     description: membership.description ?? '',
     perks: membership.perks ?? [],
   }));
+};
+
+export interface LoyaltyTierProgress {
+  currentTierName: string;
+  targetTierName: string;
+  ordersInWindow: number;
+  targetOrdersRequired: number;
+  spendInWindow: number;
+  targetAmountRequired: number;
+  ordersProgressPct: number;
+  spendProgressPct: number;
+  summary: string;
+}
+
+// PascalCase: SSW backend (.NET/Newtonsoft), same serializer as the digest endpoint.
+interface RawTierProgress {
+  CurrentTierName?: string;
+  TargetKind?: string;
+  TargetTierName?: string;
+  OrdersInWindow?: number;
+  TargetOrdersRequired?: number;
+  SpendInWindow?: number;
+  TargetAmountRequired?: number;
+  OrdersProgressPct?: number;
+  SpendProgressPct?: number;
+  Summary?: string;
+}
+
+export const fetchTierProgress = async (
+  customerId: string | number,
+): Promise<LoyaltyTierProgress | null> => {
+  const config = requireConfig();
+  if (!config.progressSite) {
+    throw new Error('Loyalty tier progress is not configured on this store');
+  }
+  const params = new URLSearchParams({
+    site: config.progressSite,
+    bigCommerceStoreId: window.B3.setting.store_hash,
+    bigCommerceCustomerId: String(customerId),
+    recentTransactionsTake: '0',
+  });
+
+  let response: Response;
+  try {
+    response = await fetch(
+      `${config.apiBase}/loyaltycustomersclient/GetDetailWithProgress?${params}`,
+    );
+  } catch {
+    throw new LoyaltyError('upstream');
+  }
+  if (!response.ok) {
+    if (response.status === 429) {
+      throw new LoyaltyError('rateLimited');
+    }
+    throw new LoyaltyError('upstream');
+  }
+
+  const raw = (await response.json()) as {
+    Success?: boolean;
+    Result?: { TierProgress?: RawTierProgress | null };
+  };
+  const progress = raw.Success === true ? raw.Result?.TierProgress : null;
+  // Anything other than an explicit next-tier target means there is nothing to show.
+  if (!progress || progress.TargetKind !== 'NextTier') {
+    return null;
+  }
+
+  return {
+    currentTierName: progress.CurrentTierName ?? '',
+    targetTierName: progress.TargetTierName ?? '',
+    ordersInWindow: progress.OrdersInWindow ?? 0,
+    targetOrdersRequired: progress.TargetOrdersRequired ?? 0,
+    spendInWindow: progress.SpendInWindow ?? 0,
+    targetAmountRequired: progress.TargetAmountRequired ?? 0,
+    ordersProgressPct: progress.OrdersProgressPct ?? 0,
+    spendProgressPct: progress.SpendProgressPct ?? 0,
+    summary: progress.Summary ?? '',
+  };
 };
 
 export interface EarnRule {

@@ -18,6 +18,7 @@ import {
   fetchMemberships,
   fetchPointsHistory,
   fetchRedeemRules,
+  fetchTierProgress,
   fetchTiers,
   getAllowedTiers,
   getLoyaltyDigest,
@@ -27,8 +28,10 @@ import {
   isRedeemableCatalogRule,
   isShippingTrackerAvailable,
   isTierAllowed,
+  isTierProgressAvailable,
   LoyaltyError,
   LoyaltyIdentity,
+  LoyaltyTierProgress,
   parseAllowedTiers,
   parseThreshold,
   redeemReward,
@@ -814,5 +817,110 @@ describe('getAllowedTiers', () => {
     window.loyaltyRolloutConfig = { allowedTiers: 'ESSENTIAL,SELECT,SIGNATURE' };
 
     expect(getAllowedTiers()).toEqual(['essential', 'select', 'signature']);
+  });
+});
+
+const progressUrl =
+  'https://ssw.example.com/customers/loyaltycustomersclient/GetDetailWithProgress';
+
+const withProgressSite = () => {
+  window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId, progressSite: 'StoreSupply' } };
+};
+
+describe('isTierProgressAvailable', () => {
+  it('is false when progressSite is not configured', () => {
+    expect(isTierProgressAvailable()).toBe(false);
+  });
+
+  it('is true when the loyalty config includes progressSite', () => {
+    withProgressSite();
+
+    expect(isTierProgressAvailable()).toBe(true);
+  });
+});
+
+describe('fetchTierProgress', () => {
+  it('sends site, store hash, customer id and take=0, and maps the PascalCase payload', async () => {
+    withProgressSite();
+    server.use(
+      http.get(progressUrl, ({ request }) => {
+        assertQueryParams(request, {
+          site: 'StoreSupply',
+          bigCommerceStoreId: 'store-hash',
+          bigCommerceCustomerId: '264074',
+          recentTransactionsTake: '0',
+        });
+
+        return HttpResponse.json({
+          Success: true,
+          Result: {
+            TierProgress: {
+              CurrentTierName: 'Select',
+              TargetKind: 'NextTier',
+              TargetTierName: 'Signature',
+              OrdersInWindow: 39,
+              TargetOrdersRequired: 75,
+              SpendInWindow: 2097.85,
+              TargetAmountRequired: 5000,
+              OrdersProgressPct: 52,
+              SpendProgressPct: 41.96,
+              Summary: "36 more order(s) OR $2902.15 more spend away from 'Signature'.",
+            },
+          },
+        });
+      }),
+    );
+
+    const result: LoyaltyTierProgress | null = await fetchTierProgress(264074);
+
+    expect(result).toEqual({
+      currentTierName: 'Select',
+      targetTierName: 'Signature',
+      ordersInWindow: 39,
+      targetOrdersRequired: 75,
+      spendInWindow: 2097.85,
+      targetAmountRequired: 5000,
+      ordersProgressPct: 52,
+      spendProgressPct: 41.96,
+      summary: "36 more order(s) OR $2902.15 more spend away from 'Signature'.",
+    });
+  });
+
+  it.each([
+    ['Success false', { Success: false, Result: { TierProgress: { TargetKind: 'NextTier' } } }],
+    ['TierProgress null', { Success: true, Result: { TierProgress: null } }],
+    ['Result missing', { Success: true }],
+    [
+      'top tier (TargetKind not NextTier)',
+      { Success: true, Result: { TierProgress: { TargetKind: 'AtTop' } } },
+    ],
+  ])('returns null for %s', async (_label, payload) => {
+    withProgressSite();
+    server.use(http.get(progressUrl, () => HttpResponse.json(payload)));
+
+    expect(await fetchTierProgress(264074)).toBeNull();
+  });
+
+  it.each([
+    [429, 'rateLimited'],
+    [500, 'upstream'],
+  ])('maps status %i to %s', async (status, kind) => {
+    withProgressSite();
+    server.use(http.get(progressUrl, () => HttpResponse.json({}, { status })));
+
+    const error = await fetchTierProgress(264074).catch((e) => e);
+
+    expect(error).toBeInstanceOf(LoyaltyError);
+    expect(error.kind).toBe(kind);
+  });
+
+  it('maps a network failure to upstream', async () => {
+    withProgressSite();
+    server.use(http.get(progressUrl, () => HttpResponse.error()));
+
+    const error = await fetchTierProgress(264074).catch((e) => e);
+
+    expect(error).toBeInstanceOf(LoyaltyError);
+    expect(error.kind).toBe('upstream');
   });
 });

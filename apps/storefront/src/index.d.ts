@@ -73,6 +73,8 @@ declare global {
         apiBase: string;
         /** SSW app client id used to mint the Current Customer JWT. */
         appClientId: string;
+        /** SSW site key for GetDetailWithProgress (e.g. "StoreSupply"); absent = tier progress off. */
+        progressSite?: string;
       };
     };
     /** Theme-set free-shipping config; absent = shipping tracker off. */
