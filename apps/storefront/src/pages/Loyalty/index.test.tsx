@@ -1188,3 +1188,28 @@ it('hides the tier progress card when the endpoint reports no progress', async (
   expect(await screen.findByRole('tab', { name: 'Tiers', selected: true })).toBeInTheDocument();
   expect(screen.queryByText(/Progress to/)).not.toBeInTheDocument();
 });
+
+it('shows no error banner when the tier-progress endpoint fails', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 2465 }));
+  window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId, progressSite: 'StoreSupply' } };
+  server.use(http.get(progressUrl, () => HttpResponse.json({}, { status: 500 })));
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
+  expect(screen.queryByText("We couldn't load your rewards.")).not.toBeInTheDocument();
+  expect(screen.queryByText(/Progress to/)).not.toBeInTheDocument();
+});
+
+it('keeps the allowlist gate keyed to the Influence tier when SSW disagrees', async () => {
+  window.loyaltyRolloutConfig = { allowedTiers: 'signature' };
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't-sig', pointBalance: 2465 }));
+  mockTiers([buildTierWith({ id: 't-sig', title: 'SIGNATURE' })]);
+  mockTierProgress(buildTierProgressWith({ currentTierName: 'NotOnTheList' }));
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  // Influence tier SIGNATURE is allowed -> page renders even though SSW's name isn't listed
+  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
+  expect(screen.getByText('NotOnTheList')).toBeInTheDocument();
+});

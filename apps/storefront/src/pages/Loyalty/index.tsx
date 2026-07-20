@@ -100,7 +100,7 @@ function Loyalty() {
   const tierProgressQuery = useQuery({
     queryKey: ['loyaltyTierProgress', customerId],
     queryFn: () => fetchTierProgress(customerId),
-    enabled: isTierProgressAvailable() && Boolean(customerId),
+    enabled: isAvailable && isTierProgressAvailable() && Boolean(customerId),
     staleTime: Infinity,
   });
   const tierProgress = tierProgressQuery.data ?? null;
