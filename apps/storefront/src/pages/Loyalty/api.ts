@@ -113,7 +113,7 @@ export const getLoyaltyDigest = async (): Promise<LoyaltyIdentity> => {
   throw new LoyaltyError('upstream');
 };
 
-export interface LoyaltyMembershipSummary {
+interface LoyaltyMembershipSummary {
   id: string;
   title: string;
   perks: string[];
