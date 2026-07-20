@@ -238,15 +238,6 @@ interface RawTier {
   perks?: string[];
 }
 
-// Tier thresholds are strings with no documented unit (spec S3) — parse defensively.
-export const parseThreshold = (threshold: string): number | null => {
-  if (threshold.trim() === '') {
-    return null;
-  }
-  const value = Number(threshold);
-  return Number.isFinite(value) ? value : null;
-};
-
 export const fetchTiers = async (): Promise<LoyaltyTier[]> => {
   const config = requireConfig();
   const raw = (await launcherGet('/shop/tiers', { shop: config.shopKey }, 'upstream')) as {

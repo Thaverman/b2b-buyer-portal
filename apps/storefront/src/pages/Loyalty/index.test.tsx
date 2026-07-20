@@ -21,6 +21,7 @@ import {
   LoyaltyIdentity,
   LoyaltyMembership,
   LoyaltyTier,
+  LoyaltyTierProgress,
   PointActivity,
   RedeemRule,
 } from './api';
@@ -208,6 +209,51 @@ const mockShippingTracker = (
   );
 };
 
+const buildTierProgressWith = builder<LoyaltyTierProgress>(() => ({
+  currentTierName: faker.commerce.productAdjective(),
+  targetTierName: faker.commerce.productAdjective(),
+  ordersInWindow: faker.number.int({ min: 0, max: 50 }),
+  targetOrdersRequired: faker.number.int({ min: 51, max: 100 }),
+  spendInWindow: faker.number.float({ min: 0, max: 999, fractionDigits: 2 }),
+  targetAmountRequired: faker.number.int({ min: 1000, max: 9999 }),
+  ordersProgressPct: faker.number.int({ min: 0, max: 99 }),
+  spendProgressPct: faker.number.int({ min: 0, max: 99 }),
+  summary: faker.company.catchPhrase(),
+}));
+
+const progressUrl = `${apiBase}/loyaltycustomersclient/GetDetailWithProgress`;
+
+// Sets the progressSite config AND the endpoint mock; callers must also pass a
+// preloadedState customer id so the query's enabled gate opens.
+const mockTierProgress = (progress: LoyaltyTierProgress) => {
+  window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId, progressSite: 'StoreSupply' } };
+  server.use(
+    http.get(progressUrl, () =>
+      HttpResponse.json({
+        Success: true,
+        Result: {
+          TierProgress: {
+            CurrentTierName: progress.currentTierName,
+            TargetKind: 'NextTier',
+            TargetTierName: progress.targetTierName,
+            OrdersInWindow: progress.ordersInWindow,
+            TargetOrdersRequired: progress.targetOrdersRequired,
+            SpendInWindow: progress.spendInWindow,
+            TargetAmountRequired: progress.targetAmountRequired,
+            OrdersProgressPct: progress.ordersProgressPct,
+            SpendProgressPct: progress.spendProgressPct,
+            Summary: progress.summary,
+          },
+        },
+      }),
+    ),
+  );
+};
+
+const customerPreloadedState = {
+  preloadedState: { company: buildCompanyStateWith({ customer: { id: 264074 } }) },
+};
+
 it('renders the hero with company name, member-since, and points balance', async () => {
   mockLoyaltyApis(
     buildLoyaltyCustomerWith({ pointBalance: 2465, createdAt: '2026-01-15T00:00:00.000Z' }),
@@ -342,27 +388,6 @@ it('renders the tier list with the current tier highlighted and its title in the
   ) as HTMLElement;
   expect(within(currentCard).getByText(select.perks[0])).toBeInTheDocument();
   expect(screen.getByText('Elite')).toBeInTheDocument();
-  // progress toward Elite: 240 of 300
-  expect(screen.getByText('240 / 300')).toBeInTheDocument();
-  expect(screen.getByRole('progressbar')).toBeInTheDocument();
-});
-
-it('hides the tier progress bar when a threshold is not numeric', async () => {
-  mockLoyaltyApis(
-    buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't1', currentLoyaltyTierProgress: 240 }),
-  );
-  mockTiers([
-    buildTierWith({ id: 't1', title: 'Select', threshold: '0' }),
-    buildTierWith({ id: 't2', title: 'Elite', threshold: 'Gold Status' }),
-  ]);
-
-  const { user } = renderWithProviders(<Loyalty />);
-
-  await user.click(await screen.findByRole('tab', { name: 'Tiers' }));
-
-  // wait for the tier list to render, then confirm no progress bar was attempted
-  expect(await screen.findByText('Current tier: Select')).toBeInTheDocument();
-  expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
 });
 
 it('shows the Memberships tab and lists membership cards when the store has memberships', async () => {
@@ -443,7 +468,6 @@ it('shows the current tier benefits and points summary on the Your rewards tab',
   expect(await screen.findByText('Your Select benefits')).toBeInTheDocument();
   expect(screen.getByText('5% credit on every order')).toBeInTheDocument();
   expect(screen.getByText('Free ground shipping over $300')).toBeInTheDocument();
-  expect(screen.getByText('240 / 300')).toBeInTheDocument();
 });
 
 it('shows the current membership benefits on the Your rewards tab', async () => {
@@ -1065,4 +1089,102 @@ it('fails closed to unavailable on an upstream digest failure while the allowlis
   expect(await screen.findByText('Rewards are not available.')).toBeInTheDocument();
   expect(screen.queryByText("We couldn't load your rewards.")).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+});
+
+it('shows dual-quota tier progress on the Your rewards tab', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockTierProgress(
+    buildTierProgressWith({
+      targetTierName: 'Signature',
+      ordersInWindow: 39,
+      targetOrdersRequired: 75,
+      spendInWindow: 130.85,
+      targetAmountRequired: 300,
+      summary: "36 more order(s) OR $169.15 more spend away from 'Signature'.",
+    }),
+  );
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  expect(await screen.findByText('Progress to Signature')).toBeInTheDocument();
+  expect(screen.getByText('Orders')).toBeInTheDocument();
+  expect(screen.getByText('39 / 75')).toBeInTheDocument();
+  expect(screen.getByText('Spend')).toBeInTheDocument();
+  expect(screen.getByText('$130.85 / $300.00')).toBeInTheDocument();
+  expect(
+    screen.getByText("36 more order(s) OR $169.15 more spend away from 'Signature'."),
+  ).toBeInTheDocument();
+});
+
+it('shows the same tier progress card on the Tiers tab', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockTierProgress(
+    buildTierProgressWith({
+      targetTierName: 'Signature',
+      ordersInWindow: 39,
+      targetOrdersRequired: 75,
+    }),
+  );
+
+  const { user } = renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  await user.click(await screen.findByRole('tab', { name: 'Tiers' }));
+
+  expect(await screen.findByText('Progress to Signature')).toBeInTheDocument();
+  expect(screen.getByText('39 / 75')).toBeInTheDocument();
+});
+
+it('omits the orders row when only a spend quota is configured', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockTierProgress(
+    buildTierProgressWith({
+      targetOrdersRequired: 0,
+      spendInWindow: 130.85,
+      targetAmountRequired: 300,
+    }),
+  );
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  expect(await screen.findByText('$130.85 / $300.00')).toBeInTheDocument();
+  expect(screen.queryByText('Orders')).not.toBeInTheDocument();
+});
+
+it('omits the spend row when only an orders quota is configured', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockTierProgress(
+    buildTierProgressWith({
+      ordersInWindow: 39,
+      targetOrdersRequired: 75,
+      targetAmountRequired: 0,
+    }),
+  );
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  expect(await screen.findByText('39 / 75')).toBeInTheDocument();
+  expect(screen.queryByText('Spend')).not.toBeInTheDocument();
+});
+
+it('shows the SSW tier name in the hero when tier progress is available', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockTierProgress(buildTierProgressWith({ currentTierName: 'Select' }));
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  expect(await screen.findByText('Current tier')).toBeInTheDocument();
+  expect(await screen.findByText('Select')).toBeInTheDocument();
+});
+
+it('hides the tier progress card when the endpoint reports no progress', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId, progressSite: 'StoreSupply' } };
+  server.use(http.get(progressUrl, () => HttpResponse.json({ Success: false })));
+
+  const { user } = renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  await user.click(await screen.findByRole('tab', { name: 'Tiers' }));
+
+  expect(await screen.findByRole('tab', { name: 'Tiers', selected: true })).toBeInTheDocument();
+  expect(screen.queryByText(/Progress to/)).not.toBeInTheDocument();
 });

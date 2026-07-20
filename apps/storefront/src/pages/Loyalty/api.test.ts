@@ -33,7 +33,6 @@ import {
   LoyaltyIdentity,
   LoyaltyTierProgress,
   parseAllowedTiers,
-  parseThreshold,
   redeemReward,
 } from './api';
 
@@ -309,17 +308,6 @@ describe('fetchMemberships', () => {
 
     expect(error).toBeInstanceOf(LoyaltyError);
     expect(error.kind).toBe('upstream');
-  });
-});
-
-describe('parseThreshold', () => {
-  it.each([
-    ['300', 300],
-    ['0', 0],
-    ['not-a-number', null],
-    ['', null],
-  ])('parses %j to %j', (input, expected) => {
-    expect(parseThreshold(input)).toBe(expected);
   });
 });
 

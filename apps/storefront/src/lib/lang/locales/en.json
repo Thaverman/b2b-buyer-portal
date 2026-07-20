@@ -788,6 +788,8 @@
   "loyalty.tabs.memberships": "Memberships",
   "loyalty.tiers.currentTier": "Current tier: {tier}",
   "loyalty.tiers.progressTo": "Progress to {tier}",
+  "loyalty.progress.orders": "Orders",
+  "loyalty.progress.spend": "Spend",
   "loyalty.overview.benefitsTitle": "Your {tier} benefits",
   "loyalty.overview.membershipBenefitsTitle": "Your {membership} membership benefits",
   "loyalty.earn.completed": "Completed",

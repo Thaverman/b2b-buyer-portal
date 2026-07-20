@@ -24,11 +24,13 @@ import TiersTab from './components/TiersTab';
 import {
   fetchLoyaltyCustomer,
   fetchMemberships,
+  fetchTierProgress,
   fetchTiers,
   getAllowedTiers,
   getLoyaltyDigest,
   isLoyaltyAvailable,
   isTierAllowed,
+  isTierProgressAvailable,
   LoyaltyError,
 } from './api';
 
@@ -95,6 +97,14 @@ function Loyalty() {
   });
   const memberships = membershipsQuery.data ?? [];
 
+  const tierProgressQuery = useQuery({
+    queryKey: ['loyaltyTierProgress', customerId],
+    queryFn: () => fetchTierProgress(customerId),
+    enabled: isTierProgressAvailable() && Boolean(customerId),
+    staleTime: Infinity,
+  });
+  const tierProgress = tierProgressQuery.data ?? null;
+
   if (!isAvailable) {
     return (
       <Box>
@@ -107,6 +117,9 @@ function Loyalty() {
     (customer?.currentLoyaltyTierId &&
       tiers.find((tier) => tier.id === customer.currentLoyaltyTierId)?.title) ||
     null;
+
+  // Display identity only — the allowlist gate below stays keyed to the Influence title.
+  const displayTierTitle = tierProgress?.currentTierName || tierTitle;
 
   // Theme rollout gate (spec 2026-07-14): with a non-empty allowlist every
   // unverifiable state fails CLOSED — matching the theme's four enforcement
@@ -169,7 +182,7 @@ function Loyalty() {
         <LoyaltyHero
           companyName={companyName}
           memberSince={customer ? formatMemberSince(customer.createdAt) : null}
-          tierTitle={tierTitle}
+          tierTitle={displayTierTitle}
           pointBalance={customer ? customer.pointBalance : null}
         />
         {isSessionExpired && <Alert severity="warning">{b3Lang('loyalty.sessionExpired')}</Alert>}
@@ -245,7 +258,9 @@ function Loyalty() {
             label={b3Lang('loyalty.tabs.history')}
           />
         </Tabs>
-        {activeTab === 'overview' && <OverviewTab customer={customer} tiers={tiers} />}
+        {activeTab === 'overview' && (
+          <OverviewTab customer={customer} tiers={tiers} tierProgress={tierProgress} />
+        )}
         {activeTab === 'earn' && (
           <EarnPointsTab
             identity={identity}
@@ -264,7 +279,7 @@ function Loyalty() {
           <TiersTab
             tiers={tiers}
             currentTierId={customer?.currentLoyaltyTierId ?? null}
-            currentTierProgress={customer?.currentLoyaltyTierProgress ?? null}
+            tierProgress={tierProgress}
           />
         )}
         {activeTab === 'memberships' && <MembershipsTab memberships={memberships} />}

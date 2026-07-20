@@ -1,18 +1,19 @@
-import { Box, LinearProgress, Typography } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 
 import { useB3Lang } from '@/lib/lang';
 
-import { LoyaltyCustomer, LoyaltyTier } from '../api';
-import { findNextTier } from '../tierProgress';
+import { LoyaltyCustomer, LoyaltyTier, LoyaltyTierProgress } from '../api';
 
 import SectionHeader from './SectionHeader';
+import TierProgressCard from './TierProgressCard';
 
 interface OverviewTabProps {
   customer: LoyaltyCustomer | undefined;
   tiers: LoyaltyTier[];
+  tierProgress: LoyaltyTierProgress | null;
 }
 
-function OverviewTab({ customer, tiers }: OverviewTabProps) {
+function OverviewTab({ customer, tiers, tierProgress }: OverviewTabProps) {
   const b3Lang = useB3Lang();
 
   if (!customer) {
@@ -20,8 +21,6 @@ function OverviewTab({ customer, tiers }: OverviewTabProps) {
   }
 
   const currentTier = tiers.find((tier) => tier.id === customer.currentLoyaltyTierId);
-  const progress = customer.currentLoyaltyTierProgress;
-  const nextTier = findNextTier(tiers, progress);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -82,21 +81,7 @@ function OverviewTab({ customer, tiers }: OverviewTabProps) {
           </Box>
         </Box>
       )}
-      {nextTier && progress !== null && (
-        <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 2, p: 3 }}>
-          <Typography variant="subtitle2" color="text.secondary">
-            {b3Lang('loyalty.tiers.progressTo', { tier: nextTier.tier.title })}
-          </Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            {`${progress.toLocaleString()} / ${nextTier.threshold.toLocaleString()}`}
-          </Typography>
-          <LinearProgress
-            variant="determinate"
-            value={Math.min(100, (progress / nextTier.threshold) * 100)}
-            sx={{ mt: 1, height: 8, borderRadius: 4 }}
-          />
-        </Box>
-      )}
+      <TierProgressCard progress={tierProgress} />
     </Box>
   );
 }
