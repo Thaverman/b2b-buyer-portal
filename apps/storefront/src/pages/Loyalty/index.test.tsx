@@ -475,7 +475,7 @@ it('shows the current membership benefits on the Your rewards tab', async () => 
     buildLoyaltyCustomerWith({
       currentMembership: {
         id: 'm1',
-        title: 'VIP Gold',
+        title: 'Signature Membership',
         perks: ['Free expedited shipping', 'Early access'],
       },
     }),
@@ -483,7 +483,9 @@ it('shows the current membership benefits on the Your rewards tab', async () => 
 
   renderWithProviders(<Loyalty />);
 
-  expect(await screen.findByText('Your VIP Gold membership benefits')).toBeInTheDocument();
+  // Membership titles already end in "Membership", so the heading must not double it.
+  expect(await screen.findByText('Your Signature Membership benefits')).toBeInTheDocument();
+  expect(screen.queryByText(/membership\s+membership/i)).not.toBeInTheDocument();
   expect(screen.getByText('Free expedited shipping')).toBeInTheDocument();
   expect(screen.getByText('Early access')).toBeInTheDocument();
 });
@@ -494,7 +496,8 @@ it('omits the membership benefits block when the customer has no membership', as
   renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('You have 100 points')).toBeInTheDocument();
-  expect(screen.queryByText(/membership benefits/)).not.toBeInTheDocument();
+  // No membership and no tiers mocked here, so neither benefits box renders.
+  expect(screen.queryByText(/benefits/i)).not.toBeInTheDocument();
 });
 
 it('renders earn rules with title and summary', async () => {
