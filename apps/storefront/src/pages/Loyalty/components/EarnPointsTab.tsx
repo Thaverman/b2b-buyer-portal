@@ -81,7 +81,7 @@ function EarnPointsTab({ identity, customer, customerQueryKey }: EarnPointsTabPr
 
   return (
     <Box>
-      <SectionHeader>{b3Lang('loyalty.tabs.earn')}</SectionHeader>
+      <SectionHeader>{b3Lang('loyalty.benefits.howYouEarn')}</SectionHeader>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
         {rules.map((rule) => {
           const Icon = earnRuleIcon(rule);

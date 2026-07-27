@@ -1,12 +1,4 @@
 import { useSearchParams } from 'react-router-dom';
-import {
-  CardGiftcard,
-  CardMembership,
-  FavoriteBorder,
-  Layers,
-  Schedule,
-  StarBorder,
-} from '@mui/icons-material';
 import { Alert, Box, Button, Tab, Tabs, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 
@@ -14,13 +6,10 @@ import B3Spin from '@/components/spin/B3Spin';
 import { useB3Lang } from '@/lib/lang';
 import { useAppSelector } from '@/store';
 
-import EarnPointsTab from './components/EarnPointsTab';
+import BenefitsTab from './components/BenefitsTab';
 import LoyaltyHero from './components/LoyaltyHero';
-import MembershipsTab from './components/MembershipsTab';
 import MyRewardsTab from './components/MyRewardsTab';
-import OverviewTab from './components/OverviewTab';
 import RewardsTab from './components/RewardsTab';
-import TiersTab from './components/TiersTab';
 import {
   fetchLoyaltyCustomer,
   fetchMemberships,
@@ -35,11 +24,25 @@ import {
   LoyaltyError,
 } from './api';
 
-const LOYALTY_TABS = ['overview', 'earn', 'redeem', 'tiers', 'memberships', 'history'] as const;
+const LOYALTY_TABS = ['benefits', 'get-rewards', 'my-rewards', 'faq'] as const;
 type LoyaltyTab = (typeof LOYALTY_TABS)[number];
 
-const toLoyaltyTab = (value: string | null): LoyaltyTab =>
-  LOYALTY_TABS.includes(value as LoyaltyTab) ? (value as LoyaltyTab) : 'overview';
+// Old bookmarks keep working: every retired tab value maps onto its new home.
+const LEGACY_TABS: Record<string, LoyaltyTab> = {
+  overview: 'benefits',
+  earn: 'benefits',
+  tiers: 'benefits',
+  memberships: 'benefits',
+  redeem: 'get-rewards',
+  history: 'my-rewards',
+};
+
+const toLoyaltyTab = (value: string | null): LoyaltyTab => {
+  if (LOYALTY_TABS.includes(value as LoyaltyTab)) {
+    return value as LoyaltyTab;
+  }
+  return LEGACY_TABS[value ?? ''] ?? 'benefits';
+};
 
 const formatMemberSince = (createdAt: string): string | null => {
   const date = new Date(createdAt);
@@ -165,8 +168,8 @@ function Loyalty() {
   const isSessionExpired = errorKind === 'sessionExpired';
   const isLoadError = Boolean(errorKind) && !isNotEnrolled && !isSessionExpired;
 
-  const hasMemberships = memberships.length > 0;
-  const activeTab = tab === 'memberships' && !hasMemberships ? 'overview' : tab;
+  // The FAQ tab arrives in the next task; until then no tab can be conditionally absent.
+  const activeTab = tab === 'faq' ? 'benefits' : tab;
 
   return (
     <B3Spin isSpinning={digestQuery.isFetching || customerQuery.isFetching}>
@@ -227,71 +230,28 @@ function Loyalty() {
             '& .MuiTabs-flexContainer > :last-of-type': { mr: 'auto' },
           }}
         >
-          <Tab
-            value="overview"
-            icon={<FavoriteBorder />}
-            iconPosition="start"
-            label={b3Lang('loyalty.tabs.overview')}
-          />
-          <Tab
-            value="earn"
-            icon={<StarBorder />}
-            iconPosition="start"
-            label={b3Lang('loyalty.tabs.earn')}
-          />
-          <Tab
-            value="redeem"
-            icon={<CardGiftcard />}
-            iconPosition="start"
-            label={b3Lang('loyalty.tabs.getRewards')}
-          />
-          <Tab
-            value="tiers"
-            icon={<Layers />}
-            iconPosition="start"
-            label={b3Lang('loyalty.tabs.tiers')}
-          />
-          {hasMemberships && (
-            <Tab
-              value="memberships"
-              icon={<CardMembership />}
-              iconPosition="start"
-              label={b3Lang('loyalty.tabs.memberships')}
-            />
-          )}
-          <Tab
-            value="history"
-            icon={<Schedule />}
-            iconPosition="start"
-            label={b3Lang('loyalty.tabs.history')}
-          />
+          <Tab value="benefits" label={b3Lang('loyalty.tabs.benefits')} />
+          <Tab value="get-rewards" label={b3Lang('loyalty.tabs.getRewards')} />
+          <Tab value="my-rewards" label={b3Lang('loyalty.tabs.myRewards')} />
         </Tabs>
-        {activeTab === 'overview' && (
-          <OverviewTab customer={customer} tiers={tiers} tierProgress={tierProgress} />
-        )}
-        {activeTab === 'earn' && (
-          <EarnPointsTab
-            identity={identity}
+        {activeTab === 'benefits' && (
+          <BenefitsTab
             customer={customer}
+            tiers={tiers}
+            memberships={memberships}
+            tierProgress={tierProgress}
+            identity={identity}
             customerQueryKey={['loyaltyCustomer', customerId]}
           />
         )}
-        {activeTab === 'redeem' && (
+        {activeTab === 'get-rewards' && (
           <RewardsTab
             identity={identity}
             pointBalance={customer?.pointBalance ?? 0}
             customerQueryKey={['loyaltyCustomer', customerId]}
           />
         )}
-        {activeTab === 'tiers' && (
-          <TiersTab
-            tiers={tiers}
-            currentTierId={customer?.currentLoyaltyTierId ?? null}
-            tierProgress={tierProgress}
-          />
-        )}
-        {activeTab === 'memberships' && <MembershipsTab memberships={memberships} />}
-        {activeTab === 'history' && <MyRewardsTab identity={identity} />}
+        {activeTab === 'my-rewards' && <MyRewardsTab identity={identity} />}
       </Box>
     </B3Spin>
   );

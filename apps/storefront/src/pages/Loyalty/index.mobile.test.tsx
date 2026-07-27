@@ -76,6 +76,6 @@ it('renders the hero and scrollable tabs on a mobile viewport', async () => {
 
   expect(await screen.findByText('Welcome back, Riverside Hardware Co.')).toBeInTheDocument();
   expect(await screen.findByText('You have 2,465 points available.')).toBeInTheDocument();
-  expect(screen.getByRole('tab', { name: 'Your rewards' })).toBeInTheDocument();
-  expect(screen.getByRole('tab', { name: 'History' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'My benefits' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'My rewards' })).toBeInTheDocument();
 });

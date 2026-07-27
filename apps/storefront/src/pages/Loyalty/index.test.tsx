@@ -325,35 +325,35 @@ it('recovers from a load error via the retry button', async () => {
   expect(await screen.findByText('You have 100 points available.')).toBeInTheDocument();
 });
 
-it('renders the five tabs with mockup labels and defaults to Your rewards', async () => {
+it('renders the tabs with mockup labels and defaults to My benefits', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
 
   renderWithProviders(<Loyalty />);
 
   expect(
-    await screen.findByRole('tab', { name: 'Your rewards', selected: true }),
+    await screen.findByRole('tab', { name: 'My benefits', selected: true }),
   ).toBeInTheDocument();
-  expect(screen.getByRole('tab', { name: 'Earn points' })).toBeInTheDocument();
   expect(screen.getByRole('tab', { name: 'Get rewards' })).toBeInTheDocument();
-  expect(screen.getByRole('tab', { name: 'Tiers' })).toBeInTheDocument();
-  expect(screen.getByRole('tab', { name: 'History' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'My rewards' })).toBeInTheDocument();
 });
 
 it('selects the tab named by the URL search param', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
 
-  renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=history' }] });
+  renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=my-rewards' }] });
 
-  expect(await screen.findByRole('tab', { name: 'History', selected: true })).toBeInTheDocument();
+  expect(
+    await screen.findByRole('tab', { name: 'My rewards', selected: true }),
+  ).toBeInTheDocument();
 });
 
-it('falls back to Your rewards for an unknown tab param', async () => {
+it('falls back to My benefits for an unknown tab param', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
 
   renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=bogus' }] });
 
   expect(
-    await screen.findByRole('tab', { name: 'Your rewards', selected: true }),
+    await screen.findByRole('tab', { name: 'My benefits', selected: true }),
   ).toBeInTheDocument();
 });
 
@@ -362,9 +362,9 @@ it('switches tabs on click', async () => {
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'Tiers' }));
+  await user.click(await screen.findByRole('tab', { name: 'Get rewards' }));
 
-  expect(screen.getByRole('tab', { name: 'Tiers', selected: true })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'Get rewards', selected: true })).toBeInTheDocument();
 });
 
 it('renders the tier list with the current tier highlighted and its title in the hero', async () => {
@@ -376,13 +376,11 @@ it('renders the tier list with the current tier highlighted and its title in the
   );
   mockTiers([select, elite]);
 
-  const { user } = renderWithProviders(<Loyalty />);
+  renderWithProviders(<Loyalty />);
 
   // hero shows the resolved tier title
   expect(await screen.findByText('Current tier')).toBeInTheDocument();
   expect(await screen.findByText('Select')).toBeInTheDocument();
-
-  await user.click(screen.getByRole('tab', { name: 'Tiers' }));
 
   const currentCard = (await screen.findByText('Current tier: Select')).closest(
     '.MuiCard-root',
@@ -391,46 +389,14 @@ it('renders the tier list with the current tier highlighted and its title in the
   expect(screen.getByText('Elite')).toBeInTheDocument();
 });
 
-it('shows the Memberships tab and lists membership cards when the store has memberships', async () => {
-  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
-  mockMemberships([
-    buildMembershipWith({
-      title: 'VIP Gold',
-      description: 'Our premium program',
-      perks: ['Free expedited shipping', 'Early access to sales'],
-    }),
-  ]);
-
-  const { user } = renderWithProviders(<Loyalty />);
-
-  await user.click(await screen.findByRole('tab', { name: 'Memberships' }));
-
-  expect(await screen.findByText('VIP Gold')).toBeInTheDocument();
-  expect(screen.getByText('Our premium program')).toBeInTheDocument();
-  expect(screen.getByText('Free expedited shipping')).toBeInTheDocument();
-  expect(screen.getByText('Early access to sales')).toBeInTheDocument();
-});
-
-it('hides the Memberships tab when the store has no memberships', async () => {
+it('omits the memberships section when the store has none', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
   mockMemberships([]);
 
   renderWithProviders(<Loyalty />);
 
-  expect(await screen.findByRole('tab', { name: 'Your rewards' })).toBeInTheDocument();
-  expect(screen.queryByRole('tab', { name: 'Memberships' })).not.toBeInTheDocument();
-});
-
-it('falls back to Your rewards when ?tab=memberships but the store has none', async () => {
-  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
-  mockMemberships([]);
-
-  renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=memberships' }] });
-
-  expect(
-    await screen.findByRole('tab', { name: 'Your rewards', selected: true }),
-  ).toBeInTheDocument();
-  expect(screen.queryByRole('tab', { name: 'Memberships' })).not.toBeInTheDocument();
+  expect(await screen.findByRole('tab', { name: 'My benefits' })).toBeInTheDocument();
+  expect(screen.queryByText('Memberships')).not.toBeInTheDocument();
 });
 
 it('omits the description line for a membership with no description', async () => {
@@ -439,15 +405,13 @@ it('omits the description line for a membership with no description', async () =
     buildMembershipWith({ title: 'Trade Pro', description: '', perks: ['Net-30 terms'] }),
   ]);
 
-  const { user } = renderWithProviders(<Loyalty />);
-
-  await user.click(await screen.findByRole('tab', { name: 'Memberships' }));
+  renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('Trade Pro')).toBeInTheDocument();
   expect(screen.getByText('Net-30 terms')).toBeInTheDocument();
 });
 
-it('shows the current tier benefits and points summary on the Your rewards tab', async () => {
+it('shows the current tier benefits and points summary on My benefits', async () => {
   const select = buildTierWith({
     id: 't1',
     title: 'Select',
@@ -466,12 +430,15 @@ it('shows the current tier benefits and points summary on the Your rewards tab',
 
   renderWithProviders(<Loyalty />);
 
-  expect(await screen.findByText('Your Select benefits')).toBeInTheDocument();
-  expect(screen.getByText('5% credit on every order')).toBeInTheDocument();
-  expect(screen.getByText('Free ground shipping over $300')).toBeInTheDocument();
+  // Scoped to the highlighted benefits box — the same tier's perks also appear in the tier list below.
+  const benefitsBox = (await screen.findByText('Your Select benefits')).closest(
+    '.MuiBox-root',
+  ) as HTMLElement;
+  expect(within(benefitsBox).getByText('5% credit on every order')).toBeInTheDocument();
+  expect(within(benefitsBox).getByText('Free ground shipping over $300')).toBeInTheDocument();
 });
 
-it('shows the current membership benefits on the Your rewards tab', async () => {
+it('shows the current membership benefits on My benefits', async () => {
   mockLoyaltyApis(
     buildLoyaltyCustomerWith({
       currentMembership: {
@@ -497,8 +464,9 @@ it('omits the membership benefits block when the customer has no membership', as
   renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('You have 100 points available.')).toBeInTheDocument();
-  // No membership and no tiers mocked here, so neither benefits box renders.
-  expect(screen.queryByText(/benefits/i)).not.toBeInTheDocument();
+  // No membership and no tiers mocked here, so neither highlighted benefits box renders
+  // (the "My benefits" tab/section heading itself is unconditional, so this can't be /benefits/i).
+  expect(screen.queryByText(/Your .+ benefits/)).not.toBeInTheDocument();
 });
 
 it('renders earn rules with title and summary', async () => {
@@ -507,9 +475,7 @@ it('renders earn rules with title and summary', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
   mockEarnRules([rule]);
 
-  const { user } = renderWithProviders(<Loyalty />);
-
-  await user.click(await screen.findByRole('tab', { name: 'Earn points' }));
+  renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('Make a purchase')).toBeInTheDocument();
   expect(screen.getByText('2 points per $1')).toBeInTheDocument();
@@ -523,9 +489,7 @@ it('shows a per-dollar points line for increments earn rules', async () => {
     buildEarnRuleWith({ title: 'Place an order', earnType: 'increments', earnValue: 3 }),
   ]);
 
-  const { user } = renderWithProviders(<Loyalty />);
-
-  await user.click(await screen.findByRole('tab', { name: 'Earn points' }));
+  renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('Place an order')).toBeInTheDocument();
   expect(screen.getByText('Earn 3 points per $1 spent')).toBeInTheDocument();
@@ -535,9 +499,7 @@ it('shows a flat points line for non-increments earn rules', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
   mockEarnRules([buildEarnRuleWith({ title: 'Sign up', earnType: '', earnValue: 10 })]);
 
-  const { user } = renderWithProviders(<Loyalty />);
-
-  await user.click(await screen.findByRole('tab', { name: 'Earn points' }));
+  renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('Sign up')).toBeInTheDocument();
   expect(screen.getByText('Earn 10 points')).toBeInTheDocument();
@@ -547,9 +509,7 @@ it('omits the points line when earnValue is 0', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
   mockEarnRules([buildEarnRuleWith({ title: 'Mystery rule', earnValue: 0 })]);
 
-  const { user } = renderWithProviders(<Loyalty />);
-
-  await user.click(await screen.findByRole('tab', { name: 'Earn points' }));
+  renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('Mystery rule')).toBeInTheDocument();
   expect(screen.queryByText('Earn 0 points')).not.toBeInTheDocument();
@@ -575,12 +535,10 @@ it('shows only the earn rules for the customer current tier', async () => {
     buildEarnRuleWith({ title: 'Sign up', earnValue: 10 }),
   ]);
 
-  const { user } = renderWithProviders(<Loyalty />);
-
-  await user.click(await screen.findByRole('tab', { name: 'Earn points' }));
+  renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('Sign up')).toBeInTheDocument();
-  expect(screen.getAllByText('Place an order')).toHaveLength(1);
+  expect(await screen.findAllByText('Place an order')).toHaveLength(1);
   expect(screen.getByText('Earn 3 points per $1 spent')).toBeInTheDocument();
   expect(screen.queryByText('Earn 2 points per $1 spent')).not.toBeInTheDocument();
 });
@@ -589,9 +547,7 @@ it('shows a completed chip on a social rule the customer already did', async () 
   mockLoyaltyApis(buildLoyaltyCustomerWith({ followInstagram: true }));
   mockEarnRules([buildEarnRuleWith({ templateName: 'instagram_follow', title: 'Follow us' })]);
 
-  const { user } = renderWithProviders(<Loyalty />);
-
-  await user.click(await screen.findByRole('tab', { name: 'Earn points' }));
+  renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('Completed')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Follow' })).not.toBeInTheDocument();
@@ -619,7 +575,6 @@ it('awards points through the social follow button', async () => {
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'Earn points' }));
   await user.click(await screen.findByRole('button', { name: 'Follow' }));
 
   await waitFor(() => {
@@ -642,7 +597,6 @@ it('shows the rate-limited error when the social follow is throttled', async () 
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'Earn points' }));
   await user.click(await screen.findByRole('button', { name: 'Follow' }));
 
   await waitFor(() => {
@@ -661,7 +615,6 @@ it('shows the generic error when the social follow fails upstream', async () => 
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'Earn points' }));
   await user.click(await screen.findByRole('button', { name: 'Follow' }));
 
   await waitFor(() => {
@@ -827,7 +780,7 @@ it('lists previously earned coupon codes and loads more pages', async () => {
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'History' }));
+  await user.click(await screen.findByRole('tab', { name: 'My rewards' }));
 
   expect(await screen.findByText('FIRST-CODE')).toBeInTheDocument();
 
@@ -853,7 +806,7 @@ it('lists points history and loads more pages', async () => {
   );
 
   const { user } = renderWithProviders(<Loyalty />, {
-    initialEntries: [{ search: '?tab=history' }],
+    initialEntries: [{ search: '?tab=my-rewards' }],
   });
 
   expect(await screen.findByText('Order #1001')).toBeInTheDocument();
@@ -873,7 +826,7 @@ it('shows the empty history state', async () => {
     ),
   );
 
-  renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=history' }] });
+  renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=my-rewards' }] });
 
   expect(await screen.findByText('No points activity yet.')).toBeInTheDocument();
 });
@@ -1022,7 +975,7 @@ it('renders the page when the customer tier is on the rollout allowlist', async 
   renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('You have 2,465 points available.')).toBeInTheDocument();
-  expect(screen.getByRole('tab', { name: 'Earn points' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'My benefits' })).toBeInTheDocument();
 });
 
 it('shows the unavailable state when the customer tier is not on the allowlist', async () => {
@@ -1033,7 +986,7 @@ it('shows the unavailable state when the customer tier is not on the allowlist',
   renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('Rewards are not available.')).toBeInTheDocument();
-  expect(screen.queryByRole('tab', { name: 'Earn points' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: 'My benefits' })).not.toBeInTheDocument();
 });
 
 it('fails closed to unavailable on a digest failure while the allowlist is set', async () => {
@@ -1070,7 +1023,7 @@ it('fails closed to unavailable when the tiers lookup fails while the allowlist 
   renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('Rewards are not available.')).toBeInTheDocument();
-  expect(screen.queryByRole('tab', { name: 'Earn points' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: 'My benefits' })).not.toBeInTheDocument();
 });
 
 it('treats an empty allowedTiers string as lever-off (current behavior)', async () => {
@@ -1095,7 +1048,7 @@ it('fails closed to unavailable on an upstream digest failure while the allowlis
   expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
 });
 
-it('shows dual-quota tier progress on the Your rewards tab', async () => {
+it('shows dual-quota tier progress on My benefits', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
   mockTierProgress(
     buildTierProgressWith({
@@ -1120,7 +1073,7 @@ it('shows dual-quota tier progress on the Your rewards tab', async () => {
   ).toBeInTheDocument();
 });
 
-it('shows the same tier progress card on the Tiers tab', async () => {
+it('shows the tier progress card once on My benefits', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
   mockTierProgress(
     buildTierProgressWith({
@@ -1130,11 +1083,9 @@ it('shows the same tier progress card on the Tiers tab', async () => {
     }),
   );
 
-  const { user } = renderWithProviders(<Loyalty />, customerPreloadedState);
+  renderWithProviders(<Loyalty />, customerPreloadedState);
 
-  await user.click(await screen.findByRole('tab', { name: 'Tiers' }));
-
-  expect(await screen.findByText('Progress to Signature')).toBeInTheDocument();
+  expect(await screen.findAllByText('Progress to Signature')).toHaveLength(1);
   expect(screen.getByText('39 / 75')).toBeInTheDocument();
 });
 
@@ -1185,11 +1136,11 @@ it('hides the tier progress card when the endpoint reports no progress', async (
   window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId, progressSite: 'StoreSupply' } };
   server.use(http.get(progressUrl, () => HttpResponse.json({ Success: false })));
 
-  const { user } = renderWithProviders(<Loyalty />, customerPreloadedState);
+  renderWithProviders(<Loyalty />, customerPreloadedState);
 
-  await user.click(await screen.findByRole('tab', { name: 'Tiers' }));
-
-  expect(await screen.findByRole('tab', { name: 'Tiers', selected: true })).toBeInTheDocument();
+  expect(
+    await screen.findByRole('tab', { name: 'My benefits', selected: true }),
+  ).toBeInTheDocument();
   expect(screen.queryByText(/Progress to/)).not.toBeInTheDocument();
 });
 
@@ -1303,9 +1254,66 @@ it('lists earned coupon codes and points history together, away from the catalog
   expect(await screen.findByText('Free shipping')).toBeInTheDocument();
   expect(screen.queryByText('SAVE-123')).not.toBeInTheDocument();
 
-  await user.click(screen.getByRole('tab', { name: 'History' }));
+  await user.click(screen.getByRole('tab', { name: 'My rewards' }));
   expect(await screen.findByText('SAVE-123')).toBeInTheDocument();
   expect(screen.getByText('Your earned rewards')).toBeInTheDocument();
   expect(screen.getByText('Order #1001')).toBeInTheDocument();
   expect(screen.getByText('+50')).toBeInTheDocument();
+});
+
+it('renders the four Smart Rewards tabs and defaults to My benefits', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  renderWithProviders(<Loyalty />);
+
+  expect(
+    await screen.findByRole('tab', { name: 'My benefits', selected: true }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'Get rewards' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'My rewards' })).toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: 'Earn points' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: 'Tiers' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: 'History' })).not.toBeInTheDocument();
+});
+
+it('shows membership status, tier benefits, earn rules and comparisons on My benefits', async () => {
+  const select = buildTierWith({ id: 't1', title: 'Select', perks: ['5% credit'] });
+
+  mockLoyaltyApis(
+    buildLoyaltyCustomerWith({
+      currentLoyaltyTierId: 't1',
+      currentMembership: {
+        id: 'm1',
+        title: 'Signature Membership',
+        perks: ['Dedicated account representative'],
+      },
+    }),
+  );
+  mockTiers([select]);
+  mockMemberships([buildMembershipWith({ title: 'Signature Membership' })]);
+  mockEarnRules([buildEarnRuleWith({ title: 'Place an order', earnValue: 3 })]);
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('Your Signature Membership benefits')).toBeInTheDocument();
+  expect(screen.getByText('Dedicated account representative')).toBeInTheDocument();
+  expect(await screen.findByText('Your Select benefits')).toBeInTheDocument();
+  expect(screen.getByText('How you earn points')).toBeInTheDocument();
+  expect(await screen.findByText('Place an order')).toBeInTheDocument();
+});
+
+it.each([
+  ['overview', 'My benefits'],
+  ['earn', 'My benefits'],
+  ['tiers', 'My benefits'],
+  ['memberships', 'My benefits'],
+  ['redeem', 'Get rewards'],
+  ['history', 'My rewards'],
+  ['bogus', 'My benefits'],
+])('maps the legacy ?tab=%s deep link to %s', async (legacy, expected) => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  renderWithProviders(<Loyalty />, { initialEntries: [{ search: `?tab=${legacy}` }] });
+
+  expect(await screen.findByRole('tab', { name: expected, selected: true })).toBeInTheDocument();
 });

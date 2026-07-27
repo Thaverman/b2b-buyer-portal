@@ -2,24 +2,21 @@ import { Box, Card, CardContent, Typography } from '@mui/material';
 
 import { useB3Lang } from '@/lib/lang';
 
-import { LoyaltyTier, LoyaltyTierProgress } from '../api';
+import { LoyaltyTier } from '../api';
 
 import SectionHeader from './SectionHeader';
-import TierProgressCard from './TierProgressCard';
 
 interface TiersTabProps {
   tiers: LoyaltyTier[];
   currentTierId: string | null;
-  tierProgress: LoyaltyTierProgress | null;
 }
 
-function TiersTab({ tiers, currentTierId, tierProgress }: TiersTabProps) {
+function TiersTab({ tiers, currentTierId }: TiersTabProps) {
   const b3Lang = useB3Lang();
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <SectionHeader>{b3Lang('loyalty.tabs.tiers')}</SectionHeader>
-      <TierProgressCard progress={tierProgress} />
       {tiers.map((tier) => (
         <Card
           key={tier.id}
