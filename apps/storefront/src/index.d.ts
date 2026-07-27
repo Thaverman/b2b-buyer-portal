@@ -75,6 +75,8 @@ declare global {
         appClientId: string;
         /** SSW site key for GetDetailWithProgress (e.g. "StoreSupply"); absent = tier progress off. */
         progressSite?: string;
+        /** Theme override for the hero banner image; absent = the relative default. */
+        bannerUrl?: string;
       };
     };
     /** Theme-set free-shipping config; absent = shipping tracker off. */
@@ -96,6 +98,11 @@ declare global {
     /** Theme-set rollout gate; absent (older theme deploys) = empty allowlist = everyone. */
     loyaltyRolloutConfig?: {
       allowedTiers?: string;
+    };
+    /** Theme-set FAQ content; absent or empty = the FAQ tab is hidden. */
+    loyaltyFaqConfig?: {
+      intro?: string;
+      items?: { question?: string; answer?: string }[];
     };
     B3: {
       setting: {

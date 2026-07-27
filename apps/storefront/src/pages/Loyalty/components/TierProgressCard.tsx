@@ -12,7 +12,8 @@ interface TierProgressCardProps {
 function TierProgressCard({ progress }: TierProgressCardProps) {
   const b3Lang = useB3Lang();
 
-  if (!progress) {
+  // PrePointsGate is surfaced by the hero (CTA + summary), not by this card.
+  if (!progress || progress.targetKind !== 'NextTier') {
     return null;
   }
 

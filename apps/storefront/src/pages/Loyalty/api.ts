@@ -9,6 +9,7 @@ interface LoyaltyConfig {
   apiBase: string;
   appClientId: string;
   progressSite?: string;
+  bannerUrl?: string;
 }
 
 const LAUNCHER_API_BASE = 'https://launcher.api.influence.io/launcher/v1';
@@ -281,6 +282,7 @@ export const fetchMemberships = async (): Promise<LoyaltyMembership[]> => {
 };
 
 export interface LoyaltyTierProgress {
+  targetKind: 'NextTier' | 'PrePointsGate';
   currentTierName: string;
   targetTierName: string;
   ordersInWindow: number;
@@ -340,12 +342,17 @@ export const fetchTierProgress = async (
     Result?: { TierProgress?: RawTierProgress | null };
   };
   const progress = raw.Success === true ? raw.Result?.TierProgress : null;
-  // Anything other than an explicit next-tier target means there is nothing to show.
-  if (!progress || progress.TargetKind !== 'NextTier') {
+  // Only these two kinds have something to show: NextTier drives the progress card,
+  // PrePointsGate drives the hero's shopping nudge. AtTop (and anything unknown) = nothing.
+  if (
+    !progress ||
+    (progress.TargetKind !== 'NextTier' && progress.TargetKind !== 'PrePointsGate')
+  ) {
     return null;
   }
 
   return {
+    targetKind: progress.TargetKind,
     currentTierName: progress.CurrentTierName ?? '',
     targetTierName: progress.TargetTierName ?? '',
     ordersInWindow: progress.OrdersInWindow ?? 0,
@@ -711,3 +718,23 @@ export const isTierAllowed = (tierTitle: string | null | undefined, allowed: str
 // degrades to an empty allowlist (fail open), never a throw.
 export const getAllowedTiers = (): string[] =>
   parseAllowedTiers((window.loyaltyRolloutConfig || {}).allowedTiers);
+
+// The portal runs in the storefront's top document, so a root-relative path resolves to
+// the right host per environment (sandbox vs production) with no config and no host string.
+const DEFAULT_BANNER_URL = '/content/images/loyalty/loyalty-account-banner.jpg';
+
+export const getBannerUrl = (): string =>
+  getLoyaltyConfig()?.bannerUrl?.trim() || DEFAULT_BANNER_URL;
+
+export interface LoyaltyFaqItem {
+  question: string;
+  answer: string;
+}
+
+export const getFaqItems = (): LoyaltyFaqItem[] =>
+  (window.loyaltyFaqConfig?.items ?? [])
+    .map((item) => ({ question: item.question?.trim() ?? '', answer: item.answer?.trim() ?? '' }))
+    // A half-filled entry would render an empty accordion row; drop it.
+    .filter((item) => item.question !== '' && item.answer !== '');
+
+export const getFaqIntro = (): string => window.loyaltyFaqConfig?.intro?.trim() ?? '';

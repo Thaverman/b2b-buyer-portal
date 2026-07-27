@@ -21,6 +21,9 @@ import {
   fetchTierProgress,
   fetchTiers,
   getAllowedTiers,
+  getBannerUrl,
+  getFaqIntro,
+  getFaqItems,
   getLoyaltyDigest,
   getShippingCalculation,
   getSocialCompletionFlag,
@@ -75,6 +78,7 @@ afterEach(() => {
   delete window.loyaltyShippingConfig;
   delete window.getLoyaltyShippingCalculation;
   delete window.loyaltyRolloutConfig;
+  delete window.loyaltyFaqConfig;
 });
 
 const mockJwt = (jwt = 'fresh-jwt') =>
@@ -862,6 +866,7 @@ describe('fetchTierProgress', () => {
     const result: LoyaltyTierProgress | null = await fetchTierProgress(264074);
 
     expect(result).toEqual({
+      targetKind: 'NextTier',
       currentTierName: 'Select',
       targetTierName: 'Signature',
       ordersInWindow: 39,
@@ -910,5 +915,133 @@ describe('fetchTierProgress', () => {
 
     expect(error).toBeInstanceOf(LoyaltyError);
     expect(error.kind).toBe('upstream');
+  });
+});
+
+describe('fetchTierProgress target kinds', () => {
+  const progressUrl =
+    'https://ssw.example.com/customers/loyaltycustomersclient/GetDetailWithProgress';
+  const withProgressSite = () => {
+    window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId, progressSite: 'StoreSupply' } };
+  };
+
+  it('maps a PrePointsGate payload, keeping the spend gate and summary', async () => {
+    withProgressSite();
+    server.use(
+      http.get(progressUrl, () =>
+        HttpResponse.json({
+          Success: true,
+          Result: {
+            TierProgress: {
+              CurrentTierName: 'Signature',
+              TargetKind: 'PrePointsGate',
+              TargetTierName: 'Signature',
+              TargetOrdersRequired: 0,
+              TargetAmountRequired: 5000,
+              OrdersInWindow: 39,
+              SpendInWindow: 2097.85,
+              OrdersProgressPct: 0,
+              SpendProgressPct: 41.96,
+              Summary:
+                "Spend $2902.15 more in the next 365-day window to start earning points on the 'Signature' tier.",
+            },
+          },
+        }),
+      ),
+    );
+
+    const result = await fetchTierProgress(264074);
+
+    expect(result).toEqual({
+      targetKind: 'PrePointsGate',
+      currentTierName: 'Signature',
+      targetTierName: 'Signature',
+      ordersInWindow: 39,
+      targetOrdersRequired: 0,
+      spendInWindow: 2097.85,
+      targetAmountRequired: 5000,
+      ordersProgressPct: 0,
+      spendProgressPct: 41.96,
+      summary:
+        "Spend $2902.15 more in the next 365-day window to start earning points on the 'Signature' tier.",
+    });
+  });
+
+  it('still maps NextTier with its target kind', async () => {
+    withProgressSite();
+    server.use(
+      http.get(progressUrl, () =>
+        HttpResponse.json({
+          Success: true,
+          Result: { TierProgress: { TargetKind: 'NextTier', TargetTierName: 'Signature' } },
+        }),
+      ),
+    );
+
+    const result = await fetchTierProgress(264074);
+
+    expect(result?.targetKind).toBe('NextTier');
+    expect(result?.targetTierName).toBe('Signature');
+  });
+
+  it('returns null for AtTop', async () => {
+    withProgressSite();
+    server.use(
+      http.get(progressUrl, () =>
+        HttpResponse.json({ Success: true, Result: { TierProgress: { TargetKind: 'AtTop' } } }),
+      ),
+    );
+
+    expect(await fetchTierProgress(264074)).toBeNull();
+  });
+});
+
+describe('getBannerUrl', () => {
+  it('defaults to the storefront-relative banner path', () => {
+    window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId } };
+
+    expect(getBannerUrl()).toBe('/content/images/loyalty/loyalty-account-banner.jpg');
+  });
+
+  it('prefers a non-blank theme override', () => {
+    window.BC_CONTEXT = {
+      loyalty: { shopKey, apiBase, appClientId, bannerUrl: 'https://cdn.example.com/hero.jpg' },
+    };
+
+    expect(getBannerUrl()).toBe('https://cdn.example.com/hero.jpg');
+  });
+
+  it('falls back to the default when the override is blank', () => {
+    window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId, bannerUrl: '   ' } };
+
+    expect(getBannerUrl()).toBe('/content/images/loyalty/loyalty-account-banner.jpg');
+  });
+});
+
+describe('getFaqItems and getFaqIntro', () => {
+  it('returns an empty list and intro when the theme global is absent', () => {
+    expect(getFaqItems()).toEqual([]);
+    expect(getFaqIntro()).toBe('');
+  });
+
+  it('drops items missing a question or an answer', () => {
+    window.loyaltyFaqConfig = {
+      intro: 'Ask away.',
+      items: [
+        { question: 'How do I earn?', answer: 'Place orders.' },
+        { question: 'No answer' },
+        { answer: 'No question' },
+        { question: '  ', answer: 'blank question' },
+      ],
+    };
+
+    expect(getFaqItems()).toEqual([{ question: 'How do I earn?', answer: 'Place orders.' }]);
+    expect(getFaqIntro()).toBe('Ask away.');
+  });
+
+  it('degrades an items-less config to an empty list', () => {
+    window.loyaltyFaqConfig = {};
+
+    expect(getFaqItems()).toEqual([]);
   });
 });

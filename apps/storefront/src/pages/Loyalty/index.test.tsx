@@ -210,6 +210,7 @@ const mockShippingTracker = (
 };
 
 const buildTierProgressWith = builder<LoyaltyTierProgress>(() => ({
+  targetKind: 'NextTier' as const,
   currentTierName: faker.commerce.productAdjective(),
   targetTierName: faker.commerce.productAdjective(),
   ordersInWindow: faker.number.int({ min: 0, max: 50 }),
