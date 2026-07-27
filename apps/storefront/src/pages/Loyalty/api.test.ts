@@ -919,12 +919,6 @@ describe('fetchTierProgress', () => {
 });
 
 describe('fetchTierProgress target kinds', () => {
-  const progressUrl =
-    'https://ssw.example.com/customers/loyaltycustomersclient/GetDetailWithProgress';
-  const withProgressSite = () => {
-    window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId, progressSite: 'StoreSupply' } };
-  };
-
   it('maps a PrePointsGate payload, keeping the spend gate and summary', async () => {
     withProgressSite();
     server.use(

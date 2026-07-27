@@ -3,6 +3,7 @@ import {
   buildCompanyStateWith,
   builder,
   faker,
+  fireEvent,
   http,
   HttpResponse,
   renderWithProviders,
@@ -273,6 +274,24 @@ it('renders the hero with company name, member-since, and points balance', async
   expect(await screen.findByText('Welcome back, Riverside Hardware Co.')).toBeInTheDocument();
   expect(await screen.findByText('Member since Jan 2026')).toBeInTheDocument();
   expect(await screen.findByText('You have 2,465 points available.')).toBeInTheDocument();
+});
+
+it('renders the storefront-hosted banner image and hides it if it fails to load', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 1044 }));
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  expect(await screen.findByText('Smart Rewards')).toBeInTheDocument();
+  const image = document.querySelector(
+    'img[src="/content/images/loyalty/loyalty-account-banner.jpg"]',
+  );
+  expect(image).toBeInTheDocument();
+
+  fireEvent.error(image as Element);
+
+  expect(
+    document.querySelector('img[src="/content/images/loyalty/loyalty-account-banner.jpg"]'),
+  ).not.toBeInTheDocument();
 });
 
 it('shows the session-expired state when the jwt fetch fails', async () => {
@@ -1231,6 +1250,7 @@ it('shows the shopping CTA and gate summary for a PrePointsGate customer', async
   expect(
     screen.getByText('Spend $2902.15 more in the next 365-day window to start earning points.'),
   ).toBeInTheDocument();
+  expect(screen.queryByText(/Progress to/)).not.toBeInTheDocument();
 });
 
 it('shows no CTA for a customer who is already earning', async () => {

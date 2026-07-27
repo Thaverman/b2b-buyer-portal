@@ -15,6 +15,9 @@ interface FaqTabProps {
 function FaqTab({ items, intro }: FaqTabProps) {
   const b3Lang = useB3Lang();
 
+  // Keyed by position (not just the question) since theme config can repeat a question.
+  const keyedItems = items.map((item, index) => ({ ...item, key: `${index}-${item.question}` }));
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <SectionHeader>{b3Lang('loyalty.tabs.faq')}</SectionHeader>
@@ -22,8 +25,8 @@ function FaqTab({ items, intro }: FaqTabProps) {
         {intro || b3Lang('loyalty.faq.intro')}
       </Typography>
       <Box>
-        {items.map((item) => (
-          <Accordion key={item.question} disableGutters>
+        {keyedItems.map((item) => (
+          <Accordion key={item.key} disableGutters>
             <AccordionSummary expandIcon={<ExpandMore />}>
               <Typography sx={{ fontWeight: 700 }}>{item.question}</Typography>
             </AccordionSummary>
