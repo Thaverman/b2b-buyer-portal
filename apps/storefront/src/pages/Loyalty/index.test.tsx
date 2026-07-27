@@ -235,7 +235,7 @@ const mockTierProgress = (progress: LoyaltyTierProgress) => {
         Result: {
           TierProgress: {
             CurrentTierName: progress.currentTierName,
-            TargetKind: 'NextTier',
+            TargetKind: progress.targetKind,
             TargetTierName: progress.targetTierName,
             OrdersInWindow: progress.ordersInWindow,
             TargetOrdersRequired: progress.targetOrdersRequired,
@@ -269,9 +269,9 @@ it('renders the hero with company name, member-since, and points balance', async
     },
   });
 
-  expect(await screen.findByText('Riverside Hardware Co.')).toBeInTheDocument();
+  expect(await screen.findByText('Welcome back, Riverside Hardware Co.')).toBeInTheDocument();
   expect(await screen.findByText('Member since Jan 2026')).toBeInTheDocument();
-  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
+  expect(await screen.findByText('You have 2,465 points available.')).toBeInTheDocument();
 });
 
 it('shows the session-expired state when the jwt fetch fails', async () => {
@@ -322,7 +322,7 @@ it('recovers from a load error via the retry button', async () => {
 
   await user.click(screen.getByRole('button', { name: 'Try again' }));
 
-  expect(await screen.findByText('You have 100 points')).toBeInTheDocument();
+  expect(await screen.findByText('You have 100 points available.')).toBeInTheDocument();
 });
 
 it('renders the five tabs with mockup labels and defaults to Your rewards', async () => {
@@ -496,7 +496,7 @@ it('omits the membership benefits block when the customer has no membership', as
 
   renderWithProviders(<Loyalty />);
 
-  expect(await screen.findByText('You have 100 points')).toBeInTheDocument();
+  expect(await screen.findByText('You have 100 points available.')).toBeInTheDocument();
   // No membership and no tiers mocked here, so neither benefits box renders.
   expect(screen.queryByText(/benefits/i)).not.toBeInTheDocument();
 });
@@ -893,7 +893,7 @@ it('shows the free-shipping progress bar with remaining amount and caption', asy
 
   expect(await screen.findByText('$169.15 away from FREE shipping')).toBeInTheDocument();
   expect(screen.getByText('$130.85 / $300.00')).toBeInTheDocument();
-  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
+  expect(await screen.findByText('You have 2,465 points available.')).toBeInTheDocument();
   expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '44');
 });
 
@@ -911,7 +911,7 @@ it('shows the qualified state with a full bar', async () => {
   renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText("You've earned FREE shipping!")).toBeInTheDocument();
-  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
+  expect(await screen.findByText('You have 2,465 points available.')).toBeInTheDocument();
   expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '100');
 });
 
@@ -944,7 +944,7 @@ it('hides the shipping tracker when the theme config is absent', async () => {
 
   renderWithProviders(<Loyalty />);
 
-  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
+  expect(await screen.findByText('You have 2,465 points available.')).toBeInTheDocument();
   expect(screen.queryByText(/away from FREE shipping/)).not.toBeInTheDocument();
   expect(window.getLoyaltyShippingCalculation).not.toHaveBeenCalled();
 });
@@ -959,7 +959,7 @@ it('hides the shipping tracker when the theme function is absent', async () => {
 
   renderWithProviders(<Loyalty />);
 
-  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
+  expect(await screen.findByText('You have 2,465 points available.')).toBeInTheDocument();
   expect(screen.queryByText(/away from FREE shipping/)).not.toBeInTheDocument();
 });
 
@@ -969,7 +969,7 @@ it('hides the shipping tracker when the calculation rejects', async () => {
 
   renderWithProviders(<Loyalty />);
 
-  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
+  expect(await screen.findByText('You have 2,465 points available.')).toBeInTheDocument();
   expect(screen.queryByText(/away from FREE shipping/)).not.toBeInTheDocument();
   expect(screen.queryByText("You've earned FREE shipping!")).not.toBeInTheDocument();
 });
@@ -991,7 +991,7 @@ it('hides the shipping tracker when the resolved threshold is zero', async () =>
 
   renderWithProviders(<Loyalty />);
 
-  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
+  expect(await screen.findByText('You have 2,465 points available.')).toBeInTheDocument();
   expect(screen.queryByText(/away from FREE shipping/)).not.toBeInTheDocument();
 });
 
@@ -1009,7 +1009,7 @@ it('shows a zero bar with the full threshold remaining for an empty cart', async
   renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('$300.00 away from FREE shipping')).toBeInTheDocument();
-  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
+  expect(await screen.findByText('You have 2,465 points available.')).toBeInTheDocument();
   expect(screen.getByText('$0.00 / $300.00')).toBeInTheDocument();
   expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
 });
@@ -1021,7 +1021,7 @@ it('renders the page when the customer tier is on the rollout allowlist', async 
 
   renderWithProviders(<Loyalty />);
 
-  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
+  expect(await screen.findByText('You have 2,465 points available.')).toBeInTheDocument();
   expect(screen.getByRole('tab', { name: 'Earn points' })).toBeInTheDocument();
 });
 
@@ -1079,7 +1079,7 @@ it('treats an empty allowedTiers string as lever-off (current behavior)', async 
 
   renderWithProviders(<Loyalty />);
 
-  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
+  expect(await screen.findByText('You have 2,465 points available.')).toBeInTheDocument();
 });
 
 it('fails closed to unavailable on an upstream digest failure while the allowlist is set', async () => {
@@ -1200,7 +1200,7 @@ it('shows no error banner when the tier-progress endpoint fails', async () => {
 
   renderWithProviders(<Loyalty />, customerPreloadedState);
 
-  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
+  expect(await screen.findByText('You have 2,465 points available.')).toBeInTheDocument();
   expect(screen.queryByText("We couldn't load your rewards.")).not.toBeInTheDocument();
   expect(screen.queryByText(/Progress to/)).not.toBeInTheDocument();
 });
@@ -1214,6 +1214,69 @@ it('keeps the allowlist gate keyed to the Influence tier when SSW disagrees', as
   renderWithProviders(<Loyalty />, customerPreloadedState);
 
   // Influence tier SIGNATURE is allowed -> page renders even though SSW's name isn't listed
-  expect(await screen.findByText('You have 2,465 points')).toBeInTheDocument();
+  expect(await screen.findByText('You have 2,465 points available.')).toBeInTheDocument();
   expect(screen.getByText('NotOnTheList')).toBeInTheDocument();
+});
+
+it('greets the customer by first name in the Smart Rewards banner', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 1044 }));
+
+  renderWithProviders(<Loyalty />, {
+    preloadedState: {
+      company: buildCompanyStateWith({
+        customer: { id: 264074, firstName: 'Lisa' },
+        companyInfo: { companyName: 'Riverside Hardware Co.' },
+      }),
+    },
+  });
+
+  expect(await screen.findByText('Smart Rewards')).toBeInTheDocument();
+  expect(await screen.findByText('Welcome back, Lisa')).toBeInTheDocument();
+  expect(await screen.findByText('You have 1,044 points available.')).toBeInTheDocument();
+});
+
+it('falls back to the company name when the customer has no first name', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  renderWithProviders(<Loyalty />, {
+    preloadedState: {
+      company: buildCompanyStateWith({
+        customer: { id: 264074, firstName: '' },
+        companyInfo: { companyName: 'Riverside Hardware Co.' },
+      }),
+    },
+  });
+
+  expect(await screen.findByText('Welcome back, Riverside Hardware Co.')).toBeInTheDocument();
+});
+
+it('shows the shopping CTA and gate summary for a PrePointsGate customer', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockTierProgress(
+    buildTierProgressWith({
+      targetKind: 'PrePointsGate',
+      summary: 'Spend $2902.15 more in the next 365-day window to start earning points.',
+    }),
+  );
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  expect(
+    await screen.findByRole('link', { name: 'Start shopping to earn points' }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText('Spend $2902.15 more in the next 365-day window to start earning points.'),
+  ).toBeInTheDocument();
+});
+
+it('shows no CTA for a customer who is already earning', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 1044 }));
+  mockTierProgress(buildTierProgressWith({ targetKind: 'NextTier', summary: 'Two more orders.' }));
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  expect(await screen.findByText('You have 1,044 points available.')).toBeInTheDocument();
+  expect(
+    screen.queryByRole('link', { name: 'Start shopping to earn points' }),
+  ).not.toBeInTheDocument();
 });

@@ -27,6 +27,7 @@ import {
   fetchTierProgress,
   fetchTiers,
   getAllowedTiers,
+  getBannerUrl,
   getLoyaltyDigest,
   isLoyaltyAvailable,
   isTierAllowed,
@@ -52,6 +53,7 @@ function Loyalty() {
   const b3Lang = useB3Lang();
   const customerId = useAppSelector(({ company }) => company.customer.id);
   const companyName = useAppSelector(({ company }) => company.companyInfo.companyName);
+  const firstName = useAppSelector(({ company }) => company.customer.firstName);
   const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
   // The digest identifies the logged-in customer, so a masquerading rep must not see points here.
   const isAvailable = isLoyaltyAvailable() && !isAgenting;
@@ -180,10 +182,16 @@ function Loyalty() {
         }}
       >
         <LoyaltyHero
+          firstName={firstName}
           companyName={companyName}
           memberSince={customer ? formatMemberSince(customer.createdAt) : null}
           tierTitle={displayTierTitle}
           pointBalance={customer ? customer.pointBalance : null}
+          showEarnCta={tierProgress?.targetKind === 'PrePointsGate'}
+          gateSummary={
+            tierProgress?.targetKind === 'PrePointsGate' ? tierProgress.summary || null : null
+          }
+          bannerUrl={getBannerUrl()}
         />
         {isSessionExpired && <Alert severity="warning">{b3Lang('loyalty.sessionExpired')}</Alert>}
         {isNotEnrolled && <Alert severity="info">{b3Lang('loyalty.notEnrolled')}</Alert>}
