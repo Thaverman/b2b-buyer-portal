@@ -1250,6 +1250,9 @@ it('shows the shopping CTA and gate summary for a PrePointsGate customer', async
   expect(
     screen.getByText('Spend $2902.15 more in the next 365-day window to start earning points.'),
   ).toBeInTheDocument();
+  // BenefitsTab mounts only after the customer resolves; wait for its earn section
+  // so the card-absence check below is meaningful rather than racing the mount.
+  expect(await screen.findByText('How you earn points')).toBeInTheDocument();
   expect(screen.queryByText(/Progress to/)).not.toBeInTheDocument();
 });
 
