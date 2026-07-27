@@ -334,7 +334,7 @@ it('renders the five tabs with mockup labels and defaults to Your rewards', asyn
     await screen.findByRole('tab', { name: 'Your rewards', selected: true }),
   ).toBeInTheDocument();
   expect(screen.getByRole('tab', { name: 'Earn points' })).toBeInTheDocument();
-  expect(screen.getByRole('tab', { name: 'Rewards' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'Get rewards' })).toBeInTheDocument();
   expect(screen.getByRole('tab', { name: 'Tiers' })).toBeInTheDocument();
   expect(screen.getByRole('tab', { name: 'History' })).toBeInTheDocument();
 });
@@ -678,7 +678,7 @@ it('lists redeemable rewards and disables ones costing more than the balance', a
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'Rewards' }));
+  await user.click(await screen.findByRole('tab', { name: 'Get rewards' }));
 
   const cheap = (await screen.findByText('$5 discount')).closest('.MuiCard-root') as HTMLElement;
   const dear = screen.getByText('Free shipping').closest('.MuiCard-root') as HTMLElement;
@@ -696,7 +696,7 @@ it('hides increment-type and unknown-status rules from the catalog', async () =>
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'Rewards' }));
+  await user.click(await screen.findByRole('tab', { name: 'Get rewards' }));
 
   expect(await screen.findByText('$5 discount')).toBeInTheDocument();
   expect(screen.queryByText('Point donation')).not.toBeInTheDocument();
@@ -714,7 +714,7 @@ it('redeems a reward after confirmation and shows the coupon code', async () => 
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'Rewards' }));
+  await user.click(await screen.findByRole('tab', { name: 'Get rewards' }));
   await user.click(await screen.findByRole('button', { name: 'Get reward' }));
 
   expect(await screen.findByText('Redeem $5 discount for 500 points?')).toBeInTheDocument();
@@ -736,7 +736,7 @@ it('copies the coupon code to the clipboard', async () => {
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'Rewards' }));
+  await user.click(await screen.findByRole('tab', { name: 'Get rewards' }));
   await user.click(await screen.findByRole('button', { name: 'Get reward' }));
   await user.click(await screen.findByRole('button', { name: 'Redeem' }));
 
@@ -765,7 +765,7 @@ it('does not redeem when the confirmation is cancelled', async () => {
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'Rewards' }));
+  await user.click(await screen.findByRole('tab', { name: 'Get rewards' }));
   await user.click(await screen.findByRole('button', { name: 'Get reward' }));
   await user.click(await screen.findByRole('button', { name: 'Cancel' }));
 
@@ -781,7 +781,7 @@ it('shows an error snackbar when the redemption fails', async () => {
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'Rewards' }));
+  await user.click(await screen.findByRole('tab', { name: 'Get rewards' }));
   await user.click(await screen.findByRole('button', { name: 'Get reward' }));
   await user.click(await screen.findByRole('button', { name: 'Redeem' }));
 
@@ -799,7 +799,7 @@ it('shows an error snackbar when redemption succeeds without a coupon code', asy
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'Rewards' }));
+  await user.click(await screen.findByRole('tab', { name: 'Get rewards' }));
   await user.click(await screen.findByRole('button', { name: 'Get reward' }));
   await user.click(await screen.findByRole('button', { name: 'Redeem' }));
 
@@ -827,7 +827,7 @@ it('lists previously earned coupon codes and loads more pages', async () => {
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'Rewards' }));
+  await user.click(await screen.findByRole('tab', { name: 'History' }));
 
   expect(await screen.findByText('FIRST-CODE')).toBeInTheDocument();
 
@@ -1279,4 +1279,33 @@ it('shows no CTA for a customer who is already earning', async () => {
   expect(
     screen.queryByRole('link', { name: 'Start shopping to earn points' }),
   ).not.toBeInTheDocument();
+});
+
+it('lists earned coupon codes and points history together, away from the catalog', async () => {
+  const earned = buildEarnedRewardWith({ couponCode: 'SAVE-123', title: '$5 discount' });
+  const activity = buildPointActivityWith({ customDescription: 'Order #1001', points: 50 });
+
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 600 }));
+  mockRedeemRules([buildRedeemRuleWith({ title: 'Free shipping', pointCost: 500 })]);
+  server.use(
+    http.get(`${launcherBase}/customer/all-rewards`, () =>
+      HttpResponse.json({ items: [earned], nextToken: null }),
+    ),
+    http.get(`${launcherBase}/customer/points`, () =>
+      HttpResponse.json({ items: [activity], nextToken: null }),
+    ),
+  );
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  // Catalog tab shows the redeemable rule but no longer the earned codes.
+  await user.click(await screen.findByRole('tab', { name: 'Get rewards' }));
+  expect(await screen.findByText('Free shipping')).toBeInTheDocument();
+  expect(screen.queryByText('SAVE-123')).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole('tab', { name: 'History' }));
+  expect(await screen.findByText('SAVE-123')).toBeInTheDocument();
+  expect(screen.getByText('Your earned rewards')).toBeInTheDocument();
+  expect(screen.getByText('Order #1001')).toBeInTheDocument();
+  expect(screen.getByText('+50')).toBeInTheDocument();
 });

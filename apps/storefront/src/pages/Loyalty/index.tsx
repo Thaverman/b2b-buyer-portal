@@ -15,9 +15,9 @@ import { useB3Lang } from '@/lib/lang';
 import { useAppSelector } from '@/store';
 
 import EarnPointsTab from './components/EarnPointsTab';
-import HistoryTab from './components/HistoryTab';
 import LoyaltyHero from './components/LoyaltyHero';
 import MembershipsTab from './components/MembershipsTab';
+import MyRewardsTab from './components/MyRewardsTab';
 import OverviewTab from './components/OverviewTab';
 import RewardsTab from './components/RewardsTab';
 import TiersTab from './components/TiersTab';
@@ -243,7 +243,7 @@ function Loyalty() {
             value="redeem"
             icon={<CardGiftcard />}
             iconPosition="start"
-            label={b3Lang('loyalty.tabs.redeem')}
+            label={b3Lang('loyalty.tabs.getRewards')}
           />
           <Tab
             value="tiers"
@@ -291,7 +291,7 @@ function Loyalty() {
           />
         )}
         {activeTab === 'memberships' && <MembershipsTab memberships={memberships} />}
-        {activeTab === 'history' && <HistoryTab identity={identity} />}
+        {activeTab === 'history' && <MyRewardsTab identity={identity} />}
       </Box>
     </B3Spin>
   );

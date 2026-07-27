@@ -1,14 +1,12 @@
 import { useState } from 'react';
 import { Box, Button, Card, CardContent, Typography } from '@mui/material';
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import B3Dialog from '@/components/B3Dialog';
 import { useB3Lang } from '@/lib/lang';
 import { snackbar } from '@/utils/b3Tip';
 
 import {
-  EarnedReward,
-  fetchEarnedRewards,
   fetchRedeemRules,
   isRedeemableCatalogRule,
   LoyaltyError,
@@ -69,23 +67,6 @@ function RewardsTab({ identity, pointBalance, customerQueryKey }: RewardsTabProp
     },
   });
 
-  const earnedQuery = useInfiniteQuery({
-    queryKey: ['loyaltyRewards', identity?.customerId ?? ''],
-    queryFn: ({ pageParam }) => {
-      if (!identity) {
-        return Promise.reject(new Error('identity not loaded'));
-      }
-      return fetchEarnedRewards(identity, pageParam);
-    },
-    // v5 requires initialPageParam; undefined = first page (no nextToken param sent).
-    initialPageParam: undefined as string | undefined,
-    // || not ??: an empty-string token would count as "has next page" while the
-    // fetcher drops it from the request — refetching page 1 forever.
-    getNextPageParam: (last) => last.nextToken || undefined,
-    enabled: Boolean(identity),
-  });
-  const earnedRewards: EarnedReward[] = earnedQuery.data?.pages.flatMap((page) => page.items) ?? [];
-
   const handleCopy = async () => {
     if (!couponCode) {
       return;
@@ -100,7 +81,7 @@ function RewardsTab({ identity, pointBalance, customerQueryKey }: RewardsTabProp
 
   return (
     <Box>
-      <SectionHeader>{b3Lang('loyalty.tabs.redeem')}</SectionHeader>
+      <SectionHeader>{b3Lang('loyalty.tabs.getRewards')}</SectionHeader>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
         {catalog.map((rule) => {
           const Icon = redeemRuleIcon(rule);
@@ -132,34 +113,6 @@ function RewardsTab({ identity, pointBalance, customerQueryKey }: RewardsTabProp
             </Card>
           );
         })}
-        {earnedRewards.length > 0 && (
-          <Box sx={{ width: '100%', mt: 2 }}>
-            <Typography variant="h6" sx={{ mb: 1 }}>
-              {b3Lang('loyalty.redeem.earnedTitle')}
-            </Typography>
-            {earnedRewards.map((reward) => (
-              <Card key={reward.id} variant="outlined" sx={{ mb: 1, borderRadius: 2 }}>
-                <CardContent
-                  sx={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap' }}
-                >
-                  <Typography variant="body2">{reward.title}</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                    {reward.couponCode}
-                  </Typography>
-                </CardContent>
-              </Card>
-            ))}
-            {earnedQuery.hasNextPage && (
-              <Button
-                size="small"
-                disabled={earnedQuery.isFetchingNextPage}
-                onClick={() => earnedQuery.fetchNextPage()}
-              >
-                {b3Lang('loyalty.loadMore')}
-              </Button>
-            )}
-          </Box>
-        )}
       </Box>
       {/* Dialogs live outside the card grid: B3Dialog renders an in-flow wrapper even
           when closed, and as a flex item it consumes grid gap, shrinking the last card. */}
