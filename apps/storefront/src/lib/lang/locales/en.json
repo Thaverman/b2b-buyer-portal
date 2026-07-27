@@ -787,6 +787,8 @@
   "loyalty.tabs.history": "History",
   "loyalty.tabs.memberships": "Memberships",
   "loyalty.tabs.myRewards": "My rewards",
+  "loyalty.tabs.faq": "FAQ",
+  "loyalty.faq.intro": "Got questions? Here's what our customers ask most about SSW Smart Rewards.",
   "loyalty.tabs.benefits": "My benefits",
   "loyalty.benefits.howYouEarn": "How you earn points",
   "loyalty.tiers.currentTier": "Current tier: {tier}",

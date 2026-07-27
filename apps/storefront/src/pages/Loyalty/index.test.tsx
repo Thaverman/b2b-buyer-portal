@@ -48,6 +48,7 @@ afterEach(() => {
   delete window.loyaltyShippingConfig;
   delete window.getLoyaltyShippingCalculation;
   delete window.loyaltyRolloutConfig;
+  delete window.loyaltyFaqConfig;
 });
 
 it('shows the unavailable state when BC_CONTEXT is not configured', () => {
@@ -1328,4 +1329,54 @@ it.each([
   renderWithProviders(<Loyalty />, { initialEntries: [{ search: `?tab=${legacy}` }] });
 
   expect(await screen.findByRole('tab', { name: expected, selected: true })).toBeInTheDocument();
+});
+
+it('hides the FAQ tab when the theme ships no FAQ content', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByRole('tab', { name: 'My benefits' })).toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: 'FAQ' })).not.toBeInTheDocument();
+});
+
+it('renders theme-provided FAQ questions and answers', async () => {
+  window.loyaltyFaqConfig = {
+    intro: 'Ask away.',
+    items: [{ question: 'How do I earn points?', answer: 'Place an order.' }],
+  };
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'FAQ' }));
+
+  expect(await screen.findByText('Ask away.')).toBeInTheDocument();
+  expect(screen.getByText('How do I earn points?')).toBeInTheDocument();
+  expect(screen.getByText('Place an order.')).toBeInTheDocument();
+});
+
+it('uses the default FAQ intro when the theme supplies none', async () => {
+  window.loyaltyFaqConfig = { items: [{ question: 'Q?', answer: 'A.' }] };
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'FAQ' }));
+
+  expect(
+    await screen.findByText(
+      "Got questions? Here's what our customers ask most about SSW Smart Rewards.",
+    ),
+  ).toBeInTheDocument();
+});
+
+it('falls back to My benefits for ?tab=faq with no FAQ content', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=faq' }] });
+
+  expect(
+    await screen.findByRole('tab', { name: 'My benefits', selected: true }),
+  ).toBeInTheDocument();
 });

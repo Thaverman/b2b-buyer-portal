@@ -7,6 +7,7 @@ import { useB3Lang } from '@/lib/lang';
 import { useAppSelector } from '@/store';
 
 import BenefitsTab from './components/BenefitsTab';
+import FaqTab from './components/FaqTab';
 import LoyaltyHero from './components/LoyaltyHero';
 import MyRewardsTab from './components/MyRewardsTab';
 import RewardsTab from './components/RewardsTab';
@@ -17,6 +18,8 @@ import {
   fetchTiers,
   getAllowedTiers,
   getBannerUrl,
+  getFaqIntro,
+  getFaqItems,
   getLoyaltyDigest,
   isLoyaltyAvailable,
   isTierAllowed,
@@ -168,8 +171,9 @@ function Loyalty() {
   const isSessionExpired = errorKind === 'sessionExpired';
   const isLoadError = Boolean(errorKind) && !isNotEnrolled && !isSessionExpired;
 
-  // The FAQ tab arrives in the next task; until then no tab can be conditionally absent.
-  const activeTab = tab === 'faq' ? 'benefits' : tab;
+  const faqItems = getFaqItems();
+  const hasFaq = faqItems.length > 0;
+  const activeTab = tab === 'faq' && !hasFaq ? 'benefits' : tab;
 
   return (
     <B3Spin isSpinning={digestQuery.isFetching || customerQuery.isFetching}>
@@ -233,6 +237,7 @@ function Loyalty() {
           <Tab value="benefits" label={b3Lang('loyalty.tabs.benefits')} />
           <Tab value="get-rewards" label={b3Lang('loyalty.tabs.getRewards')} />
           <Tab value="my-rewards" label={b3Lang('loyalty.tabs.myRewards')} />
+          {hasFaq && <Tab value="faq" label={b3Lang('loyalty.tabs.faq')} />}
         </Tabs>
         {activeTab === 'benefits' && (
           <BenefitsTab
@@ -252,6 +257,7 @@ function Loyalty() {
           />
         )}
         {activeTab === 'my-rewards' && <MyRewardsTab identity={identity} />}
+        {activeTab === 'faq' && <FaqTab items={faqItems} intro={getFaqIntro()} />}
       </Box>
     </B3Spin>
   );
