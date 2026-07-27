@@ -46,8 +46,13 @@ function BenefitsTab({
   customerQueryKey,
 }: BenefitsTabProps) {
   const b3Lang = useB3Lang();
-  const currentTier = tiers.find((tier) => tier.id === customer?.currentLoyaltyTierId);
-  const membership = customer?.currentMembership;
+
+  if (!customer) {
+    return null;
+  }
+
+  const currentTier = tiers.find((tier) => tier.id === customer.currentLoyaltyTierId);
+  const membership = customer.currentMembership;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -82,7 +87,7 @@ function BenefitsTab({
       )}
       <TierProgressCard progress={tierProgress} />
       <EarnPointsTab identity={identity} customer={customer} customerQueryKey={customerQueryKey} />
-      <TiersTab tiers={tiers} currentTierId={customer?.currentLoyaltyTierId ?? null} />
+      <TiersTab tiers={tiers} currentTierId={customer.currentLoyaltyTierId ?? null} />
       {memberships.length > 0 && <MembershipsTab memberships={memberships} />}
     </Box>
   );

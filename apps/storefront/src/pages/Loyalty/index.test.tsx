@@ -297,6 +297,18 @@ it('shows a generic error without a re-login prompt when the Launcher API reject
   ).not.toBeInTheDocument();
 });
 
+it('renders no benefits sections while the customer record is unavailable', async () => {
+  mockJwt();
+  mockDigest();
+  server.use(http.get(`${launcherBase}/customer`, () => HttpResponse.json({}, { status: 502 })));
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText("We couldn't load your rewards.")).toBeInTheDocument();
+  expect(screen.queryByText('How you earn points')).not.toBeInTheDocument();
+  expect(screen.queryByText('Tiers')).not.toBeInTheDocument();
+});
+
 it('shows the not-enrolled invite when the customer is unknown to Influence.io', async () => {
   mockJwt();
   mockDigest();
