@@ -1,3 +1,4 @@
+import { prefetchLoyaltyLanding } from '@/pages/Loyalty/loyaltyLanding';
 import {
   endUserMasqueradingCompany,
   getAgentInfo,
@@ -341,6 +342,10 @@ export const getCurrentCustomerInfo = async (
       store.dispatch(setPermissionModules(permissions));
       store.dispatch(setCompanyInfo(companyPayload));
       store.dispatch(setCustomerInfo(customerInfo));
+      {
+        const { company, b2bFeatures } = store.getState();
+        prefetchLoyaltyLanding(company.customer.id, b2bFeatures.masqueradeCompany.isAgenting);
+      }
       store.dispatch(setQuoteUserId(quoteUserId));
       B3SStorage.set('isB2BUser', isB2BUser);
       B3LStorage.set('cartToQuoteId', '');

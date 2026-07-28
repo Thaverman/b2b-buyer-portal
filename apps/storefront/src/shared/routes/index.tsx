@@ -1,6 +1,7 @@
 import { lazy, LazyExoticComponent, ReactElement } from 'react';
 import { matchPath } from 'react-router-dom';
 
+import { prefetchLoyaltyLanding, resolveLoyaltyLanding } from '@/pages/Loyalty/loyaltyLanding';
 import { PageProps } from '@/pages/PageProps';
 import { store } from '@/store';
 import { CompanyStatus, CustomerRole, UserTypes } from '@/types';
@@ -184,6 +185,16 @@ const gotoAllowedAppPage = async (
       default:
         url = currentAuthorizedPages;
         break;
+    }
+
+    // Active-tier customers land on Rewards instead of the role default
+    // (spec 2026-07-28); budget-bounded and fail-quiet.
+    prefetchLoyaltyLanding(
+      company.customer.id,
+      currentState.b2bFeatures.masqueradeCompany.isAgenting,
+    );
+    if (await resolveLoyaltyLanding()) {
+      url = '/loyalty';
     }
   }
   const [realPath] = url.split('?');

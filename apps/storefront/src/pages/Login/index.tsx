@@ -136,7 +136,7 @@ function Login(props: PageProps) {
       }
 
       const info = await getCurrentCustomerInfo(token);
-      navigateAfterSuccessfulLogin(navigate, info, quoteDetailToCheckoutUrl);
+      await navigateAfterSuccessfulLogin(navigate, info, quoteDetailToCheckoutUrl);
     } catch (error: unknown) {
       if (isCompanyError(error)) {
         snackbar.error(b3Lang(COMPANY_STATUS_MAPPINGS[error.reason]));

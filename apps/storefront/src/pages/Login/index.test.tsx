@@ -2,6 +2,7 @@ import userEvent from '@testing-library/user-event';
 import {
   buildCompanyStateWith,
   graphql,
+  http,
   HttpResponse,
   renderWithProviders,
   screen,
@@ -9,6 +10,7 @@ import {
   waitFor,
 } from 'tests/test-utils';
 
+import { prefetchLoyaltyLanding } from '@/pages/Loyalty/loyaltyLanding';
 import { CustomerRole } from '@/types';
 import { snackbar } from '@/utils/b3Tip';
 import { getCurrentCustomerInfo } from '@/utils/loginInfo';
@@ -28,6 +30,10 @@ const { server } = startMockServer();
 describe('LoginPage', () => {
   beforeEach(() => {
     vi.spyOn(snackbar, 'error');
+  });
+
+  afterEach(() => {
+    delete window.BC_CONTEXT;
   });
 
   describe('successful login and redirects', () => {
@@ -109,6 +115,125 @@ describe('LoginPage', () => {
       await waitFor(() => {
         expect(navigation).toHaveBeenCalledWith(expect.stringContaining('/dashboard'));
       });
+    });
+
+    it('lands on Rewards after login when the customer has an active tier journey', async () => {
+      vi.mock('@/hooks/useB2BCallback');
+
+      window.BC_CONTEXT = {
+        loyalty: {
+          shopKey: 'store-key',
+          apiBase: 'https://ssw.example.com/customers',
+          appClientId: 'ssw-app-client-id',
+          progressSite: 'StoreSupply',
+        },
+      };
+      server.use(
+        graphql.mutation('Login', () => {
+          return HttpResponse.json({
+            data: {
+              login: {
+                result: {
+                  storefrontLoginToken: '456',
+                  token: '123',
+                  permissions: [{ code: '1', permissionLevel: 1 }],
+                },
+              },
+            },
+          });
+        }),
+        http.get(
+          'https://ssw.example.com/customers/loyaltycustomersclient/GetDetailWithProgress',
+          () =>
+            HttpResponse.json({
+              Success: true,
+              Result: {
+                TierProgress: { TargetKind: 'PrePointsGate', TargetTierName: 'Signature' },
+              },
+            }),
+        ),
+      );
+
+      vi.mocked(getCurrentCustomerInfo).mockResolvedValue({
+        userType: 5,
+        role: 2,
+        companyRoleName: 'Junior Buyer',
+      });
+      // @/utils/loginInfo is mocked in this file, so its real head-start prefetch (Step 4)
+      // never runs; call the replacing prefetch directly to simulate it for this test.
+      // navigateAfterSuccessfulLogin's IfIdle safety net only fills an empty slot once per
+      // file, so it can't be relied on to refresh state across multiple tests in this suite.
+      prefetchLoyaltyLanding(264074, false);
+
+      const { navigation } = renderWithProviders(<LoginPage setOpenPage={vi.fn()} />, {
+        preloadedState: { company: buildCompanyStateWith({ customer: { id: 264074 } }) },
+      });
+
+      await userEvent.type(screen.getByLabelText('Email address *'), 'test@example.com');
+      await userEvent.type(screen.getByLabelText('Password *'), 'Password123');
+      await userEvent.keyboard('{Enter}');
+
+      await waitFor(() => {
+        expect(navigation).toHaveBeenCalledWith(expect.stringContaining('/loyalty'));
+      });
+      // Rewards preempts the junior-buyer default entirely.
+      expect(navigation).not.toHaveBeenCalledWith(expect.stringContaining('/shoppingLists'));
+    });
+
+    it('keeps the role default landing for an AtTop customer', async () => {
+      vi.mock('@/hooks/useB2BCallback');
+
+      window.BC_CONTEXT = {
+        loyalty: {
+          shopKey: 'store-key',
+          apiBase: 'https://ssw.example.com/customers',
+          appClientId: 'ssw-app-client-id',
+          progressSite: 'StoreSupply',
+        },
+      };
+      server.use(
+        graphql.mutation('Login', () => {
+          return HttpResponse.json({
+            data: {
+              login: {
+                result: {
+                  storefrontLoginToken: '456',
+                  token: '123',
+                  permissions: [{ code: '1', permissionLevel: 1 }],
+                },
+              },
+            },
+          });
+        }),
+        http.get(
+          'https://ssw.example.com/customers/loyaltycustomersclient/GetDetailWithProgress',
+          () =>
+            HttpResponse.json({ Success: true, Result: { TierProgress: { TargetKind: 'AtTop' } } }),
+        ),
+      );
+
+      vi.mocked(getCurrentCustomerInfo).mockResolvedValue({
+        userType: 5,
+        role: 2,
+        companyRoleName: 'Junior Buyer',
+      });
+      // See the previous test: simulates the head-start prefetch that @/utils/loginInfo
+      // (mocked here) would normally fire, so this test's result doesn't depend on module
+      // state left behind by whichever test in this file ran first.
+      prefetchLoyaltyLanding(264074, false);
+
+      const { navigation } = renderWithProviders(<LoginPage setOpenPage={vi.fn()} />, {
+        preloadedState: { company: buildCompanyStateWith({ customer: { id: 264074 } }) },
+      });
+
+      await userEvent.type(screen.getByLabelText('Email address *'), 'test@example.com');
+      await userEvent.type(screen.getByLabelText('Password *'), 'Password123');
+      await userEvent.keyboard('{Enter}');
+
+      await waitFor(() => {
+        expect(navigation).toHaveBeenCalledWith(expect.stringContaining('/shoppingLists'));
+      });
+      expect(navigation).not.toHaveBeenCalledWith(expect.stringContaining('/loyalty'));
     });
   });
 
