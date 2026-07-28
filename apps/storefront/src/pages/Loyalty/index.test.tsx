@@ -564,9 +564,9 @@ it('shows an error snackbar when redemption succeeds without a coupon code', asy
   expect(screen.queryByText('Apply this code at checkout.')).not.toBeInTheDocument();
 });
 
-it('lists previously earned coupon codes and loads more pages', async () => {
-  const first = buildEarnedRewardWith({ couponCode: 'FIRST-CODE' });
-  const second = buildEarnedRewardWith({ couponCode: 'SECOND-CODE' });
+it('lists previously earned rewards and loads more pages', async () => {
+  const first = buildEarnedRewardWith({ title: '$5 credit', couponCode: 'FIRST-CODE' });
+  const second = buildEarnedRewardWith({ title: '$10 credit', couponCode: 'SECOND-CODE' });
 
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
   mockRedeemRules([]);
@@ -584,12 +584,14 @@ it('lists previously earned coupon codes and loads more pages', async () => {
 
   await user.click(await screen.findByRole('tab', { name: 'My rewards' }));
 
-  expect(await screen.findByText('FIRST-CODE')).toBeInTheDocument();
+  expect(await screen.findByText('$5 credit')).toBeInTheDocument();
+  expect(screen.queryByText('FIRST-CODE')).not.toBeInTheDocument();
 
   await user.click(screen.getByRole('button', { name: 'Load more' }));
 
-  expect(await screen.findByText('SECOND-CODE')).toBeInTheDocument();
-  expect(screen.getByText('FIRST-CODE')).toBeInTheDocument();
+  expect(await screen.findByText('$10 credit')).toBeInTheDocument();
+  expect(screen.getByText('$5 credit')).toBeInTheDocument();
+  expect(screen.getAllByText('Ready to use at checkout')).toHaveLength(2);
 });
 
 it('shows the free-shipping progress bar with remaining amount and caption', async () => {
@@ -997,7 +999,7 @@ it('shows no CTA for a customer who is already earning', async () => {
   ).not.toBeInTheDocument();
 });
 
-it('lists earned coupon codes away from the catalog', async () => {
+it('keeps earned rewards away from the catalog', async () => {
   const earned = buildEarnedRewardWith({ couponCode: 'SAVE-123', title: '$5 discount' });
 
   mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 600 }));
@@ -1016,8 +1018,123 @@ it('lists earned coupon codes away from the catalog', async () => {
   expect(screen.queryByText('SAVE-123')).not.toBeInTheDocument();
 
   await user.click(screen.getByRole('tab', { name: 'My rewards' }));
-  expect(await screen.findByText('SAVE-123')).toBeInTheDocument();
-  expect(screen.getByText('Your earned rewards')).toBeInTheDocument();
+  expect(await screen.findByText('$5 discount')).toBeInTheDocument();
+  expect(screen.getByText('Ready to use at checkout')).toBeInTheDocument();
+  expect(screen.queryByText('SAVE-123')).not.toBeInTheDocument();
+});
+
+it('copies an earned reward code from its My rewards row', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockRedeemRules([]);
+  server.use(
+    http.get(`${launcherBase}/customer/all-rewards`, () =>
+      HttpResponse.json({
+        items: [buildEarnedRewardWith({ title: '$5 credit', couponCode: 'SAVE-123' })],
+        nextToken: null,
+      }),
+    ),
+  );
+
+  const { user } = renderWithProviders(<Loyalty />, {
+    initialEntries: [{ search: '?tab=my-rewards' }],
+  });
+
+  await user.click(await screen.findByRole('button', { name: 'Copy code' }));
+
+  await waitFor(() => {
+    expect(snackbar.success).toHaveBeenCalledWith('Code copied');
+  });
+  expect(await window.navigator.clipboard.readText()).toBe('SAVE-123');
+});
+
+it('hides the copy affordance when a reward has no coupon code', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockRedeemRules([]);
+  server.use(
+    http.get(`${launcherBase}/customer/all-rewards`, () =>
+      HttpResponse.json({
+        items: [buildEarnedRewardWith({ title: '$5 credit', couponCode: '' })],
+        nextToken: null,
+      }),
+    ),
+  );
+
+  renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=my-rewards' }] });
+
+  expect(await screen.findByText('$5 credit')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Copy code' })).not.toBeInTheDocument();
+});
+
+it('shows the intro copy and the empty nudge when nothing has been redeemed', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockRedeemRules([]);
+  server.use(
+    http.get(`${launcherBase}/customer/all-rewards`, () =>
+      HttpResponse.json({ items: [], nextToken: null }),
+    ),
+  );
+
+  renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=my-rewards' }] });
+
+  expect(
+    await screen.findByText("Here's what you've redeemed and have ready to use."),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      "At checkout, you'll choose one to apply to your order — only one reward can be used per order.",
+    ),
+  ).toBeInTheDocument();
+  expect(
+    await screen.findByText(
+      "You haven't redeemed any rewards yet. Visit Get rewards to turn your points into store credit.",
+    ),
+  ).toBeInTheDocument();
+});
+
+it('keeps the empty nudge off when the rewards fetch fails', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockRedeemRules([]);
+  server.use(
+    http.get(`${launcherBase}/customer/all-rewards`, () => HttpResponse.json({}, { status: 500 })),
+  );
+
+  renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=my-rewards' }] });
+
+  expect(
+    await screen.findByText("Here's what you've redeemed and have ready to use."),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByText(
+      "You haven't redeemed any rewards yet. Visit Get rewards to turn your points into store credit.",
+    ),
+  ).not.toBeInTheDocument();
+});
+
+it('shows an error snackbar when copying a reward code fails', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockRedeemRules([]);
+  server.use(
+    http.get(`${launcherBase}/customer/all-rewards`, () =>
+      HttpResponse.json({
+        items: [buildEarnedRewardWith({ title: '$5 credit', couponCode: 'SAVE-123' })],
+        nextToken: null,
+      }),
+    ),
+  );
+  const writeText = vi
+    .spyOn(window.navigator.clipboard, 'writeText')
+    .mockRejectedValueOnce(new Error('denied'));
+
+  const { user } = renderWithProviders(<Loyalty />, {
+    initialEntries: [{ search: '?tab=my-rewards' }],
+  });
+
+  await user.click(await screen.findByRole('button', { name: 'Copy code' }));
+
+  await waitFor(() => {
+    expect(snackbar.error).toHaveBeenCalledWith('Something went wrong. Please try again.');
+  });
+  writeText.mockRestore();
 });
 
 it('renders the four Smart Rewards tabs and defaults to My benefits', async () => {

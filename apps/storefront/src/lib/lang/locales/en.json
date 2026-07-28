@@ -829,7 +829,10 @@
   "loyalty.redeem.close": "Close",
   "loyalty.redeem.copied": "Code copied",
   "loyalty.redeem.applyAtCheckout": "Apply this code at checkout.",
-  "loyalty.redeem.earnedTitle": "Your earned rewards",
+  "loyalty.myRewards.introRedeemed": "Here's what you've redeemed and have ready to use.",
+  "loyalty.myRewards.introApply": "At checkout, you'll choose one to apply to your order — only one reward can be used per order.",
+  "loyalty.myRewards.readyStatus": "Ready to use at checkout",
+  "loyalty.myRewards.empty": "You haven't redeemed any rewards yet. Visit Get rewards to turn your points into store credit.",
   "loyalty.loadMore": "Load more",
   "loyalty.errors.rateLimited": "Too many requests — please try again in a minute.",
   "loyalty.errors.generic": "Something went wrong. Please try again."
