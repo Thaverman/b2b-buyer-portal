@@ -783,7 +783,6 @@
   "loyalty.hero.currentTier": "Current tier",
   "loyalty.hero.points": "You have {points} points available.",
   "loyalty.tabs.getRewards": "Get rewards",
-  "loyalty.tabs.history": "History",
   "loyalty.tabs.myRewards": "My rewards",
   "loyalty.tabs.faq": "FAQ",
   "loyalty.faq.intro": "Got questions? Here's what our customers ask most about SSW Smart Rewards.",
@@ -832,7 +831,6 @@
   "loyalty.redeem.applyAtCheckout": "Apply this code at checkout.",
   "loyalty.redeem.earnedTitle": "Your earned rewards",
   "loyalty.loadMore": "Load more",
-  "loyalty.history.empty": "No points activity yet.",
   "loyalty.errors.rateLimited": "Too many requests — please try again in a minute.",
   "loyalty.errors.generic": "Something went wrong. Please try again."
 }

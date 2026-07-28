@@ -12,7 +12,6 @@ import b2bLogger from '@/utils/b3Logger';
 import {
   fetchEarnedRewards,
   fetchLoyaltyCustomer,
-  fetchPointsHistory,
   fetchRedeemRules,
   fetchTierProgress,
   fetchTiers,
@@ -372,52 +371,6 @@ describe('fetchEarnedRewards', () => {
     expect(result).toEqual({
       items: [{ id: 'w1', couponCode: 'SAVE-123', title: '$5 discount', createdAt: '2026-06-01' }],
       nextToken: null,
-    });
-  });
-});
-
-describe('fetchPointsHistory', () => {
-  it('sends identity and limit as query params and normalizes the page', async () => {
-    server.use(
-      http.get('https://launcher.api.influence.io/launcher/v1/customer/points', ({ request }) => {
-        assertQueryParams(request, {
-          shop: shopKey,
-          customer_id: identity.customerId,
-          customer_email: identity.email,
-          digest: identity.digest,
-          limit: '10',
-        });
-
-        return HttpResponse.json({
-          items: [
-            {
-              id: 'a1',
-              action: 'earned',
-              status: 'approved',
-              points: 50,
-              createdAt: '2026-06-20',
-              customDescription: 'Order #1001',
-            },
-          ],
-          nextToken: 'page-2',
-        });
-      }),
-    );
-
-    const result = await fetchPointsHistory(identity);
-
-    expect(result).toEqual({
-      items: [
-        {
-          id: 'a1',
-          action: 'earned',
-          status: 'approved',
-          points: 50,
-          createdAt: '2026-06-20',
-          customDescription: 'Order #1001',
-        },
-      ],
-      nextToken: 'page-2',
     });
   });
 });

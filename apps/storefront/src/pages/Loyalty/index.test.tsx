@@ -21,7 +21,6 @@ import {
   LoyaltyIdentity,
   LoyaltyTier,
   LoyaltyTierProgress,
-  PointActivity,
   RedeemRule,
 } from './api';
 import Loyalty from '.';
@@ -141,15 +140,6 @@ const buildEarnedRewardWith = builder<EarnedReward>(() => ({
   couponCode: faker.string.alphanumeric(8).toUpperCase(),
   title: faker.commerce.productName(),
   createdAt: faker.date.past().toISOString(),
-}));
-
-const buildPointActivityWith = builder<PointActivity>(() => ({
-  id: faker.string.uuid(),
-  action: faker.helpers.arrayElement(['earned', 'redeemed']),
-  status: 'approved',
-  points: faker.number.int({ min: -500, max: 500 }),
-  createdAt: faker.date.past().toISOString(),
-  customDescription: faker.company.catchPhrase(),
 }));
 
 type RawShippingCalculation = Awaited<
@@ -602,47 +592,6 @@ it('lists previously earned coupon codes and loads more pages', async () => {
   expect(screen.getByText('FIRST-CODE')).toBeInTheDocument();
 });
 
-it('lists points history and loads more pages', async () => {
-  const first = buildPointActivityWith({ customDescription: 'Order #1001', points: 50 });
-  const second = buildPointActivityWith({ customDescription: 'Order #1002', points: 80 });
-
-  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
-  server.use(
-    http.get(`${launcherBase}/customer/points`, ({ request }) => {
-      const token = new URL(request.url).searchParams.get('nextToken');
-      if (token === 'page-2') {
-        return HttpResponse.json({ items: [second], nextToken: null });
-      }
-      return HttpResponse.json({ items: [first], nextToken: 'page-2' });
-    }),
-  );
-
-  const { user } = renderWithProviders(<Loyalty />, {
-    initialEntries: [{ search: '?tab=my-rewards' }],
-  });
-
-  expect(await screen.findByText('Order #1001')).toBeInTheDocument();
-  expect(screen.getByText('+50')).toBeInTheDocument();
-
-  await user.click(screen.getByRole('button', { name: 'Load more' }));
-
-  expect(await screen.findByText('Order #1002')).toBeInTheDocument();
-  expect(screen.getByText('Order #1001')).toBeInTheDocument();
-});
-
-it('shows the empty history state', async () => {
-  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
-  server.use(
-    http.get(`${launcherBase}/customer/points`, () =>
-      HttpResponse.json({ items: [], nextToken: null }),
-    ),
-  );
-
-  renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=my-rewards' }] });
-
-  expect(await screen.findByText('No points activity yet.')).toBeInTheDocument();
-});
-
 it('shows the free-shipping progress bar with remaining amount and caption', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 2465 }));
   mockShippingTracker(
@@ -1048,18 +997,14 @@ it('shows no CTA for a customer who is already earning', async () => {
   ).not.toBeInTheDocument();
 });
 
-it('lists earned coupon codes and points history together, away from the catalog', async () => {
+it('lists earned coupon codes away from the catalog', async () => {
   const earned = buildEarnedRewardWith({ couponCode: 'SAVE-123', title: '$5 discount' });
-  const activity = buildPointActivityWith({ customDescription: 'Order #1001', points: 50 });
 
   mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 600 }));
   mockRedeemRules([buildRedeemRuleWith({ title: 'Free shipping', pointCost: 500 })]);
   server.use(
     http.get(`${launcherBase}/customer/all-rewards`, () =>
       HttpResponse.json({ items: [earned], nextToken: null }),
-    ),
-    http.get(`${launcherBase}/customer/points`, () =>
-      HttpResponse.json({ items: [activity], nextToken: null }),
     ),
   );
 
@@ -1073,8 +1018,6 @@ it('lists earned coupon codes and points history together, away from the catalog
   await user.click(screen.getByRole('tab', { name: 'My rewards' }));
   expect(await screen.findByText('SAVE-123')).toBeInTheDocument();
   expect(screen.getByText('Your earned rewards')).toBeInTheDocument();
-  expect(screen.getByText('Order #1001')).toBeInTheDocument();
-  expect(screen.getByText('+50')).toBeInTheDocument();
 });
 
 it('renders the four Smart Rewards tabs and defaults to My benefits', async () => {
