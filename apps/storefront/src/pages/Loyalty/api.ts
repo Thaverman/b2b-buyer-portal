@@ -253,34 +253,6 @@ export const fetchTiers = async (): Promise<LoyaltyTier[]> => {
   }));
 };
 
-export interface LoyaltyMembership {
-  id: string;
-  title: string;
-  description: string;
-  perks: string[];
-}
-
-interface RawMembership {
-  id?: string | number;
-  title?: string;
-  description?: string;
-  perks?: string[];
-}
-
-export const fetchMemberships = async (): Promise<LoyaltyMembership[]> => {
-  const config = requireConfig();
-  const raw = (await launcherGet('/shop/memberships', { shop: config.shopKey }, 'upstream')) as {
-    memberships?: RawMembership[];
-  };
-
-  return (raw.memberships ?? []).map((membership) => ({
-    id: String(membership.id ?? ''),
-    title: membership.title ?? '',
-    description: membership.description ?? '',
-    perks: membership.perks ?? [],
-  }));
-};
-
 export interface LoyaltyTierProgress {
   targetKind: 'NextTier' | 'PrePointsGate';
   currentTierName: string;
@@ -365,87 +337,6 @@ export const fetchTierProgress = async (
   };
 };
 
-export interface EarnRule {
-  id: string;
-  title: string;
-  summary: string;
-  earnType: string;
-  templateName: string;
-  socialUrl: string;
-  earnValue: number;
-  limitTiers: boolean;
-  loyaltyTierIds: string[];
-}
-
-interface RawEarnRule {
-  id?: string | number;
-  customTitle?: string;
-  title?: string;
-  summary?: string;
-  earnType?: string;
-  templateName?: string;
-  socialUrl?: string;
-  earnValue?: number;
-  limitTiers?: boolean;
-  loyaltyTierIds?: (string | number)[];
-}
-
-export const fetchEarnRules = async (): Promise<EarnRule[]> => {
-  const config = requireConfig();
-  const raw = (await launcherGet('/shop/rules/earn', { shop: config.shopKey }, 'upstream')) as {
-    rules?: RawEarnRule[];
-  };
-
-  return (raw.rules ?? []).map((rule) => ({
-    id: String(rule.id ?? ''),
-    title: rule.customTitle ?? rule.title ?? '',
-    summary: rule.summary ?? '',
-    earnType: rule.earnType ?? '',
-    templateName: rule.templateName ?? '',
-    socialUrl: rule.socialUrl ?? '',
-    earnValue: rule.earnValue ?? 0,
-    limitTiers: rule.limitTiers ?? false,
-    loyaltyTierIds: (rule.loyaltyTierIds ?? []).map(String),
-  }));
-};
-
-type SocialFlag = keyof Pick<
-  LoyaltyCustomer,
-  'followInstagram' | 'followTikTok' | 'followTwitter' | 'likeFacebook'
->;
-
-const SOCIAL_MATCHERS: { match: string; flag: SocialFlag }[] = [
-  { match: 'instagram', flag: 'followInstagram' },
-  { match: 'tiktok', flag: 'followTikTok' },
-  { match: 'twitter', flag: 'followTwitter' },
-  { match: 'facebook', flag: 'likeFacebook' },
-];
-
-// earnType/templateName enums are undocumented upstream (spec S4) — match heuristically
-// on the rule's template name or social URL; unmatched rules render informational-only.
-export const getSocialCompletionFlag = (rule: EarnRule): SocialFlag | null => {
-  const haystack = `${rule.templateName} ${rule.socialUrl}`.toLowerCase();
-  return SOCIAL_MATCHERS.find((matcher) => haystack.includes(matcher.match))?.flag ?? null;
-};
-
-// Tier-gated rules (limitTiers) only apply to customers in one of the listed tiers;
-// with no known tier we hide them rather than show a rate the customer may not get.
-export const isEarnRuleForTier = (rule: EarnRule, currentTierId: string | null): boolean => {
-  if (!rule.limitTiers) {
-    return true;
-  }
-  if (!currentTierId) {
-    return false;
-  }
-  return rule.loyaltyTierIds.includes(currentTierId);
-};
-
-interface SocialResult {
-  success: boolean;
-  points: number;
-  updatedBalance: number;
-}
-
 const launcherPost = async (path: string, body: Record<string, unknown>): Promise<unknown> => {
   let response: Response;
   try {
@@ -468,23 +359,6 @@ const identityBody = (config: LoyaltyConfig, identity: LoyaltyIdentity) => ({
   shop: config.shopKey,
   digest: identity.digest,
 });
-
-export const completeSocialRule = async (
-  identity: LoyaltyIdentity,
-  ruleId: string,
-): Promise<SocialResult> => {
-  const config = requireConfig();
-  const raw = (await launcherPost('/customer/social', {
-    ...identityBody(config, identity),
-    ruleId,
-  })) as { success?: boolean; points?: number; updatedBalance?: number };
-
-  return {
-    success: raw.success ?? false,
-    points: raw.points ?? 0,
-    updatedBalance: raw.updatedBalance ?? 0,
-  };
-};
 
 export interface RedeemRule {
   id: string;

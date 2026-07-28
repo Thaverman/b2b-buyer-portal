@@ -13,7 +13,6 @@ import MyRewardsTab from './components/MyRewardsTab';
 import RewardsTab from './components/RewardsTab';
 import {
   fetchLoyaltyCustomer,
-  fetchMemberships,
   fetchTierProgress,
   fetchTiers,
   getAllowedTiers,
@@ -96,14 +95,6 @@ function Loyalty() {
     staleTime: Infinity,
   });
   const tiers = tiersQuery.data ?? [];
-
-  const membershipsQuery = useQuery({
-    queryKey: ['loyaltyMemberships'],
-    queryFn: fetchMemberships,
-    enabled: isAvailable,
-    staleTime: Infinity,
-  });
-  const memberships = membershipsQuery.data ?? [];
 
   const tierProgressQuery = useQuery({
     queryKey: ['loyaltyTierProgress', customerId],
@@ -240,14 +231,7 @@ function Loyalty() {
           {hasFaq && <Tab value="faq" label={b3Lang('loyalty.tabs.faq')} />}
         </Tabs>
         {activeTab === 'benefits' && (
-          <BenefitsTab
-            customer={customer}
-            tiers={tiers}
-            memberships={memberships}
-            tierProgress={tierProgress}
-            identity={identity}
-            customerQueryKey={['loyaltyCustomer', customerId]}
-          />
+          <BenefitsTab customer={customer} tiers={tiers} tierProgress={tierProgress} />
         )}
         {activeTab === 'get-rewards' && (
           <RewardsTab

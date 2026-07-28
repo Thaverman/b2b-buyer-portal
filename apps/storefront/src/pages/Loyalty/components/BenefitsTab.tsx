@@ -2,27 +2,15 @@ import { Box, Typography } from '@mui/material';
 
 import { useB3Lang } from '@/lib/lang';
 
-import {
-  LoyaltyCustomer,
-  LoyaltyIdentity,
-  LoyaltyMembership,
-  LoyaltyTier,
-  LoyaltyTierProgress,
-} from '../api';
+import { LoyaltyCustomer, LoyaltyTier, LoyaltyTierProgress } from '../api';
 
-import EarnPointsTab from './EarnPointsTab';
-import MembershipsTab from './MembershipsTab';
 import SectionHeader from './SectionHeader';
 import TierProgressCard from './TierProgressCard';
-import TiersTab from './TiersTab';
 
 interface BenefitsTabProps {
   customer: LoyaltyCustomer | undefined;
   tiers: LoyaltyTier[];
-  memberships: LoyaltyMembership[];
   tierProgress: LoyaltyTierProgress | null;
-  identity: LoyaltyIdentity | undefined;
-  customerQueryKey: (string | number)[];
 }
 
 const benefitsBoxSx = {
@@ -37,14 +25,7 @@ const benefitsBoxSx = {
 
 const benefitsTitleSx = { fontWeight: 800, textTransform: 'uppercase', flex: '1 1 40%' } as const;
 
-function BenefitsTab({
-  customer,
-  tiers,
-  memberships,
-  tierProgress,
-  identity,
-  customerQueryKey,
-}: BenefitsTabProps) {
+function BenefitsTab({ customer, tiers, tierProgress }: BenefitsTabProps) {
   const b3Lang = useB3Lang();
 
   if (!customer) {
@@ -86,9 +67,6 @@ function BenefitsTab({
         </Box>
       )}
       <TierProgressCard progress={tierProgress} />
-      <EarnPointsTab identity={identity} customer={customer} customerQueryKey={customerQueryKey} />
-      <TiersTab tiers={tiers} currentTierId={customer.currentLoyaltyTierId ?? null} />
-      {memberships.length > 0 && <MembershipsTab memberships={memberships} />}
     </Box>
   );
 }

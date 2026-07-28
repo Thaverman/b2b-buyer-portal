@@ -10,12 +10,8 @@ import {
 import b2bLogger from '@/utils/b3Logger';
 
 import {
-  completeSocialRule,
-  EarnRule,
   fetchEarnedRewards,
-  fetchEarnRules,
   fetchLoyaltyCustomer,
-  fetchMemberships,
   fetchPointsHistory,
   fetchRedeemRules,
   fetchTierProgress,
@@ -26,8 +22,6 @@ import {
   getFaqItems,
   getLoyaltyDigest,
   getShippingCalculation,
-  getSocialCompletionFlag,
-  isEarnRuleForTier,
   isRedeemableCatalogRule,
   isShippingTrackerAvailable,
   isTierAllowed,
@@ -53,18 +47,6 @@ const buildLoyaltyIdentityWith = builder<LoyaltyIdentity>(() => ({
   digest: faker.string.hexadecimal({ length: 64, prefix: '' }).toLowerCase(),
   customerId: faker.number.int({ min: 1, max: 99999 }).toString(),
   email: faker.internet.email().toLowerCase(),
-}));
-
-const buildEarnRuleWith = builder<EarnRule>(() => ({
-  id: faker.string.uuid(),
-  title: faker.commerce.productName(),
-  summary: '',
-  earnType: '',
-  templateName: '',
-  socialUrl: '',
-  earnValue: 0,
-  limitTiers: false,
-  loyaltyTierIds: [],
 }));
 
 const identity = buildLoyaltyIdentityWith({});
@@ -260,234 +242,6 @@ describe('fetchTiers', () => {
       { id: 't2', title: 'Elite', threshold: '300', perks: [] },
     ]);
   });
-});
-
-describe('fetchMemberships', () => {
-  const membershipsUrl = 'https://launcher.api.influence.io/launcher/v1/shop/memberships';
-
-  it('fetches memberships with only the shop key and normalizes them', async () => {
-    server.use(
-      http.get(membershipsUrl, ({ request }) => {
-        assertQueryParams(request, { shop: shopKey });
-
-        return HttpResponse.json({
-          memberships: [
-            {
-              id: 'm1',
-              title: 'VIP Gold',
-              description: 'Our premium program',
-              customerCount: 1240,
-              perks: ['Free expedited shipping', 'Early access'],
-            },
-            { id: 'm2', title: 'Trade Pro' },
-          ],
-        });
-      }),
-    );
-
-    const result = await fetchMemberships();
-
-    // customerCount is intentionally dropped (not buyer-facing)
-    expect(result).toEqual([
-      {
-        id: 'm1',
-        title: 'VIP Gold',
-        description: 'Our premium program',
-        perks: ['Free expedited shipping', 'Early access'],
-      },
-      { id: 'm2', title: 'Trade Pro', description: '', perks: [] },
-    ]);
-  });
-
-  it('returns an empty list when the payload has no memberships array', async () => {
-    server.use(http.get(membershipsUrl, () => HttpResponse.json({})));
-
-    expect(await fetchMemberships()).toEqual([]);
-  });
-
-  it('maps a 404 to an upstream error (shop-key misconfig, not per-customer)', async () => {
-    server.use(http.get(membershipsUrl, () => HttpResponse.json({}, { status: 404 })));
-
-    const error = await fetchMemberships().catch((e) => e);
-
-    expect(error).toBeInstanceOf(LoyaltyError);
-    expect(error.kind).toBe('upstream');
-  });
-});
-
-describe('fetchEarnRules', () => {
-  it('fetches earn rules with only the shop key and maps customTitle to title', async () => {
-    server.use(
-      http.get('https://launcher.api.influence.io/launcher/v1/shop/rules/earn', ({ request }) => {
-        assertQueryParams(request, { shop: shopKey });
-
-        return HttpResponse.json({
-          rules: [
-            {
-              id: 'r1',
-              customTitle: 'Make a purchase',
-              summary: '2 points per $1',
-              earnType: 'order',
-              templateName: 'purchase',
-            },
-          ],
-        });
-      }),
-    );
-
-    const result = await fetchEarnRules();
-
-    expect(result).toEqual([
-      {
-        id: 'r1',
-        title: 'Make a purchase',
-        summary: '2 points per $1',
-        earnType: 'order',
-        templateName: 'purchase',
-        socialUrl: '',
-        earnValue: 0,
-        limitTiers: false,
-        loyaltyTierIds: [],
-      },
-    ]);
-  });
-
-  it('falls back to title when customTitle is absent (real Launcher payload shape)', async () => {
-    server.use(
-      http.get('https://launcher.api.influence.io/launcher/v1/shop/rules/earn', () =>
-        HttpResponse.json({
-          rules: [
-            {
-              id: 'r2',
-              title: 'Place an order',
-              earnType: 'increments',
-              templateName: 'placeorder',
-            },
-          ],
-        }),
-      ),
-    );
-
-    const result = await fetchEarnRules();
-
-    expect(result).toEqual([
-      {
-        id: 'r2',
-        title: 'Place an order',
-        summary: '',
-        earnType: 'increments',
-        templateName: 'placeorder',
-        socialUrl: '',
-        earnValue: 0,
-        limitTiers: false,
-        loyaltyTierIds: [],
-      },
-    ]);
-  });
-
-  it('maps earnValue, limitTiers and loyaltyTierIds', async () => {
-    server.use(
-      http.get('https://launcher.api.influence.io/launcher/v1/shop/rules/earn', () =>
-        HttpResponse.json({
-          rules: [
-            {
-              id: 'r3',
-              title: 'Place an order',
-              earnType: 'increments',
-              earnValue: 3,
-              templateName: 'placeorder',
-              limitTiers: true,
-              loyaltyTierIds: ['29777d36-e455-44aa-a711-62f7c0ddad85'],
-            },
-          ],
-        }),
-      ),
-    );
-
-    const result = await fetchEarnRules();
-
-    expect(result).toEqual([
-      {
-        id: 'r3',
-        title: 'Place an order',
-        summary: '',
-        earnType: 'increments',
-        templateName: 'placeorder',
-        socialUrl: '',
-        earnValue: 3,
-        limitTiers: true,
-        loyaltyTierIds: ['29777d36-e455-44aa-a711-62f7c0ddad85'],
-      },
-    ]);
-  });
-});
-
-describe('completeSocialRule', () => {
-  it('posts identity, shop, digest and ruleId in the body', async () => {
-    const requestBody = vi.fn();
-
-    server.use(
-      http.post(
-        'https://launcher.api.influence.io/launcher/v1/customer/social',
-        async ({ request }) => {
-          requestBody(await request.json());
-
-          return HttpResponse.json({ success: true, points: 100, updatedBalance: 2565 });
-        },
-      ),
-    );
-
-    const result = await completeSocialRule(identity, 'r-social');
-
-    expect(requestBody).toHaveBeenCalledWith({
-      customer: { id: identity.customerId, email: identity.email },
-      shop: shopKey,
-      digest: identity.digest,
-      ruleId: 'r-social',
-    });
-    expect(result).toEqual({ success: true, points: 100, updatedBalance: 2565 });
-  });
-});
-
-describe('getSocialCompletionFlag', () => {
-  it.each([
-    ['instagram_follow', '', 'followInstagram'],
-    ['', 'https://instagram.com/LoyaltyLionHQ', 'followInstagram'],
-    ['tiktok_follow', '', 'followTikTok'],
-    ['twitter_follow', '', 'followTwitter'],
-    ['facebook_like', '', 'likeFacebook'],
-    ['purchase', '', null],
-  ])('maps templateName %j / socialUrl %j to %j', (templateName, socialUrl, expected) => {
-    const rule = {
-      id: 'r',
-      title: '',
-      summary: '',
-      earnType: '',
-      templateName,
-      socialUrl,
-      earnValue: 0,
-      limitTiers: false,
-      loyaltyTierIds: [],
-    };
-
-    expect(getSocialCompletionFlag(rule)).toBe(expected);
-  });
-});
-
-describe('isEarnRuleForTier', () => {
-  it.each([
-    [false, [], 'tier-select', true],
-    [true, ['tier-select'], 'tier-select', true],
-    [true, ['tier-select'], 'tier-signature', false],
-    [true, ['tier-select'], null, false],
-  ] as [boolean, string[], string | null, boolean][])(
-    'limitTiers=%j tierIds=%j currentTier=%j → %j',
-    (limitTiers, loyaltyTierIds, currentTierId, expected) => {
-      const rule = buildEarnRuleWith({ limitTiers, loyaltyTierIds });
-
-      expect(isEarnRuleForTier(rule, currentTierId)).toBe(expected);
-    },
-  );
 });
 
 describe('fetchRedeemRules and isRedeemableCatalogRule', () => {
