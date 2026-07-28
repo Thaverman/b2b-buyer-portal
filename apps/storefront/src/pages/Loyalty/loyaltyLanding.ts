@@ -22,6 +22,13 @@ export const prefetchLoyaltyLandingIfIdle = (customerId: number, isAgenting: boo
   }
 };
 
+// Logout must forget the previous customer's answer: the module outlives a
+// same-page logout→login, and IfIdle would otherwise keep serving it if the
+// next login's replacing prefetch is skipped by a degraded getCurrentCustomerInfo.
+export const clearLoyaltyLanding = (): void => {
+  pendingLanding = null;
+};
+
 // True only when the customer has an active tier journey (NextTier/PrePointsGate)
 // AND the answer arrived within the budget. Callers use it once at navigation
 // time — a late answer never causes a bounce.

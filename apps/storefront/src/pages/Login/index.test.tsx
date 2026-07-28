@@ -10,7 +10,7 @@ import {
   waitFor,
 } from 'tests/test-utils';
 
-import { prefetchLoyaltyLanding } from '@/pages/Loyalty/loyaltyLanding';
+import { clearLoyaltyLanding } from '@/pages/Loyalty/loyaltyLanding';
 import { CustomerRole } from '@/types';
 import { snackbar } from '@/utils/b3Tip';
 import { getCurrentCustomerInfo } from '@/utils/loginInfo';
@@ -30,6 +30,9 @@ const { server } = startMockServer();
 describe('LoginPage', () => {
   beforeEach(() => {
     vi.spyOn(snackbar, 'error');
+    // The loyalty landing check is a module-level singleton (see loyaltyLanding.ts) that
+    // outlives any one test; forget the previous test's answer so IfIdle can refill it.
+    clearLoyaltyLanding();
   });
 
   afterEach(() => {
@@ -159,11 +162,6 @@ describe('LoginPage', () => {
         role: 2,
         companyRoleName: 'Junior Buyer',
       });
-      // @/utils/loginInfo is mocked in this file, so its real head-start prefetch (Step 4)
-      // never runs; call the replacing prefetch directly to simulate it for this test.
-      // navigateAfterSuccessfulLogin's IfIdle safety net only fills an empty slot once per
-      // file, so it can't be relied on to refresh state across multiple tests in this suite.
-      prefetchLoyaltyLanding(264074, false);
 
       const { navigation } = renderWithProviders(<LoginPage setOpenPage={vi.fn()} />, {
         preloadedState: { company: buildCompanyStateWith({ customer: { id: 264074 } }) },
@@ -217,10 +215,6 @@ describe('LoginPage', () => {
         role: 2,
         companyRoleName: 'Junior Buyer',
       });
-      // See the previous test: simulates the head-start prefetch that @/utils/loginInfo
-      // (mocked here) would normally fire, so this test's result doesn't depend on module
-      // state left behind by whichever test in this file ran first.
-      prefetchLoyaltyLanding(264074, false);
 
       const { navigation } = renderWithProviders(<LoginPage setOpenPage={vi.fn()} />, {
         preloadedState: { company: buildCompanyStateWith({ customer: { id: 264074 } }) },

@@ -1,6 +1,7 @@
 import { http, HttpResponse, startMockServer } from 'tests/test-utils';
 
 import {
+  clearLoyaltyLanding,
   prefetchLoyaltyLanding,
   prefetchLoyaltyLandingIfIdle,
   resolveLoyaltyLanding,
@@ -161,4 +162,18 @@ it('prefetchLoyaltyLandingIfIdle leaves a stored resolved-null check in place', 
   prefetchLoyaltyLandingIfIdle(264074, false);
 
   expect(await resolveLoyaltyLanding(50)).toBe(false);
+});
+
+it('clearLoyaltyLanding forgets the stored check so IfIdle can refill', async () => {
+  withProgressSite();
+  mockProgress('NextTier');
+  prefetchLoyaltyLanding(264074, false);
+  expect(await resolveLoyaltyLanding()).toBe(true);
+
+  clearLoyaltyLanding();
+  expect(await resolveLoyaltyLanding(50)).toBe(false);
+
+  mockProgress('PrePointsGate');
+  prefetchLoyaltyLandingIfIdle(264074, false);
+  expect(await resolveLoyaltyLanding()).toBe(true);
 });
