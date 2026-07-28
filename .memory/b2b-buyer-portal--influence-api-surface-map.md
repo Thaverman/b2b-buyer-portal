@@ -1,9 +1,9 @@
 ---
-title: Influence.io API surface map — Platform (x-api-key) + Launcher (HMAC digest), 53 documented endpoints; portal Loyalty consumes ~8 of the 24 Launcher endpoints
+title: Influence.io API surface map — Platform (x-api-key) + Launcher (HMAC digest), 53 documented endpoints; portal Loyalty consumes 5 of the 24 Launcher endpoints (was 8 before the 2026-07-27/28 loyalty redesigns)
 type: reference
 created: 2026-07-16
-updated: 2026-07-17
-lastVerified: 2026-07-17
+updated: 2026-07-28
+lastVerified: 2026-07-28
 repo: b2b-buyer-portal
 storeHash: 24erkpw9h6
 website: SSW
@@ -21,11 +21,11 @@ codeRefs:
   - kind: ts-react
     package: apps/storefront
     path: src/pages/Loyalty/api.ts
-    symbol: launcherGet                # generic GET caller; today hits /customer, /customer/all-rewards, /customer/points, /shop/tiers, /shop/rules/earn, /shop/rules/redeem
+    symbol: launcherGet                # generic GET caller; as of 2026-07-28 hits /customer, /customer/all-rewards, /shop/tiers, /shop/rules/redeem (dropped /customer/points, /shop/rules/earn)
   - kind: ts-react
     package: apps/storefront
     path: src/pages/Loyalty/api.ts
-    symbol: launcherPost               # generic POST caller; today hits /customer/social, /customer/redeem
+    symbol: launcherPost               # generic POST caller; as of 2026-07-28 hits /customer/redeem only (dropped /customer/social)
   - kind: ts-react
     package: apps/storefront
     path: src/pages/Loyalty/api.ts
@@ -65,13 +65,15 @@ Rendered diagrams (endpoint map, ER model, auth flows, lifecycle):
 
 ## Launcher endpoints — used vs. available
 
-The portal currently consumes **~8 of 24** Launcher endpoints. The rest are
+The portal currently consumes **5 of 24** Launcher endpoints (was 8 until the
+2026-07-27/28 loyalty redesigns — see *Consumption drift* below). The rest are
 available for future loyalty features (stamps, referrals, memberships, uploads,
 dynamic links, loyalty-card lookup).
 
 **Customer (14 documented):**
 - USED: `GET /v1/customer`, `GET /v1/customer/all-rewards`,
-  `GET /v1/customer/points`, `POST /v1/customer/redeem`, `POST /v1/customer/social`
+  `POST /v1/customer/redeem`
+- DROPPED 2026-07-28: `GET /v1/customer/points`, `POST /v1/customer/social`
 - AVAILABLE (not yet wired): `GET /v1/customer/all-rewards/count`,
   `PUT /v1/customer/birthday`, `POST /v1/customer/dynamic-link`,
   `GET /v1/customer/loyalty-card-lookup`, `GET /v1/customer/referrals`,
@@ -80,7 +82,8 @@ dynamic links, loyalty-card lookup).
 - DEPRECATED: `POST /v1/customer/auth`
 
 **Shop (10 documented):**
-- USED: `GET /v1/shop/tiers`, `GET /v1/shop/rules/earn`, `GET /v1/shop/rules/redeem`
+- USED: `GET /v1/shop/tiers`, `GET /v1/shop/rules/redeem`
+- DROPPED 2026-07-27: `GET /v1/shop/rules/earn`
 - AVAILABLE: `GET /v1/shop`, `GET /v1/shop/rules/referral`,
   `GET /v1/shop/rules/earn/{id}/exclusions/product`,
   `GET /v1/shop/rules/earn/{id}/exclusions/variant`, `GET /v1/shop/tiers/{id}`,
@@ -150,6 +153,30 @@ and `Webhook`s. A `Customer` accrues `PointActivity` + `Stamp`s that redeem into
 `Reward`/`Coupon`s. `Order` carries `financialStatus` ∈ {authorized, pending, paid,
 partially_paid, refunded, partially_refunded, voided, expired} and point
 award/refund flags.
+
+## Consumption drift (re-verified 2026-07-28 against dev @ 14b6438b)
+
+Two loyalty redesigns shipped back-to-back and each dropped endpoints. Verified
+by grepping the `launcherGet(`/`launcherPost(` call sites in
+`src/pages/Loyalty/api.ts` — not from the docs.
+
+| Endpoint | Dropped by | Commit |
+|---|---|---|
+| `GET /v1/customer/points` | My rewards redesign — in-portal points ledger removed wholesale | `23068a2f` (2026-07-28) |
+| `GET /v1/shop/rules/earn` | My benefits redesign — `EarnPointsTab` deleted | `d02aa49b` (2026-07-27) |
+| `POST /v1/customer/social` | My benefits redesign — social-follow earning left the portal | `d02aa49b` (2026-07-27) |
+
+The endpoints still exist upstream; the portal simply stopped calling them.
+Influence's own launcher widget remains the only points-ledger and
+social-follow surface for customers.
+
+**Consequence for future work:** reinstating any of these three is a *re-add*,
+not a re-wire — `fetchPointsHistory`/`PointActivity`/`PointActivityPage`/
+`RawPointActivity`, `fetchEarnRules`/`EarnRule`, and `completeSocialRule` are
+all gone from git HEAD along with their tests, builders and i18n keys. Recover
+them from the commits above rather than rewriting from the docs.
+`LoyaltyCustomer`'s social-flag fields (`followInstagram` etc.) survive as
+payload mappings only.
 
 ## Caveats (why this is a sketch, not a contract)
 
