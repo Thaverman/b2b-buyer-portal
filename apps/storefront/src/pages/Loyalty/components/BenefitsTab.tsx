@@ -1,16 +1,17 @@
+import { WorkspacePremiumOutlined } from '@mui/icons-material';
 import { Box, Typography } from '@mui/material';
 
 import { useB3Lang } from '@/lib/lang';
 
 import { LoyaltyCustomer, LoyaltyTier, LoyaltyTierProgress } from '../api';
 
-import SectionHeader from './SectionHeader';
 import TierProgressCard from './TierProgressCard';
 
 interface BenefitsTabProps {
   customer: LoyaltyCustomer | undefined;
   tiers: LoyaltyTier[];
   tierProgress: LoyaltyTierProgress | null;
+  tierDisplayName: string | null;
 }
 
 const benefitsBoxSx = {
@@ -19,13 +20,39 @@ const benefitsBoxSx = {
   borderRadius: 2,
   p: { xs: 3, sm: 4 },
   display: 'flex',
+  alignItems: 'center',
   flexWrap: 'wrap',
-  gap: 2,
+  gap: 3,
 } as const;
 
-const benefitsTitleSx = { fontWeight: 800, textTransform: 'uppercase', flex: '1 1 40%' } as const;
+interface BenefitsBoxProps {
+  title: string;
+  perks: string[];
+}
 
-function BenefitsTab({ customer, tiers, tierProgress }: BenefitsTabProps) {
+function BenefitsBox({ title, perks }: BenefitsBoxProps) {
+  return (
+    <Box sx={benefitsBoxSx}>
+      <WorkspacePremiumOutlined
+        sx={{ fontSize: 64, flex: '0 0 auto', mx: { xs: 'auto', sm: 3 } }}
+      />
+      <Box sx={{ flex: '1 1 60%' }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+          {title}
+        </Typography>
+        <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
+          {perks.map((perk) => (
+            <Typography key={perk} component="li" variant="body2" sx={{ mb: 0.5 }}>
+              {perk}
+            </Typography>
+          ))}
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
+function BenefitsTab({ customer, tiers, tierProgress, tierDisplayName }: BenefitsTabProps) {
   const b3Lang = useB3Lang();
 
   if (!customer) {
@@ -36,35 +63,30 @@ function BenefitsTab({ customer, tiers, tierProgress }: BenefitsTabProps) {
   const membership = customer.currentMembership;
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <SectionHeader>{b3Lang('loyalty.tabs.benefits')}</SectionHeader>
-      {membership && membership.perks.length > 0 && (
-        <Box sx={benefitsBoxSx}>
-          <Typography variant="h6" sx={benefitsTitleSx}>
-            {b3Lang('loyalty.overview.membershipBenefitsTitle', { membership: membership.title })}
-          </Typography>
-          <Box sx={{ flex: '1 1 50%' }}>
-            {membership.perks.map((perk) => (
-              <Typography key={perk} variant="body2" sx={{ mb: 0.5 }}>
-                {perk}
-              </Typography>
-            ))}
-          </Box>
-        </Box>
-      )}
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <Box sx={{ textAlign: 'center' }}>
+        <Typography variant="body2" color="text.secondary">
+          {b3Lang('loyalty.benefits.introLead')}
+        </Typography>
+        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+          {tierDisplayName
+            ? b3Lang('loyalty.benefits.introGuide', { tier: tierDisplayName })
+            : b3Lang('loyalty.benefits.introGuideGeneric')}
+        </Typography>
+      </Box>
       {currentTier && (
-        <Box sx={benefitsBoxSx}>
-          <Typography variant="h6" sx={benefitsTitleSx}>
-            {b3Lang('loyalty.overview.benefitsTitle', { tier: currentTier.title })}
-          </Typography>
-          <Box sx={{ flex: '1 1 50%' }}>
-            {currentTier.perks.map((perk) => (
-              <Typography key={perk} variant="body2" sx={{ mb: 0.5 }}>
-                {perk}
-              </Typography>
-            ))}
-          </Box>
-        </Box>
+        <BenefitsBox
+          title={b3Lang('loyalty.overview.benefitsTitle', { tier: currentTier.title })}
+          perks={currentTier.perks}
+        />
+      )}
+      {membership && membership.perks.length > 0 && (
+        <BenefitsBox
+          title={b3Lang('loyalty.overview.membershipBenefitsTitle', {
+            membership: membership.title,
+          })}
+          perks={membership.perks}
+        />
       )}
       <TierProgressCard progress={tierProgress} />
     </Box>

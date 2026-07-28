@@ -1,4 +1,4 @@
-import { Box, LinearProgress, Typography } from '@mui/material';
+import { alpha, Box, LinearProgress, Typography } from '@mui/material';
 
 import { useB3Lang } from '@/lib/lang';
 import { currencyFormat } from '@/utils/b3CurrencyFormat';
@@ -18,32 +18,23 @@ function TierProgressCard({ progress }: TierProgressCardProps) {
   }
 
   return (
-    <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 2, p: 3 }}>
-      <Typography variant="subtitle2" color="text.secondary">
+    <Box
+      sx={{
+        bgcolor: (theme) => alpha(theme.palette.primary.main, 0.08),
+        borderRadius: 2,
+        p: 3,
+      }}
+    >
+      <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
         {b3Lang('loyalty.tiers.progressTo', { tier: progress.targetTierName })}
       </Typography>
-      {progress.targetOrdersRequired > 0 && (
+      {progress.targetAmountRequired > 0 && (
         <Box sx={{ mt: 1 }}>
           <Typography variant="body2" color="text.secondary">
-            {b3Lang('loyalty.progress.orders')}
-          </Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            {`${progress.ordersInWindow.toLocaleString()} / ${progress.targetOrdersRequired.toLocaleString()}`}
-          </Typography>
-          <LinearProgress
-            variant="determinate"
-            value={Math.min(100, progress.ordersProgressPct)}
-            sx={{ mt: 1, height: 8, borderRadius: 4 }}
-          />
-        </Box>
-      )}
-      {progress.targetAmountRequired > 0 && (
-        <Box sx={{ mt: 2 }}>
-          <Typography variant="body2" color="text.secondary">
-            {b3Lang('loyalty.progress.spend')}
-          </Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            {`${currencyFormat(progress.spendInWindow)} / ${currencyFormat(progress.targetAmountRequired)}`}
+            {b3Lang('loyalty.progress.spendOf', {
+              spent: currencyFormat(progress.spendInWindow),
+              target: currencyFormat(progress.targetAmountRequired),
+            })}
           </Typography>
           <LinearProgress
             variant="determinate"
@@ -52,10 +43,20 @@ function TierProgressCard({ progress }: TierProgressCardProps) {
           />
         </Box>
       )}
-      {progress.summary && (
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-          {progress.summary}
-        </Typography>
+      {progress.targetOrdersRequired > 0 && (
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            {b3Lang('loyalty.progress.ordersOf', {
+              current: progress.ordersInWindow.toLocaleString(),
+              target: progress.targetOrdersRequired.toLocaleString(),
+            })}
+          </Typography>
+          <LinearProgress
+            variant="determinate"
+            value={Math.min(100, progress.ordersProgressPct)}
+            sx={{ mt: 1, height: 8, borderRadius: 4 }}
+          />
+        </Box>
       )}
     </Box>
   );

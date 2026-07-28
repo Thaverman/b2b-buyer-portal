@@ -290,8 +290,10 @@ it('renders no benefits sections while the customer record is unavailable', asyn
   renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText("We couldn't load your rewards.")).toBeInTheDocument();
-  expect(screen.queryByText('How you earn points')).not.toBeInTheDocument();
-  expect(screen.queryByText('Tiers')).not.toBeInTheDocument();
+  expect(
+    screen.queryByText("You're officially part of the SSW Smart Rewards family", { exact: false }),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText(/Progress to/)).not.toBeInTheDocument();
 });
 
 it('shows the not-enrolled invite when the customer is unknown to Influence.io', async () => {
@@ -873,14 +875,12 @@ it('shows dual-quota tier progress on My benefits', async () => {
 
   renderWithProviders(<Loyalty />, customerPreloadedState);
 
-  expect(await screen.findByText('Progress to Signature')).toBeInTheDocument();
-  expect(screen.getByText('Orders')).toBeInTheDocument();
-  expect(screen.getByText('39 / 75')).toBeInTheDocument();
-  expect(screen.getByText('Spend')).toBeInTheDocument();
-  expect(screen.getByText('$130.85 / $300.00')).toBeInTheDocument();
+  expect(await screen.findByText('Progress to Signature Tier')).toBeInTheDocument();
+  expect(screen.getByText('39 of 75 orders')).toBeInTheDocument();
+  expect(screen.getByText('$130.85 of $300.00')).toBeInTheDocument();
   expect(
-    screen.getByText("36 more order(s) OR $169.15 more spend away from 'Signature'."),
-  ).toBeInTheDocument();
+    screen.queryByText("36 more order(s) OR $169.15 more spend away from 'Signature'."),
+  ).not.toBeInTheDocument();
 });
 
 it('shows the tier progress card once on My benefits', async () => {
@@ -895,8 +895,8 @@ it('shows the tier progress card once on My benefits', async () => {
 
   renderWithProviders(<Loyalty />, customerPreloadedState);
 
-  expect(await screen.findAllByText('Progress to Signature')).toHaveLength(1);
-  expect(screen.getByText('39 / 75')).toBeInTheDocument();
+  expect(await screen.findAllByText('Progress to Signature Tier')).toHaveLength(1);
+  expect(screen.getByText('39 of 75 orders')).toBeInTheDocument();
 });
 
 it('omits the orders row when only a spend quota is configured', async () => {
@@ -911,8 +911,8 @@ it('omits the orders row when only a spend quota is configured', async () => {
 
   renderWithProviders(<Loyalty />, customerPreloadedState);
 
-  expect(await screen.findByText('$130.85 / $300.00')).toBeInTheDocument();
-  expect(screen.queryByText('Orders')).not.toBeInTheDocument();
+  expect(await screen.findByText('$130.85 of $300.00')).toBeInTheDocument();
+  expect(screen.queryByText(/orders$/)).not.toBeInTheDocument();
 });
 
 it('omits the spend row when only an orders quota is configured', async () => {
@@ -927,8 +927,8 @@ it('omits the spend row when only an orders quota is configured', async () => {
 
   renderWithProviders(<Loyalty />, customerPreloadedState);
 
-  expect(await screen.findByText('39 / 75')).toBeInTheDocument();
-  expect(screen.queryByText('Spend')).not.toBeInTheDocument();
+  expect(await screen.findByText('39 of 75 orders')).toBeInTheDocument();
+  expect(screen.queryByText(/^\$/)).not.toBeInTheDocument();
 });
 
 it('shows the SSW tier name in the hero when tier progress is available', async () => {
@@ -1177,5 +1177,35 @@ it('falls back to My benefits for ?tab=faq with no FAQ content', async () => {
 
   expect(
     await screen.findByRole('tab', { name: 'My benefits', selected: true }),
+  ).toBeInTheDocument();
+});
+
+it('introduces My benefits with the customer tier name', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't1' }));
+  mockTiers([buildTierWith({ id: 't1', title: 'Essential' })]);
+
+  renderWithProviders(<Loyalty />);
+
+  expect(
+    await screen.findByText(
+      "You're officially part of the SSW Smart Rewards family. We want to make sure every order works harder for you.",
+    ),
+  ).toBeInTheDocument();
+  expect(
+    await screen.findByText(
+      "Here's a quick guide to your Essential benefits and how to get the most from them.",
+    ),
+  ).toBeInTheDocument();
+});
+
+it('uses the generic intro line when no tier name is known', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: null }));
+
+  renderWithProviders(<Loyalty />);
+
+  expect(
+    await screen.findByText(
+      "Here's a quick guide to your benefits and how to get the most from them.",
+    ),
   ).toBeInTheDocument();
 });

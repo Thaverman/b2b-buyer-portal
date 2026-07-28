@@ -231,7 +231,12 @@ function Loyalty() {
           {hasFaq && <Tab value="faq" label={b3Lang('loyalty.tabs.faq')} />}
         </Tabs>
         {activeTab === 'benefits' && (
-          <BenefitsTab customer={customer} tiers={tiers} tierProgress={tierProgress} />
+          <BenefitsTab
+            customer={customer}
+            tiers={tiers}
+            tierProgress={tierProgress}
+            tierDisplayName={displayTierTitle}
+          />
         )}
         {activeTab === 'get-rewards' && (
           <RewardsTab
