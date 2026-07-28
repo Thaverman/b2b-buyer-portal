@@ -77,6 +77,8 @@ declare global {
         progressSite?: string;
         /** Theme override for the hero banner image; absent = the relative default. */
         bannerUrl?: string;
+        /** Theme override for the My-benefits banner image; absent = the relative default. */
+        benefitsBannerUrl?: string;
       };
     };
     /** Theme-set free-shipping config; absent = shipping tracker off. */

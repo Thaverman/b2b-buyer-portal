@@ -1209,3 +1209,52 @@ it('uses the generic intro line when no tier name is known', async () => {
     ),
   ).toBeInTheDocument();
 });
+
+it('shows the benefits banner and explainer cards with the tier name', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't1' }));
+  mockTiers([buildTierWith({ id: 't1', title: 'Essential' })]);
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText("Here's how your Essential rewards work")).toBeInTheDocument();
+  expect(screen.getByText('Each purchase earns you points.')).toBeInTheDocument();
+  expect(
+    document.querySelector('img[src="/content/images/loyalty/loyalty-benefits-banner.jpg"]'),
+  ).toBeInTheDocument();
+  expect(screen.getByText('Earning and Redeeming Credit')).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      'At the Essential level, you earn at a 1% rate once you reach $500 in annual purchases.',
+    ),
+  ).toBeInTheDocument();
+  expect(screen.getByText('Free Shipping')).toBeInTheDocument();
+  expect(
+    screen.getByText('Orders over $300 ship ground for free, every time.'),
+  ).toBeInTheDocument();
+  expect(screen.getByText('Your Tier Status')).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      'We look at your orders over the past 12 months, updated monthly, to determine your tier.',
+    ),
+  ).toBeInTheDocument();
+});
+
+it('hides the benefits banner image when it fails to load', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  renderWithProviders(<Loyalty />);
+
+  const image = await waitFor(() => {
+    const el = document.querySelector(
+      'img[src="/content/images/loyalty/loyalty-benefits-banner.jpg"]',
+    );
+    expect(el).toBeInTheDocument();
+    return el;
+  });
+
+  fireEvent.error(image as Element);
+
+  expect(
+    document.querySelector('img[src="/content/images/loyalty/loyalty-benefits-banner.jpg"]'),
+  ).not.toBeInTheDocument();
+});

@@ -1,10 +1,12 @@
+import { useState } from 'react';
 import { WorkspacePremiumOutlined } from '@mui/icons-material';
 import { Box, Typography } from '@mui/material';
 
 import { useB3Lang } from '@/lib/lang';
 
-import { LoyaltyCustomer, LoyaltyTier, LoyaltyTierProgress } from '../api';
+import { getBenefitsBannerUrl, LoyaltyCustomer, LoyaltyTier, LoyaltyTierProgress } from '../api';
 
+import BenefitsInfoCards from './BenefitsInfoCards';
 import TierProgressCard from './TierProgressCard';
 
 interface BenefitsTabProps {
@@ -54,6 +56,8 @@ function BenefitsBox({ title, perks }: BenefitsBoxProps) {
 
 function BenefitsTab({ customer, tiers, tierProgress, tierDisplayName }: BenefitsTabProps) {
   const b3Lang = useB3Lang();
+  // background-image cannot report load failures, so the banner is a real <img> we can hide.
+  const [bannerFailed, setBannerFailed] = useState(false);
 
   if (!customer) {
     return null;
@@ -89,6 +93,46 @@ function BenefitsTab({ customer, tiers, tierProgress, tierDisplayName }: Benefit
         />
       )}
       <TierProgressCard progress={tierProgress} />
+      <Box
+        sx={{
+          position: 'relative',
+          overflow: 'hidden',
+          bgcolor: 'primary.main',
+          color: 'primary.contrastText',
+          borderRadius: 2,
+          p: { xs: 3, sm: 6 },
+          mx: { md: -4 },
+        }}
+      >
+        {!bannerFailed && (
+          <Box
+            component="img"
+            src={getBenefitsBannerUrl()}
+            alt=""
+            onError={() => setBannerFailed(true)}
+            sx={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              height: '100%',
+              width: { xs: 0, md: '45%' },
+              objectFit: 'cover',
+              display: { xs: 'none', md: 'block' },
+            }}
+          />
+        )}
+        <Box sx={{ position: 'relative', maxWidth: { md: '50%' } }}>
+          <Typography variant="h4" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+            {tierDisplayName
+              ? b3Lang('loyalty.benefits.bannerTitle', { tier: tierDisplayName })
+              : b3Lang('loyalty.benefits.bannerTitleGeneric')}
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 2, opacity: 0.9 }}>
+            {b3Lang('loyalty.benefits.bannerSubtitle')}
+          </Typography>
+        </Box>
+      </Box>
+      <BenefitsInfoCards tierDisplayName={tierDisplayName} />
     </Box>
   );
 }

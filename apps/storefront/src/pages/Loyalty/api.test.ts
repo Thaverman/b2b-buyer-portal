@@ -18,6 +18,7 @@ import {
   fetchTiers,
   getAllowedTiers,
   getBannerUrl,
+  getBenefitsBannerUrl,
   getFaqIntro,
   getFaqItems,
   getLoyaltyDigest,
@@ -763,6 +764,27 @@ describe('getBannerUrl', () => {
     window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId, bannerUrl: '   ' } };
 
     expect(getBannerUrl()).toBe('/content/images/loyalty/loyalty-account-banner.jpg');
+  });
+});
+
+describe('getBenefitsBannerUrl', () => {
+  it('defaults to the storefront-relative benefits banner path', () => {
+    window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId } };
+
+    expect(getBenefitsBannerUrl()).toBe('/content/images/loyalty/loyalty-benefits-banner.jpg');
+  });
+
+  it('prefers a non-blank theme override', () => {
+    window.BC_CONTEXT = {
+      loyalty: {
+        shopKey,
+        apiBase,
+        appClientId,
+        benefitsBannerUrl: 'https://cdn.example.com/b.jpg',
+      },
+    };
+
+    expect(getBenefitsBannerUrl()).toBe('https://cdn.example.com/b.jpg');
   });
 });
 

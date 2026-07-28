@@ -10,6 +10,7 @@ interface LoyaltyConfig {
   appClientId: string;
   progressSite?: string;
   bannerUrl?: string;
+  benefitsBannerUrl?: string;
 }
 
 const LAUNCHER_API_BASE = 'https://launcher.api.influence.io/launcher/v1';
@@ -599,6 +600,11 @@ const DEFAULT_BANNER_URL = '/content/images/loyalty/loyalty-account-banner.jpg';
 
 export const getBannerUrl = (): string =>
   getLoyaltyConfig()?.bannerUrl?.trim() || DEFAULT_BANNER_URL;
+
+const DEFAULT_BENEFITS_BANNER_URL = '/content/images/loyalty/loyalty-benefits-banner.jpg';
+
+export const getBenefitsBannerUrl = (): string =>
+  getLoyaltyConfig()?.benefitsBannerUrl?.trim() || DEFAULT_BENEFITS_BANNER_URL;
 
 export interface LoyaltyFaqItem {
   question: string;
