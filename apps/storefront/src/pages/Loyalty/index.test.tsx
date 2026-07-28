@@ -1258,3 +1258,76 @@ it('hides the benefits banner image when it fails to load', async () => {
     document.querySelector('img[src="/content/images/loyalty/loyalty-benefits-banner.jpg"]'),
   ).not.toBeInTheDocument();
 });
+
+const rewardTiers = () => [
+  buildTierWith({ id: 't1', title: 'Essential', threshold: '' }),
+  buildTierWith({
+    id: 't2',
+    title: 'Select',
+    threshold: '8+ orders/year or $2,000+ annual spend',
+    perks: ['2% monthly credit', 'an account rep'],
+  }),
+  buildTierWith({
+    id: 't3',
+    title: 'Signature',
+    threshold: '16+ orders/year or $5,000+ annual spend',
+    perks: ['3% monthly credit'],
+  }),
+];
+
+it('shows the tiers above the customer with their quota and perks', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't1' }));
+  mockTiers(rewardTiers());
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText("What's Available as Your Orders Grow?")).toBeInTheDocument();
+  expect(
+    screen.getByText('As your orders grow, so do your rewards. 2 more levels are available:'),
+  ).toBeInTheDocument();
+  expect(screen.getByText('Select Tier')).toBeInTheDocument();
+  expect(screen.getByText('(8+ orders/year or $2,000+ annual spend) :')).toBeInTheDocument();
+  expect(screen.getByText('2% monthly credit, an account rep')).toBeInTheDocument();
+  expect(screen.getByText('Signature Tier')).toBeInTheDocument();
+  expect(
+    screen.getByText('When you reach the next level, your tier upgrades automatically.'),
+  ).toBeInTheDocument();
+});
+
+it('shows only the tiers above the customer, not current or lower ones', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't2' }));
+  mockTiers(rewardTiers());
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('Signature Tier')).toBeInTheDocument();
+  expect(
+    screen.getByText('As your orders grow, so do your rewards. 1 more level is available:'),
+  ).toBeInTheDocument();
+  expect(screen.queryByText('Select Tier')).not.toBeInTheDocument();
+  expect(screen.queryByText('Essential Tier')).not.toBeInTheDocument();
+});
+
+it('hides the tier ladder for a top-tier customer but keeps the contact footer', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't3' }));
+  mockTiers(rewardTiers());
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('Questions? Contact us at 1-833-397-2619')).toBeInTheDocument();
+  expect(screen.queryByText("What's Available as Your Orders Grow?")).not.toBeInTheDocument();
+  expect(
+    screen.queryByText('When you reach the next level, your tier upgrades automatically.'),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Place your next order' })).toBeInTheDocument();
+});
+
+it('hides the tier ladder when the customer tier is unknown', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 'not-in-list' }));
+  mockTiers(rewardTiers());
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('Questions? Contact us at 1-833-397-2619')).toBeInTheDocument();
+  expect(screen.queryByText("What's Available as Your Orders Grow?")).not.toBeInTheDocument();
+});

@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { WorkspacePremiumOutlined } from '@mui/icons-material';
-import { Box, Typography } from '@mui/material';
+import { Box, Button, Typography } from '@mui/material';
 
 import { useB3Lang } from '@/lib/lang';
 
 import { getBenefitsBannerUrl, LoyaltyCustomer, LoyaltyTier, LoyaltyTierProgress } from '../api';
 
 import BenefitsInfoCards from './BenefitsInfoCards';
+import NextTiersSection from './NextTiersSection';
 import TierProgressCard from './TierProgressCard';
 
 interface BenefitsTabProps {
@@ -133,6 +134,19 @@ function BenefitsTab({ customer, tiers, tierProgress, tierDisplayName }: Benefit
         </Box>
       </Box>
       <BenefitsInfoCards tierDisplayName={tierDisplayName} />
+      <NextTiersSection tiers={tiers} currentTierId={customer.currentLoyaltyTierId ?? null} />
+      <Typography sx={{ textAlign: 'center', fontWeight: 700 }}>
+        {b3Lang('loyalty.benefits.contact')}
+      </Typography>
+      <Button
+        href={`${window.location.origin}/`}
+        variant="contained"
+        color="error"
+        size="large"
+        fullWidth
+      >
+        {b3Lang('loyalty.benefits.orderCta')}
+      </Button>
     </Box>
   );
 }
