@@ -1103,11 +1103,16 @@ it('keeps the empty nudge off when the rewards fetch fails', async () => {
   expect(
     await screen.findByText("Here's what you've redeemed and have ready to use."),
   ).toBeInTheDocument();
-  expect(
-    screen.queryByText(
+  // findByText polls until it either finds the node or times out, so this only
+  // passes if the nudge stays absent for the whole window — including after the
+  // failed query settles — rather than merely being absent at first paint.
+  await expect(
+    screen.findByText(
       "You haven't redeemed any rewards yet. Visit Get rewards to turn your points into store credit.",
+      {},
+      { timeout: 1500 },
     ),
-  ).not.toBeInTheDocument();
+  ).rejects.toThrow();
 });
 
 it('shows an error snackbar when copying a reward code fails', async () => {
