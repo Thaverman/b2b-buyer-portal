@@ -136,7 +136,12 @@ function BenefitsTab({ customer, tiers, tierProgress, tierDisplayName }: Benefit
         </Box>
       </Box>
       <BenefitsInfoCards tierDisplayName={tierDisplayName} />
-      <NextTiersSection tiers={tiers} currentTierId={customer.currentLoyaltyTierId ?? null} />
+      <NextTiersSection
+        tiers={tiers}
+        currentTierId={customer.currentLoyaltyTierId ?? null}
+        currentTierName={tierProgress?.currentTierName || null}
+        atTop={tierProgress?.targetKind === 'AtTop'}
+      />
       <Typography sx={{ textAlign: 'center', fontWeight: 700 }}>
         {b3Lang('loyalty.benefits.contact')}
       </Typography>

@@ -1405,6 +1405,8 @@ it('hides the tier ladder for a top-tier customer but keeps the contact footer',
     screen.queryByText('When you reach the next level, your tier upgrades automatically.'),
   ).not.toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Place your next order' })).toBeInTheDocument();
+  // Influence ordering alone never earns the top-tier message; only SSW's AtTop does.
+  expect(screen.queryByText(/our top tier/)).not.toBeInTheDocument();
 });
 
 it('hides the tier ladder when the customer tier is unknown', async () => {
@@ -1415,4 +1417,73 @@ it('hides the tier ladder when the customer tier is unknown', async () => {
 
   expect(await screen.findByText('Questions? Contact us at 1-833-397-2619')).toBeInTheDocument();
   expect(screen.queryByText("What's Available as Your Orders Grow?")).not.toBeInTheDocument();
+});
+
+it('replaces the tier ladder with the top-tier message when SSW reports AtTop', async () => {
+  // Influence still has this customer on the lowest tier (t1) while SSW says they are
+  // topped out — the exact divergence that used to leave a SIGNATURE card in the ladder.
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't1' }));
+  mockTiers(rewardTiers());
+  mockTierProgress(
+    buildTierProgressWith({
+      targetKind: 'AtTop',
+      currentTierName: 'Signature',
+      targetTierName: '',
+    }),
+  );
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  expect(
+    await screen.findByText(
+      "You're at Signature, our top tier — you're already earning at the highest rate we offer.",
+    ),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("What's Available as Your Orders Grow?")).not.toBeInTheDocument();
+  expect(screen.queryByText('Signature Tier')).not.toBeInTheDocument();
+  expect(
+    screen.queryByText('When you reach the next level, your tier upgrades automatically.'),
+  ).not.toBeInTheDocument();
+  // A non-null AtTop progress object must not wake the progress card or the hero CTA.
+  expect(screen.queryByText(/Progress to/)).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('link', { name: 'Start shopping to earn points' }),
+  ).not.toBeInTheDocument();
+});
+
+it('falls back to the generic top-tier message when SSW sends no tier name', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't1' }));
+  mockTiers(rewardTiers());
+  mockTierProgress(
+    buildTierProgressWith({ targetKind: 'AtTop', currentTierName: '', targetTierName: '' }),
+  );
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  expect(
+    await screen.findByText(
+      "You're at our top tier — you're already earning at the highest rate we offer.",
+    ),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("What's Available as Your Orders Grow?")).not.toBeInTheDocument();
+});
+
+it('anchors the tier ladder on the SSW tier name when the Influence id disagrees', async () => {
+  // SSW and Influence keep separate tier id spaces, so the id resolves to nothing here;
+  // the case-insensitive name match ('SELECT' vs 'Select') is what positions the ladder.
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 'influence-only-id' }));
+  mockTiers(rewardTiers());
+  mockTierProgress(
+    buildTierProgressWith({
+      targetKind: 'NextTier',
+      currentTierName: 'SELECT',
+      targetTierName: 'Signature',
+    }),
+  );
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  expect(await screen.findByText('Signature Tier')).toBeInTheDocument();
+  expect(screen.queryByText('Select Tier')).not.toBeInTheDocument();
+  expect(screen.queryByText('Essential Tier')).not.toBeInTheDocument();
 });

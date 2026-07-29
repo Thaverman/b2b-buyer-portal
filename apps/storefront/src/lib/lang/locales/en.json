@@ -816,6 +816,8 @@
   "loyalty.benefits.nextTiersIntroMany": "As your orders grow, so do your rewards. {count} more levels are available:",
   "loyalty.benefits.nextTierName": "{title} Tier",
   "loyalty.benefits.autoUpgrade": "When you reach the next level, your tier upgrades automatically.",
+  "loyalty.benefits.atTopTier": "You're at {tier}, our top tier — you're already earning at the highest rate we offer.",
+  "loyalty.benefits.atTopTierGeneric": "You're at our top tier — you're already earning at the highest rate we offer.",
   "loyalty.benefits.contact": "Questions? Contact us at 1-833-397-2619",
   "loyalty.benefits.orderCta": "Place your next order",
   "loyalty.redeem.pointCost": "{points} points",
