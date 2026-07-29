@@ -30,6 +30,7 @@
 |---|---|
 | `src/pages/Loyalty/api.ts` | Task 1 — `targetKind` union + accept `AtTop` in the guard |
 | `src/pages/Loyalty/api.test.ts` | Task 1 — repoint **two** `AtTop → null` assertions, add the mapping test |
+| `src/pages/Loyalty/loyaltyLanding.ts` | Task 1 — allowlist guard so at-top customers keep their existing post-login behavior (added mid-task; the plan's original audit missed this consumer) |
 | `src/lib/lang/locales/en.json` | Task 2 — 2 new keys |
 | `src/pages/Loyalty/components/NextTiersSection.tsx` | Task 2 — new props, name anchor, top-tier line |
 | `src/pages/Loyalty/components/BenefitsTab.tsx` | Task 2 — pass the two new props |

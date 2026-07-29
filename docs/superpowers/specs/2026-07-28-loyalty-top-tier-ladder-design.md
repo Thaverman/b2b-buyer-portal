@@ -75,6 +75,7 @@ every reader:
 | `TierProgressCard` | None — already returns null unless `targetKind === 'NextTier'` |
 | Hero CTA + server summary | None — already gated on `targetKind === 'PrePointsGate'` |
 | Tier-allowlist gate (`isTierAllowed`) | None — keyed to `tierTitle` (Influence), not `displayTierTitle`, by design |
+| `resolveLoyaltyLanding` (`loyaltyLanding.ts`) | **Changes** — it treated any non-null progress as "active tier journey"; now guarded to an explicit `NextTier`/`PrePointsGate` allowlist so at-top customers still do not land on Rewards after login (behavior unchanged from today; its existing tests already specified this) |
 | `displayTierTitle` (`index.tsx:121`) | **Changes** — see below |
 | `NextTiersSection` | The fix (§2) |
 
@@ -86,6 +87,12 @@ case for those customers — consistent with how `NextTier` customers already
 render. The tier **perk box** keeps Influence's `currentTier.title`, so
 `Your SIGNATURE benefits` remains all-caps; casing stays mixed on that one line.
 Pre-existing for `NextTier` customers; not addressed here.
+
+**Audit correction (2026-07-28):** this table originally omitted
+`resolveLoyaltyLanding`, and the omission was caught only when mapping `AtTop`
+broke two of its pre-existing tests. Anyone widening `targetKind` again should
+treat "consumers that infer meaning from a non-null result" as part of the
+audit, not just consumers that read `targetKind` directly.
 
 ## 2. Ladder (`components/NextTiersSection.tsx`)
 

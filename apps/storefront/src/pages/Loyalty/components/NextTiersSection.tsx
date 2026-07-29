@@ -15,23 +15,26 @@ interface NextTiersSectionProps {
 function NextTiersSection({ tiers, currentTierId, currentTierName, atTop }: NextTiersSectionProps) {
   const b3Lang = useB3Lang();
 
+  const sswTierName = currentTierName?.trim() ?? '';
+
   // SSW is the only trustworthy source for "topped out": Influence tier ids live in a
   // separate id space, so an id match cannot tell us the customer's real position.
   if (atTop) {
     return (
       <Typography sx={{ textAlign: 'center' }}>
-        {currentTierName
-          ? b3Lang('loyalty.benefits.atTopTier', { tier: currentTierName })
+        {sswTierName
+          ? b3Lang('loyalty.benefits.atTopTier', { tier: sswTierName })
           : b3Lang('loyalty.benefits.atTopTierGeneric')}
       </Typography>
     );
   }
 
-  const sswName = currentTierName?.trim().toLowerCase() ?? '';
+  const sswName = sswTierName.toLowerCase();
   const byName = sswName
     ? tiers.findIndex((tier) => tier.title.trim().toLowerCase() === sswName)
     : -1;
-  // Prefer the SSW name; fall back to the Influence id when progress is unavailable.
+  // Prefer the SSW name; fall back to the Influence id both when SSW sent no usable
+  // name and when the name matches no tier title (the safety net for name drift).
   const currentIndex =
     byName === -1 ? tiers.findIndex((tier) => tier.id === currentTierId) : byName;
   // Unknown current tier: we cannot say what is "above", so show nothing.

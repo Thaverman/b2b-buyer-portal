@@ -1487,3 +1487,22 @@ it('anchors the tier ladder on the SSW tier name when the Influence id disagrees
   expect(screen.queryByText('Select Tier')).not.toBeInTheDocument();
   expect(screen.queryByText('Essential Tier')).not.toBeInTheDocument();
 });
+
+it('falls back to the Influence tier id when the SSW tier name matches no tier', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't2' }));
+  mockTiers(rewardTiers());
+  mockTierProgress(
+    buildTierProgressWith({
+      targetKind: 'NextTier',
+      currentTierName: 'Renamed In SSW Only',
+      targetTierName: 'Signature',
+    }),
+  );
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  // The name matches no tier title, so the Influence id (t2 = Select) positions the ladder.
+  expect(await screen.findByText('Signature Tier')).toBeInTheDocument();
+  expect(screen.queryByText('Select Tier')).not.toBeInTheDocument();
+  expect(screen.queryByText('Essential Tier')).not.toBeInTheDocument();
+});
