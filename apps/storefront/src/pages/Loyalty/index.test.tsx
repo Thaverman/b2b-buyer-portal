@@ -1304,6 +1304,26 @@ it('shows the benefits banner and explainer cards with the tier name', async () 
   ).toBeInTheDocument();
 });
 
+it('frames the benefits banner photo on the subject rather than centring the crop', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  renderWithProviders(<Loyalty />);
+
+  const image = await waitFor(() => {
+    const el = document.querySelector(
+      'img[src="/content/images/loyalty/loyalty-benefits-banner.jpg"]',
+    );
+    expect(el).toBeInTheDocument();
+    return el as Element;
+  });
+
+  // The photo is 3:2 (1347x898) with the subject's head near the top, so filling the
+  // much wider banner panel with a centred crop shaves the head off.
+  const style = window.getComputedStyle(image);
+  expect(style.objectFit).toBe('cover');
+  expect(style.objectPosition).toBe('center 20%');
+});
+
 it('hides the benefits banner image when it fails to load', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
 

@@ -102,7 +102,6 @@ function BenefitsTab({ customer, tiers, tierProgress, tierDisplayName }: Benefit
           color: 'primary.contrastText',
           borderRadius: 2,
           p: { xs: 3, sm: 6 },
-          mx: { md: -4 },
         }}
       >
         {!bannerFailed && (
@@ -118,6 +117,9 @@ function BenefitsTab({ customer, tiers, tierProgress, tierDisplayName }: Benefit
               height: '100%',
               width: { xs: 0, md: '45%' },
               objectFit: 'cover',
+              // The photo is 3:2 (1347x898) with the subject's head near the top; this panel is
+              // far wider than that, so bias the crop upwards to keep the head in frame.
+              objectPosition: 'center 20%',
               display: { xs: 'none', md: 'block' },
             }}
           />
