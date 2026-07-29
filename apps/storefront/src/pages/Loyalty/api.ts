@@ -255,7 +255,7 @@ export const fetchTiers = async (): Promise<LoyaltyTier[]> => {
 };
 
 export interface LoyaltyTierProgress {
-  targetKind: 'NextTier' | 'PrePointsGate';
+  targetKind: 'NextTier' | 'PrePointsGate' | 'AtTop';
   currentTierName: string;
   targetTierName: string;
   ordersInWindow: number;
@@ -315,11 +315,13 @@ export const fetchTierProgress = async (
     Result?: { TierProgress?: RawTierProgress | null };
   };
   const progress = raw.Success === true ? raw.Result?.TierProgress : null;
-  // Only these two kinds have something to show: NextTier drives the progress card,
-  // PrePointsGate drives the hero's shopping nudge. AtTop (and anything unknown) = nothing.
+  // NextTier drives the progress card, PrePointsGate the hero's shopping nudge, and
+  // AtTop tells My benefits to drop the tier ladder. Anything unknown = nothing to show.
   if (
     !progress ||
-    (progress.TargetKind !== 'NextTier' && progress.TargetKind !== 'PrePointsGate')
+    (progress.TargetKind !== 'NextTier' &&
+      progress.TargetKind !== 'PrePointsGate' &&
+      progress.TargetKind !== 'AtTop')
   ) {
     return null;
   }

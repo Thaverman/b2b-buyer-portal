@@ -592,8 +592,8 @@ describe('fetchTierProgress', () => {
     ['TierProgress null', { Success: true, Result: { TierProgress: null } }],
     ['Result missing', { Success: true }],
     [
-      'top tier (TargetKind not NextTier)',
-      { Success: true, Result: { TierProgress: { TargetKind: 'AtTop' } } },
+      'an unrecognized target kind',
+      { Success: true, Result: { TierProgress: { TargetKind: 'Unrecognized' } } },
     ],
   ])('returns null for %s', async (_label, payload) => {
     withProgressSite();
@@ -686,15 +686,42 @@ describe('fetchTierProgress target kinds', () => {
     expect(result?.targetTierName).toBe('Signature');
   });
 
-  it('returns null for AtTop', async () => {
+  it('maps AtTop with the current tier name and zeroed quotas', async () => {
     withProgressSite();
     server.use(
       http.get(progressUrl, () =>
-        HttpResponse.json({ Success: true, Result: { TierProgress: { TargetKind: 'AtTop' } } }),
+        HttpResponse.json({
+          Success: true,
+          Result: {
+            TierProgress: {
+              CurrentTierName: 'Signature',
+              TargetKind: 'AtTop',
+              TargetTierName: null,
+              TargetOrdersRequired: 0,
+              TargetAmountRequired: 0,
+              OrdersInWindow: 0,
+              SpendInWindow: 0,
+              OrdersProgressPct: 0,
+              SpendProgressPct: 0,
+              Summary: "At top tier 'Signature' — earning at 300.00 %.",
+            },
+          },
+        }),
       ),
     );
 
-    expect(await fetchTierProgress(264074)).toBeNull();
+    expect(await fetchTierProgress(264074)).toEqual({
+      targetKind: 'AtTop',
+      currentTierName: 'Signature',
+      targetTierName: '',
+      ordersInWindow: 0,
+      targetOrdersRequired: 0,
+      spendInWindow: 0,
+      targetAmountRequired: 0,
+      ordersProgressPct: 0,
+      spendProgressPct: 0,
+      summary: "At top tier 'Signature' — earning at 300.00 %.",
+    });
   });
 });
 

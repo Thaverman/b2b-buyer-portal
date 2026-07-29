@@ -33,5 +33,7 @@ export const resolveLoyaltyLanding = async (budgetMs = 1500): Promise<boolean> =
     setTimeout(() => resolve(null), budgetMs);
   });
   const result = await Promise.race([pendingLanding, timeout]);
-  return result !== null;
+  // AtTop is a real progress result but not an active journey — fetchTierProgress
+  // used to drop it, so "non-null" alone silently meant NextTier/PrePointsGate.
+  return result !== null && result.targetKind !== 'AtTop';
 };
