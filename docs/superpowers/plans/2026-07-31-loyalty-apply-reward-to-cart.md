@@ -1045,7 +1045,18 @@ yarn test --run src/pages/Loyalty
 yarn build
 ```
 
-Expected: `tsc` clean, `lint` (dependency-cruiser + eslint + knip) clean, Loyalty suite green except the three FAQ baseline failures, `build` exit 0.
+Expected, measured against the branch's **pre-existing** redness (none of it in files this plan touches — do not fix any of it):
+
+| Check | Expected |
+|---|---|
+| `yarn tsc --noEmit` | clean |
+| `yarn lint:eslint` | fails with exactly 1 error + 1 warning, both in `src/pages/ManageSubscriptions/index.tsx` (`'_props' is defined but never used`, `Unexpected console statement`). Scoped runs over `src/shared/service/bc/api/cart.ts` and `src/pages/Loyalty` must be clean. |
+| `yarn lint:knip` | fails with exactly `Unused files (1): src/utils/analytics.ts` |
+| `yarn lint:dependencies` | fails with exactly `no-orphans: src/utils/analytics.ts` |
+| `yarn test --run src/pages/Loyalty` | green except the three FAQ baseline failures |
+| `yarn build` | fails at the `vite build` stage only if the above lint issues gate it; `tsc --noEmit` portion must be clean |
+
+The new `src/shared/service/bc/api/cart.ts` must **not** appear in the knip or dependency-cruiser output — if it does, it is orphaned and something failed to import it.
 
 - [ ] **Step 7: Commit**
 
