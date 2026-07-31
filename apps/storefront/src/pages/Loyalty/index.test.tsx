@@ -212,10 +212,8 @@ const customerPreloadedState = {
   preloadedState: { company: buildCompanyStateWith({ customer: { id: 264074 } }) },
 };
 
-it('renders the hero with company name, member-since, and points balance', async () => {
-  mockLoyaltyApis(
-    buildLoyaltyCustomerWith({ pointBalance: 2465, createdAt: '2026-01-15T00:00:00.000Z' }),
-  );
+it('renders the hero with company name and points balance', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 2465 }));
 
   renderWithProviders(<Loyalty />, {
     preloadedState: {
@@ -226,8 +224,7 @@ it('renders the hero with company name, member-since, and points balance', async
     },
   });
 
-  expect(await screen.findByText('Welcome back, Riverside Hardware Co.')).toBeInTheDocument();
-  expect(await screen.findByText('Member since Jan 2026')).toBeInTheDocument();
+  expect(await screen.findByText('Welcome, Riverside Hardware Co.')).toBeInTheDocument();
   expect(await screen.findByText('You have 2,465 points available.')).toBeInTheDocument();
 });
 
@@ -281,7 +278,7 @@ it('renders no benefits sections while the customer record is unavailable', asyn
 
   expect(await screen.findByText("We couldn't load your rewards.")).toBeInTheDocument();
   expect(
-    screen.queryByText("You're officially part of the SSW Smart Rewards family", { exact: false }),
+    screen.queryByText('We want to make sure every order works harder for you.', { exact: false }),
   ).not.toBeInTheDocument();
   expect(screen.queryByText(/Progress to/)).not.toBeInTheDocument();
 });
@@ -439,6 +436,26 @@ it('lists redeemable rewards and disables ones costing more than the balance', a
   const dear = screen.getByText('Free shipping').closest('.MuiCard-root') as HTMLElement;
   expect(within(cheap).getByRole('button', { name: 'Get reward' })).toBeEnabled();
   expect(within(dear).getByRole('button', { name: 'Get reward' })).toBeDisabled();
+});
+
+it('orders the reward catalog by point cost, lowest first', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 5000 }));
+  mockRedeemRules([
+    buildRedeemRuleWith({ title: '$5 discount', pointCost: 500 }),
+    buildRedeemRuleWith({ title: 'Free shipping', pointCost: 1000 }),
+    buildRedeemRuleWith({ title: '$2 discount', pointCost: 200 }),
+  ]);
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'Get rewards' }));
+  await screen.findByText('Free shipping');
+
+  const cards = document.querySelectorAll('.MuiCard-root');
+  const titles = Array.from(cards).map(
+    (card) => within(card as HTMLElement).getByRole('heading', { level: 6 }).textContent,
+  );
+  expect(titles).toEqual(['$2 discount', '$5 discount', 'Free shipping']);
 });
 
 it('hides increment-type and unknown-status rules from the catalog', async () => {
@@ -943,7 +960,7 @@ it('greets the customer by first name in the Smart Rewards banner', async () => 
   });
 
   expect(await screen.findByText('Smart Rewards')).toBeInTheDocument();
-  expect(await screen.findByText('Welcome back, Lisa')).toBeInTheDocument();
+  expect(await screen.findByText('Welcome, Lisa')).toBeInTheDocument();
   expect(await screen.findByText('You have 1,044 points available.')).toBeInTheDocument();
 });
 
@@ -959,7 +976,7 @@ it('falls back to the company name when the customer has no first name', async (
     },
   });
 
-  expect(await screen.findByText('Welcome back, Riverside Hardware Co.')).toBeInTheDocument();
+  expect(await screen.findByText('Welcome, Riverside Hardware Co.')).toBeInTheDocument();
 });
 
 it('shows the shopping CTA and gate summary for a PrePointsGate customer', async () => {
@@ -1204,10 +1221,15 @@ it('hides the FAQ tab when the theme ships no FAQ content', async () => {
   expect(screen.queryByRole('tab', { name: 'FAQ' })).not.toBeInTheDocument();
 });
 
-it('renders theme-provided FAQ questions and answers', async () => {
+it('renders theme-provided FAQ sections, questions and answers', async () => {
   window.loyaltyFaqConfig = {
     intro: 'Ask away.',
-    items: [{ question: 'How do I earn points?', answer: 'Place an order.' }],
+    sections: [
+      {
+        title: 'Getting started',
+        items: [{ question: 'How do I earn points?', answer: 'Place an order.' }],
+      },
+    ],
   };
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
 
@@ -1216,12 +1238,15 @@ it('renders theme-provided FAQ questions and answers', async () => {
   await user.click(await screen.findByRole('tab', { name: 'FAQ' }));
 
   expect(await screen.findByText('Ask away.')).toBeInTheDocument();
+  expect(screen.getByText('Getting started')).toBeInTheDocument();
   expect(screen.getByText('How do I earn points?')).toBeInTheDocument();
   expect(screen.getByText('Place an order.')).toBeInTheDocument();
 });
 
 it('uses the default FAQ intro when the theme supplies none', async () => {
-  window.loyaltyFaqConfig = { items: [{ question: 'Q?', answer: 'A.' }] };
+  window.loyaltyFaqConfig = {
+    sections: [{ title: 'Getting started', items: [{ question: 'Q?', answer: 'A.' }] }],
+  };
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
 
   const { user } = renderWithProviders(<Loyalty />);
@@ -1233,6 +1258,31 @@ it('uses the default FAQ intro when the theme supplies none', async () => {
       "Got questions? Here's what our customers ask most about SSW Smart Rewards.",
     ),
   ).toBeInTheDocument();
+});
+
+it('renders an FAQ item bullet list even when the item has no answer', async () => {
+  window.loyaltyFaqConfig = {
+    sections: [
+      {
+        title: 'Program Tiers',
+        items: [
+          {
+            question: 'What do I need to qualify for each tier?',
+            bullets: ['Essential: first order.', 'Select: 8+ orders per year.'],
+          },
+        ],
+      },
+    ],
+  };
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'FAQ' }));
+
+  expect(await screen.findByText('What do I need to qualify for each tier?')).toBeInTheDocument();
+  expect(screen.getByText('Essential: first order.')).toBeInTheDocument();
+  expect(screen.getByText('Select: 8+ orders per year.')).toBeInTheDocument();
 });
 
 it('falls back to My benefits for ?tab=faq with no FAQ content', async () => {
@@ -1252,9 +1302,7 @@ it('introduces My benefits with the customer tier name', async () => {
   renderWithProviders(<Loyalty />);
 
   expect(
-    await screen.findByText(
-      "You're officially part of the SSW Smart Rewards family. We want to make sure every order works harder for you.",
-    ),
+    await screen.findByText('We want to make sure every order works harder for you.'),
   ).toBeInTheDocument();
   expect(
     await screen.findByText(
@@ -1289,7 +1337,7 @@ it('shows the benefits banner and explainer cards with the tier name', async () 
   expect(screen.getByText('Earning and Redeeming Credit')).toBeInTheDocument();
   expect(
     screen.getByText(
-      'At the Essential level, you earn at a 1% rate once you reach $500 in annual purchases.',
+      'Once you reach $500 in annual purchases, your rate is 1% of your total order.',
     ),
   ).toBeInTheDocument();
   expect(screen.getByText('Free Shipping')).toBeInTheDocument();
@@ -1302,6 +1350,58 @@ it('shows the benefits banner and explainer cards with the tier name', async () 
       'We look at your orders over the past 12 months, updated monthly, to determine your tier.',
     ),
   ).toBeInTheDocument();
+});
+
+it('styles the benefits explainer card bullet points at 18px in #282828', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't1' }));
+  mockTiers([buildTierWith({ id: 't1', title: 'Essential' })]);
+
+  renderWithProviders(<Loyalty />);
+
+  // The banner subtitle above these cards is "Each purchase earns you points." verbatim —
+  // query the full bullet sentence so this never collides with that shorter subtitle.
+  const bullet = await screen.findByText(
+    'Every purchase earns you points, based on your tier rate.',
+  );
+
+  const style = window.getComputedStyle(bullet);
+  expect(style.fontSize).toBe('18px');
+  expect(style.color).toBe('rgb(40, 40, 40)');
+});
+
+it('shows the Select tier credit rate with no annual-purchase gate', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't1' }));
+  mockTiers([buildTierWith({ id: 't1', title: 'Select' })]);
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('Your rate is 2% of your total order.')).toBeInTheDocument();
+});
+
+it('shows the Signature tier credit rate with no annual-purchase gate', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't1' }));
+  mockTiers([buildTierWith({ id: 't1', title: 'Signature' })]);
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('Your rate is 3% of your total order.')).toBeInTheDocument();
+});
+
+it('falls back to a generic credit rate line when no tier is resolved', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: null }));
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('Your rate depends on your membership tier.')).toBeInTheDocument();
+});
+
+it('falls back to a generic credit rate line for a tier name outside Essential/Select/Signature', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't1' }));
+  mockTiers([buildTierWith({ id: 't1', title: 'Platinum' })]);
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('Your rate depends on your membership tier.')).toBeInTheDocument();
 });
 
 it('frames the benefits banner photo on the subject rather than centring the crop', async () => {

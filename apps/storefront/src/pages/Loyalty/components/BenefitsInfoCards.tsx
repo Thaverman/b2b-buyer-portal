@@ -33,8 +33,7 @@ function InfoCard({ title, Icon, points }: InfoCardProps) {
             key={point}
             component="li"
             variant="body2"
-            color="text.secondary"
-            sx={{ mb: 0.5 }}
+            sx={{ mb: 0.5, fontSize: '18px', color: '#282828' }}
           >
             {point}
           </Typography>
@@ -44,8 +43,26 @@ function InfoCard({ title, Icon, points }: InfoCardProps) {
   );
 }
 
+type CreditRateTier = 'essential' | 'select' | 'signature';
+
+const CREDIT_RATE_TIERS: CreditRateTier[] = ['essential', 'select', 'signature'];
+
+// Case-insensitive, trim-then-compare — mirrors isTierAllowed's convention in api.ts —
+// but stays local: this is display-copy selection, not shared by any other consumer.
+function matchCreditRateTier(tierDisplayName: string | null): CreditRateTier | null {
+  const normalized = tierDisplayName?.trim().toLowerCase();
+  return CREDIT_RATE_TIERS.find((tier) => tier === normalized) ?? null;
+}
+
+const CREDIT_RATE_KEYS: Record<CreditRateTier, string> = {
+  essential: 'loyalty.benefits.credit.point2Essential',
+  select: 'loyalty.benefits.credit.point2Select',
+  signature: 'loyalty.benefits.credit.point2Signature',
+};
+
 function BenefitsInfoCards({ tierDisplayName }: BenefitsInfoCardsProps) {
   const b3Lang = useB3Lang();
+  const creditRateTier = matchCreditRateTier(tierDisplayName);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -54,12 +71,13 @@ function BenefitsInfoCards({ tierDisplayName }: BenefitsInfoCardsProps) {
         Icon={SavingsOutlined}
         points={[
           b3Lang('loyalty.benefits.credit.point1'),
-          tierDisplayName
-            ? b3Lang('loyalty.benefits.credit.point2', { tier: tierDisplayName })
-            : b3Lang('loyalty.benefits.credit.point2Generic'),
+          b3Lang(
+            creditRateTier
+              ? CREDIT_RATE_KEYS[creditRateTier]
+              : 'loyalty.benefits.credit.point2Generic',
+          ),
           b3Lang('loyalty.benefits.credit.point3'),
           b3Lang('loyalty.benefits.credit.point4'),
-          b3Lang('loyalty.benefits.credit.point5'),
         ]}
       />
       <InfoCard
