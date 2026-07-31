@@ -94,8 +94,11 @@ type CartCouponErrorKind = 'emptyCart' | 'rejected' | 'upstream';
 class CartCouponError extends Error { kind: CartCouponErrorKind }
 
 fetchCartCoupons(): Promise<CartCoupons>
-applyCartCoupon(cartId: string, code: string): Promise<string[]>   // → applied codes after the write
-removeCartCoupon(cartId: string, code: string): Promise<string[]>
+// Both writes → the applied codes after the write, or null when the write
+// succeeded but returned no readable body (see the error-mapping notes below).
+applyCartCoupon(cartId: string, code: string): Promise<string[] | null>
+removeCartCoupon(cartId: string, code: string): Promise<string[] | null>
+isSameCouponCode(a: string, b: string): boolean
 ```
 
 Requests are `fetch` with `credentials: 'same-origin'`,
@@ -124,11 +127,29 @@ Details that matter:
   `GET /carts`).
 - **The optional `version` field is omitted**, which makes the documented 409
   unreachable.
-- **Error mapping**, given the doc gap: response body `type === 'empty_cart'`
-  (the discriminator BigCommerce's own SDK checks) → `emptyCart`; 404 or 422 →
-  `rejected`; anything else, including a network throw → `upstream`. The real
+- **Error mapping**, given the doc gap, in this precedence order: response body
+  `type === 'empty_cart'` (the discriminator BigCommerce's own SDK checks) →
+  `emptyCart`; `401`/`403` → `upstream`; **any other 4xx** → `rejected`;
+  anything else, including 5xx and a network throw → `upstream`. The real
   status and `title` go to `b2bLogger.error` so support can diagnose what the
   docs could not tell us. This mirrors `LoyaltyError` in `pages/Loyalty/api.ts`.
+
+  Keying `rejected` on the whole 4xx *class* rather than named members is
+  deliberate: BigCommerce documents no status for a refused coupon, so
+  enumerating guesses would leave the useful copy unreachable in production for
+  the feature's most likely failure. The `401`/`403` carve-out above it exists
+  because an auth or CSRF fault is never a statement about the coupon — telling
+  a buyer their reward "may have already been used" would blame them for a
+  server misconfiguration. Both `emptyCart` and the carve-out must stay above
+  the class check; the empty-cart response is itself a 4xx.
+
+- **A successful write with an unreadable body returns `null`, not an error.**
+  `couponWrite` parses the response inside a `try`; on failure (a `204`, an
+  empty body) it yields `null`, meaning "the write succeeded but the new code
+  list is unknown". Callers then resync with `invalidateQueries` instead of
+  writing the cache, and still show their success message. Throwing here would
+  put an error toast on screen for an operation that worked, contradicted a
+  moment later by the resynced UI.
 
 ## `MyRewardsTab.tsx` changes
 
