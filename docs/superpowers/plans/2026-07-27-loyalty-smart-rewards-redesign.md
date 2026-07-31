@@ -375,7 +375,7 @@ it('greets the customer by first name in the Smart Rewards banner', async () => 
   });
 
   expect(await screen.findByText('Smart Rewards')).toBeInTheDocument();
-  expect(await screen.findByText('Welcome back, Lisa')).toBeInTheDocument();
+  expect(await screen.findByText('Welcome, Lisa')).toBeInTheDocument();
   expect(await screen.findByText('You have 1,044 points available.')).toBeInTheDocument();
 });
 
@@ -391,7 +391,7 @@ it('falls back to the company name when the customer has no first name', async (
     },
   });
 
-  expect(await screen.findByText('Welcome back, Riverside Hardware Co.')).toBeInTheDocument();
+  expect(await screen.findByText('Welcome, Riverside Hardware Co.')).toBeInTheDocument();
 });
 
 it('shows the shopping CTA and gate summary for a PrePointsGate customer', async () => {
@@ -431,21 +431,21 @@ it('shows no CTA for a customer who is already earning', async () => {
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `CIRCLECI=true yarn test src/pages/Loyalty/index.test.tsx --run -t "Smart Rewards|first name|PrePointsGate|already earning"`
-Expected: FAIL — "Smart Rewards" / "Welcome back, Lisa" / the CTA link are not in the DOM.
+Expected: FAIL — "Smart Rewards" / "Welcome, Lisa" / the CTA link are not in the DOM.
 
 - [ ] **Step 3: Update the i18n copy**
 
 In `src/lib/lang/locales/en.json`, replace the line
 
 ```json
-  "loyalty.hero.welcome": "Welcome back",
+  "loyalty.hero.welcome": "Welcome",
 ```
 
 with
 
 ```json
   "loyalty.hero.brand": "Smart Rewards",
-  "loyalty.hero.welcomeBack": "Welcome back, {name}",
+  "loyalty.hero.welcomeBack": "Welcome, {name}",
   "loyalty.hero.cta": "Start shopping to earn points",
 ```
 
@@ -1384,7 +1384,7 @@ it('uses the default FAQ intro when the theme supplies none', async () => {
 
   expect(
     await screen.findByText(
-      "Got questions? Here's what our customers ask most about SSW Smart Rewards.",
+      "Got questions? Here's what our customers ask most about Smart Rewards.",
     ),
   ).toBeInTheDocument();
 });
@@ -1411,7 +1411,7 @@ In `src/lib/lang/locales/en.json`, after the `loyalty.tabs.myRewards` line:
 
 ```json
   "loyalty.tabs.faq": "FAQ",
-  "loyalty.faq.intro": "Got questions? Here's what our customers ask most about SSW Smart Rewards.",
+  "loyalty.faq.intro": "Got questions? Here's what our customers ask most about Smart Rewards.",
 ```
 
 - [ ] **Step 4: Create `FaqTab`**

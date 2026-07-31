@@ -51,7 +51,7 @@ export default function B3Layout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const itemsRoutes = routes.find((item) => item.path === location.pathname);
-    if (itemsRoutes && location.pathname !== '/quoteDraft') {
+    if (itemsRoutes && location.pathname !== '/quoteDraft' && location.pathname !== '/loyalty') {
       const foundPath = Object.entries(SPECIAL_PATH_TEXTS).find(
         ([specialPath]) => specialPath === location.pathname,
       );

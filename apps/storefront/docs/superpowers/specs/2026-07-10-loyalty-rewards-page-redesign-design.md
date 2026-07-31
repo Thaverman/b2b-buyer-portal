@@ -86,7 +86,7 @@ use inline `sx`.
   unit-tested.
 
 ### `LoyaltyHero.tsx`
-Keep the filled `primary.main` panel and its props. "WELCOME BACK" becomes
+Keep the filled `primary.main` panel and its props. "WELCOME" becomes
 bold/uppercase; keep the "Member since" chip top-right; restyle the tier chip
 into the mockup's dark pill with a small tier icon. Points render in a slim
 centered strip just below the hero (`loyalty.hero.points`), dropping "pending".

@@ -18,7 +18,7 @@ import {
   getAllowedTiers,
   getBannerUrl,
   getFaqIntro,
-  getFaqItems,
+  getFaqSections,
   getLoyaltyDigest,
   isLoyaltyAvailable,
   isTierAllowed,
@@ -44,14 +44,6 @@ const toLoyaltyTab = (value: string | null): LoyaltyTab => {
     return value as LoyaltyTab;
   }
   return LEGACY_TABS[value ?? ''] ?? 'benefits';
-};
-
-const formatMemberSince = (createdAt: string): string | null => {
-  const date = new Date(createdAt);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 };
 
 function Loyalty() {
@@ -162,8 +154,8 @@ function Loyalty() {
   const isSessionExpired = errorKind === 'sessionExpired';
   const isLoadError = Boolean(errorKind) && !isNotEnrolled && !isSessionExpired;
 
-  const faqItems = getFaqItems();
-  const hasFaq = faqItems.length > 0;
+  const faqSections = getFaqSections();
+  const hasFaq = faqSections.length > 0;
   const activeTab = tab === 'faq' && !hasFaq ? 'benefits' : tab;
 
   return (
@@ -182,7 +174,6 @@ function Loyalty() {
         <LoyaltyHero
           firstName={firstName}
           companyName={companyName}
-          memberSince={customer ? formatMemberSince(customer.createdAt) : null}
           tierTitle={displayTierTitle}
           pointBalance={customer ? customer.pointBalance : null}
           showEarnCta={tierProgress?.targetKind === 'PrePointsGate'}
@@ -246,7 +237,7 @@ function Loyalty() {
           />
         )}
         {activeTab === 'my-rewards' && <MyRewardsTab identity={identity} />}
-        {activeTab === 'faq' && <FaqTab items={faqItems} intro={getFaqIntro()} />}
+        {activeTab === 'faq' && <FaqTab sections={faqSections} intro={getFaqIntro()} />}
       </Box>
     </B3Spin>
   );

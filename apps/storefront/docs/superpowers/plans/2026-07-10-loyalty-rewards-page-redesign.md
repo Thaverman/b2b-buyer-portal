@@ -1135,7 +1135,7 @@ Expected: `lint:dependencies`, `lint:eslint` (`--max-warnings 0`), and `lint:kni
 - [ ] **Step 4: Manual visual verification**
 
 Use the `/verify` skill (or run `yarn dev` on port 3001 and load the buyer portal at `/#/loyalty` through the BigCommerce store URL). Confirm against the mockup:
-- Hero: uppercase "WELCOME BACK", company name, member-since chip, tier pill with badge icon; points strip centered below.
+- Hero: uppercase "WELCOME", company name, member-since chip, tier pill with badge icon; points strip centered below.
 - Tabs show leading icons; clicking each still updates `?tab=`.
 - Your rewards: filled tier-benefits panel (title left, perks right) + bordered progress bar.
 - Earn points / Rewards: centered icon-topped cards with the section header above.

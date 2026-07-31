@@ -104,7 +104,10 @@ declare global {
     /** Theme-set FAQ content; absent or empty = the FAQ tab is hidden. */
     loyaltyFaqConfig?: {
       intro?: string;
-      items?: { question?: string; answer?: string }[];
+      sections?: {
+        title?: string;
+        items?: { question?: string; answer?: string; bullets?: string[] }[];
+      }[];
     };
     B3: {
       setting: {

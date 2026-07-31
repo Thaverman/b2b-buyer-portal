@@ -9,7 +9,6 @@ import ShippingTracker from './ShippingTracker';
 interface LoyaltyHeroProps {
   firstName: string;
   companyName: string;
-  memberSince: string | null;
   tierTitle: string | null;
   pointBalance: number | null;
   showEarnCta: boolean;
@@ -20,7 +19,6 @@ interface LoyaltyHeroProps {
 function LoyaltyHero({
   firstName,
   companyName,
-  memberSince,
   tierTitle,
   pointBalance,
   showEarnCta,
@@ -71,61 +69,57 @@ function LoyaltyHero({
           }}
         />
         <Box sx={{ position: 'relative' }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <WorkspacePremium />
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                {b3Lang('loyalty.hero.brand')}
-              </Typography>
-            </Box>
-            {memberSince && (
-              <Chip
-                label={b3Lang('loyalty.hero.memberSince', { date: memberSince })}
-                sx={{ bgcolor: 'common.black', color: 'common.white' }}
-              />
-            )}
-          </Box>
-          <Typography variant="h4" sx={{ fontWeight: 800, mt: 1 }}>
-            {b3Lang('loyalty.hero.welcomeBack', { name: firstName || companyName })}
-          </Typography>
-          {showEarnCta && (
-            <Button
-              href={`${window.location.origin}/`}
-              variant="outlined"
-              sx={{
-                mt: 2,
-                borderRadius: 8,
-                color: 'primary.contrastText',
-                borderColor: 'primary.contrastText',
-              }}
-            >
-              {b3Lang('loyalty.hero.cta')}
-            </Button>
-          )}
-          {gateSummary && (
-            <Typography variant="body2" sx={{ mt: 2, opacity: 0.9 }}>
-              {gateSummary}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <WorkspacePremium />
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              {b3Lang('loyalty.hero.brand')}
             </Typography>
-          )}
-          {tierTitle && (
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                {b3Lang('loyalty.hero.currentTier')}
-              </Typography>
-              <Chip
-                icon={<WorkspacePremium />}
-                label={tierTitle}
+          </Box>
+          {/* Capped so long copy wraps before it reaches the photo, rather than drifting across
+              it — the gradient above only keeps text legible up to about the image's left edge. */}
+          <Box sx={{ maxWidth: { md: '55%' } }}>
+            <Typography variant="h4" sx={{ fontWeight: 800, mt: 1 }}>
+              {b3Lang('loyalty.hero.welcomeBack', { name: firstName || companyName })}
+            </Typography>
+            {showEarnCta && (
+              <Button
+                href={`${window.location.origin}/`}
+                variant="outlined"
                 sx={{
-                  mt: 1,
-                  fontWeight: 700,
-                  bgcolor: 'common.black',
-                  color: 'common.white',
-                  '& .MuiChip-icon': { color: 'common.white' },
+                  mt: 2,
+                  borderRadius: 8,
+                  color: 'primary.contrastText',
+                  borderColor: 'primary.contrastText',
                 }}
-              />
-            </Box>
-          )}
-          <ShippingTracker />
+              >
+                {b3Lang('loyalty.hero.cta')}
+              </Button>
+            )}
+            {gateSummary && (
+              <Typography variant="body2" sx={{ mt: 2, opacity: 0.9 }}>
+                {gateSummary}
+              </Typography>
+            )}
+            {tierTitle && (
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                  {b3Lang('loyalty.hero.currentTier')}
+                </Typography>
+                <Chip
+                  icon={<WorkspacePremium />}
+                  label={tierTitle}
+                  sx={{
+                    mt: 1,
+                    fontWeight: 700,
+                    bgcolor: 'common.black',
+                    color: 'common.white',
+                    '& .MuiChip-icon': { color: 'common.white' },
+                  }}
+                />
+              </Box>
+            )}
+            <ShippingTracker />
+          </Box>
         </Box>
       </Box>
       {pointBalance !== null && (

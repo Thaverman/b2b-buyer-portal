@@ -234,7 +234,7 @@ export const routeList: (BuyerPortalRoute | RouteItem)[] = [
   },
   {
     path: '/loyalty',
-    name: 'Rewards',
+    name: 'Smart Rewards',
     wsKey: 'loyalty',
     isMenuItem: true,
     permissions: accountSettingPermissions,

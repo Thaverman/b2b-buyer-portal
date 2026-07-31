@@ -35,7 +35,9 @@ function RewardsTab({ identity, pointBalance, customerQueryKey }: RewardsTabProp
     queryFn: fetchRedeemRules,
     staleTime: Infinity,
   });
-  const catalog = (rulesQuery.data ?? []).filter(isRedeemableCatalogRule);
+  const catalog = (rulesQuery.data ?? [])
+    .filter(isRedeemableCatalogRule)
+    .sort((a, b) => (a.pointCost ?? 0) - (b.pointCost ?? 0));
 
   const redeemMutation = useMutation({
     mutationFn: (ruleId: string) => {

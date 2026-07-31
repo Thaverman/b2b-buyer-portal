@@ -1255,7 +1255,7 @@ it('uses the default FAQ intro when the theme supplies none', async () => {
 
   expect(
     await screen.findByText(
-      "Got questions? Here's what our customers ask most about SSW Smart Rewards.",
+      "Got questions? Here's what our customers ask most about Smart Rewards.",
     ),
   ).toBeInTheDocument();
 });

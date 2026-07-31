@@ -156,7 +156,7 @@ it('introduces My benefits with the customer tier name', async () => {
 
   expect(
     await screen.findByText(
-      "You're officially part of the SSW Smart Rewards family. We want to make sure every order works harder for you.",
+      "We want to make sure every order works harder for you.",
     ),
   ).toBeInTheDocument();
   expect(
@@ -197,7 +197,7 @@ In `en.json`: change `"loyalty.tiers.progressTo": "Progress to {tier}"` → `"Pr
 ```json
   "loyalty.progress.spendOf": "{spent} of {target}",
   "loyalty.progress.ordersOf": "{current} of {target} orders",
-  "loyalty.benefits.introLead": "You're officially part of the SSW Smart Rewards family. We want to make sure every order works harder for you.",
+  "loyalty.benefits.introLead": "We want to make sure every order works harder for you.",
   "loyalty.benefits.introGuide": "Here's a quick guide to your {tier} benefits and how to get the most from them.",
   "loyalty.benefits.introGuideGeneric": "Here's a quick guide to your benefits and how to get the most from them.",
 ```

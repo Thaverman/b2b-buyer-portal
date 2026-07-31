@@ -19,7 +19,7 @@ import {
   getBannerUrl,
   getBenefitsBannerUrl,
   getFaqIntro,
-  getFaqItems,
+  getFaqSections,
   getLoyaltyDigest,
   getShippingCalculation,
   isRedeemableCatalogRule,
@@ -768,30 +768,88 @@ describe('getBenefitsBannerUrl', () => {
   });
 });
 
-describe('getFaqItems and getFaqIntro', () => {
+describe('getFaqSections and getFaqIntro', () => {
   it('returns an empty list and intro when the theme global is absent', () => {
-    expect(getFaqItems()).toEqual([]);
+    expect(getFaqSections()).toEqual([]);
     expect(getFaqIntro()).toBe('');
   });
 
-  it('drops items missing a question or an answer', () => {
+  it('drops items missing a question, or missing both an answer and bullets, keeping valid ones', () => {
     window.loyaltyFaqConfig = {
       intro: 'Ask away.',
-      items: [
-        { question: 'How do I earn?', answer: 'Place orders.' },
-        { question: 'No answer' },
-        { answer: 'No question' },
-        { question: '  ', answer: 'blank question' },
+      sections: [
+        {
+          title: 'Getting started',
+          items: [
+            { question: 'How do I earn?', answer: 'Place orders.' },
+            { question: 'No answer or bullets' },
+            { answer: 'No question' },
+            { question: '  ', answer: 'blank question' },
+          ],
+        },
       ],
     };
 
-    expect(getFaqItems()).toEqual([{ question: 'How do I earn?', answer: 'Place orders.' }]);
+    expect(getFaqSections()).toEqual([
+      {
+        title: 'Getting started',
+        items: [{ question: 'How do I earn?', answer: 'Place orders.', bullets: [] }],
+      },
+    ]);
     expect(getFaqIntro()).toBe('Ask away.');
   });
 
-  it('degrades an items-less config to an empty list', () => {
+  it('keeps an item with bullets and no answer, filtering blank/whitespace-only bullets', () => {
+    window.loyaltyFaqConfig = {
+      sections: [
+        {
+          title: 'Program Tiers',
+          items: [
+            {
+              question: 'What are the tiers?',
+              bullets: ['Essential: 1%', '  ', 'Select: 2%', ''],
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(getFaqSections()).toEqual([
+      {
+        title: 'Program Tiers',
+        items: [
+          {
+            question: 'What are the tiers?',
+            answer: '',
+            bullets: ['Essential: 1%', 'Select: 2%'],
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('drops a section with a blank or missing title even if its items are valid', () => {
+    window.loyaltyFaqConfig = {
+      sections: [
+        { title: '  ', items: [{ question: 'Q?', answer: 'A.' }] },
+        { items: [{ question: 'Q2?', answer: 'A2.' }] },
+      ],
+    };
+
+    expect(getFaqSections()).toEqual([]);
+  });
+
+  it('drops a section whose items are all invalid', () => {
+    window.loyaltyFaqConfig = {
+      sections: [{ title: 'Empty section', items: [{ question: 'No answer or bullets' }] }],
+    };
+
+    expect(getFaqSections()).toEqual([]);
+  });
+
+  it('degrades a sections-less config to an empty list', () => {
     window.loyaltyFaqConfig = {};
 
-    expect(getFaqItems()).toEqual([]);
+    expect(getFaqSections()).toEqual([]);
   });
 });

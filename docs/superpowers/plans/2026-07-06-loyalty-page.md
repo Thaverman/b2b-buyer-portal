@@ -1017,7 +1017,7 @@ In `en.json`, extend the loyalty block (comma-separate; keep `loyalty.unavailabl
   "loyalty.notEnrolled": "Start earning points with your first order.",
   "loyalty.loadError": "We couldn't load your rewards.",
   "loyalty.retry": "Try again",
-  "loyalty.hero.welcome": "Welcome back",
+  "loyalty.hero.welcome": "Welcome",
   "loyalty.hero.memberSince": "Member since {date}",
   "loyalty.hero.currentTier": "Current tier",
   "loyalty.hero.points": "You have {points} points"

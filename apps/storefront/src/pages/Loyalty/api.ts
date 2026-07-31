@@ -558,15 +558,35 @@ const DEFAULT_BENEFITS_BANNER_URL = '/content/images/loyalty/loyalty-benefits-ba
 export const getBenefitsBannerUrl = (): string =>
   getLoyaltyConfig()?.benefitsBannerUrl?.trim() || DEFAULT_BENEFITS_BANNER_URL;
 
-export interface LoyaltyFaqItem {
+// Module-internal: knip fails the build on unused exports, so this file only
+// exports what other files actually import.
+interface LoyaltyFaqItem {
   question: string;
   answer: string;
+  bullets: string[];
 }
 
-export const getFaqItems = (): LoyaltyFaqItem[] =>
-  (window.loyaltyFaqConfig?.items ?? [])
-    .map((item) => ({ question: item.question?.trim() ?? '', answer: item.answer?.trim() ?? '' }))
-    // A half-filled entry would render an empty accordion row; drop it.
-    .filter((item) => item.question !== '' && item.answer !== '');
+export interface LoyaltyFaqSection {
+  title: string;
+  items: LoyaltyFaqItem[];
+}
+
+export const getFaqSections = (): LoyaltyFaqSection[] =>
+  (window.loyaltyFaqConfig?.sections ?? [])
+    .map((section) => ({
+      title: section.title?.trim() ?? '',
+      items: (section.items ?? [])
+        .map((item) => ({
+          question: item.question?.trim() ?? '',
+          answer: item.answer?.trim() ?? '',
+          bullets: (item.bullets ?? [])
+            .map((bullet) => bullet.trim())
+            .filter((bullet) => bullet !== ''),
+        }))
+        // A half-filled entry would render an empty accordion row; drop it.
+        .filter((item) => item.question !== '' && (item.answer !== '' || item.bullets.length > 0)),
+    }))
+    // A titleless or item-less section would render an empty heading; drop it.
+    .filter((section) => section.title !== '' && section.items.length > 0);
 
 export const getFaqIntro = (): string => window.loyaltyFaqConfig?.intro?.trim() ?? '';

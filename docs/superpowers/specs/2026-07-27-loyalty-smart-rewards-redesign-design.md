@@ -41,7 +41,7 @@ every `TargetKind` except `NextTier`).
 
 - **Brand row:** `WorkspacePremium` icon (named `@mui/icons-material` import) +
   "Smart Rewards" (`loyalty.hero.brand`).
-- **Greeting:** "Welcome back, {name}" (`loyalty.hero.welcomeBack`) where
+- **Greeting:** "Welcome, {name}" (`loyalty.hero.welcomeBack`) where
   `name = company.customer.firstName || companyName` (Redux, read at page top
   and passed down as today).
 - **PrePointsGate block** (only when `tierProgress?.targetKind === 'PrePointsGate'`):
@@ -82,15 +82,18 @@ every `TargetKind` except `NextTier`).
 /** Theme-set FAQ content; absent or empty = FAQ tab hidden. */
 loyaltyFaqConfig?: {
   intro?: string;
-  items?: { question?: string; answer?: string }[];
+  sections?: { title?: string; items?: { question?: string; answer?: string; bullets?: string[] }[] }[];
 };
 ```
 
-`api.ts` exports `getFaqItems(): { question: string; answer: string }[]`
-(defensive: drops items missing either field, `?? []` throughout) and the tab
-renders only when it returns ≥ 1 item. Intro falls back to
-`loyalty.faq.intro` ("Got questions? Here's what our customers ask most about
-SSW Smart Rewards.") when `intro` is blank.
+`api.ts` exports
+`getFaqSections(): { title: string; items: { question: string; answer: string; bullets: string[] }[] }[]`
+(defensive: drops items missing a `question` or missing both an `answer` and
+`bullets`, and drops sections missing a `title` or left with zero valid items
+after that filtering, `?? []` throughout) and the tab renders only when it
+returns ≥ 1 section. Intro falls back to `loyalty.faq.intro` ("Got questions?
+Here's what our customers ask most about Smart Rewards.") when `intro` is
+blank.
 
 ### 2c. Banner image URL — theme override over a relative default
 
@@ -147,7 +150,7 @@ hosting side, **not** a buyer-portal change.
 | `benefits` | MY BENEFITS (`loyalty.tabs.benefits`) | §4 |
 | `get-rewards` | GET REWARDS (`loyalty.tabs.getRewards`) | redeem catalog only |
 | `my-rewards` | MY REWARDS (`loyalty.tabs.myRewards`) | earned codes + points history |
-| `faq` | FAQ (`loyalty.tabs.faq`) | §6; tab hidden when no FAQ items |
+| `faq` | FAQ (`loyalty.tabs.faq`) | §6; tab hidden when no FAQ sections |
 
 **Legacy deep-link mapping** in `toLoyaltyTab` (old bookmarks keep working;
 MUI `Tabs` never gets an unknown value):
@@ -195,9 +198,11 @@ Section order (top → bottom):
 
 ## 6. FAQ tab (new `components/FaqTab.tsx`)
 
-Intro line (theme `intro` or the i18n default) + one MUI `Accordion` per FAQ
-item (`question` as summary, `answer` as body text). Purely presentational; no
-queries. Tab + panel render only when `getFaqItems().length > 0`.
+Intro line (theme `intro` or the i18n default) + one heading + MUI `Accordion`
+group per FAQ section (`title` as heading, one `Accordion` per item with
+`question` as summary and `answer` plus an optional bullet list as body
+text). Purely presentational; no queries. Tab + panel render only when
+`getFaqSections().length > 0`.
 
 ## Edge cases
 
@@ -210,7 +215,7 @@ queries. Tab + panel render only when `getFaqItems().length > 0`.
 | Banner image 404s / not yet uploaded | `onError` ⇒ gradient-only banner (never a broken image) |
 | `BC_CONTEXT.loyalty.bannerUrl` set | That URL wins over the relative default |
 | `bannerUrl` absent or blank | Relative `/content/images/loyalty/loyalty-account-banner.jpg` (resolves per environment) |
-| `loyaltyFaqConfig` absent/empty/all-invalid items | FAQ tab hidden; `?tab=faq` → benefits |
+| `loyaltyFaqConfig` absent/empty/all-invalid sections or items | FAQ tab hidden; `?tab=faq` → benefits |
 | Old bookmark `?tab=redeem` etc. | Mapped to the new tab, no MUI warning |
 | Store with no memberships | Memberships section hidden inside MY BENEFITS (tab no longer hides) |
 | Masquerade / non-Stencil / tier-allowlist deny | Unchanged gates — whole page unavailable before any of this renders |
@@ -229,8 +234,9 @@ queries. Tab + panel render only when `getFaqItems().length > 0`.
 
 - **api.test.ts:** `fetchTierProgress` returns mapped object with
   `targetKind: 'PrePointsGate'` for the new payload (use the user's example);
-  still null for `AtTop`; `getFaqItems` table (absent global, empty items,
-  partial items dropped, valid items pass).
+  still null for `AtTop`; `getFaqSections` table (absent global, empty
+  sections, partial items dropped, bullet-only items with no answer kept,
+  blank/invalid sections dropped, valid sections pass).
 - **index.test.tsx:** restructured to the new tab names — intent preserved,
   labels/locations updated (this restructuring is spec-mandated; the
   tab-name change IS the feature). New tests: PrePointsGate banner shows CTA +

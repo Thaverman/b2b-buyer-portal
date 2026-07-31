@@ -60,7 +60,7 @@ Re-ran the same Playwright flow later the same day. All loyalty calls now succee
 - `GET launcher/v1/customer?shop=24erkpw9h6&customer_id=80591&…` → **200** (was 401)
   — returns real data: `currentLoyaltyTierId 29777d36…` (**SIGNATURE**), `externalId 80591`.
 
-The Rewards page renders the real state — *Welcome back Test Company · Member
+The Rewards page renders the real state — *Welcome Test Company · Member
 since Mar 2026 · Current tier SIGNATURE · 46,834 points · SIGNATURE benefits* —
 with no error banner and no `Loyalty: Launcher API rejected the digest (401)`
 console error. Both blockers are closed: the `/loyalty/digest` 404 (theme
