@@ -14,8 +14,13 @@
 
 - **All commands run from `apps/storefront/`**, not the repo root.
 - **Commit format:** `type: TICKET-### Short description`. Use `B2B-0000` (matches the recent Loyalty commits).
-- **Red baseline:** the working tree has an uncommitted `en.json` edit flipping `loyalty.tabs.faq` from `"FAQ"` to `"FAQs"` while four tests still query the tab by the name `FAQ` (`index.test.tsx:1242, :1259, :1275, :1302`). **Those four are red before you start. Do not fix them.** Diff failures against that baseline.
-- **Do not commit** the other pre-existing working-tree changes (`LoyaltyHero.tsx`, `index.test.tsx` deltas, `en.json` FAQ edit, untracked `.memory/` files). Stage explicit paths only, never `git add -A`.
+- **Red baseline — measured, not predicted.** `en.json` has `"loyalty.tabs.faq": "FAQs"` committed while tests still query the tab by the accessible name `FAQ`. Running `yarn test --run src/pages/Loyalty/index.test.tsx` on the starting commit gives **3 failed | 91 passed (94)**. The three failures are exactly:
+  - `renders theme-provided FAQ sections, questions and answers`
+  - `uses the default FAQ intro when the theme supplies none`
+  - `renders an FAQ item bullet list even when the item has no answer`
+
+  **These three are red before you start. Do not fix them.** Any *other* failure is yours. (A fourth `name: 'FAQ'` query at `index.test.tsx:1242` passes vacuously — it asserts the tab is *absent* — so it is not in the failure list.)
+- **Stage explicit paths only, never `git add -A`.** The branch is `feature/loyalty-apply-reward` in a dedicated worktree; keep commits to the files each task names.
 - **Imports:** `@/` and `tests/` aliases only — no long relative paths. Named imports from `@mui/icons-material`. `lodash-es` only.
 - **Do not add new violations** of the project-wide-disabled ESLint rules (notably: no non-null assertions `!`, no `any`).
 - **No new Redux slices, Context providers, or `localStorage`/`sessionStorage` state.**
@@ -346,7 +351,7 @@ and replace its last line with:
 
 Run: `yarn test --run src/pages/Loyalty/index.test.tsx`
 
-Expected: all five apply / no-cart / cart-error tests fail, because no `Apply to cart` button exists yet and `findByRole` times out. The reworded-intro test fails on the old string. The four `FAQ` tests fail — that is the pre-existing baseline, not your regression.
+Expected: all five apply / no-cart / cart-error tests fail, because no `Apply to cart` button exists yet and `findByRole` times out. The reworded-intro test fails on the old string. The three FAQ tests listed in Global Constraints fail — pre-existing baseline, not your regression.
 
 - [ ] **Step 4: Create the service module**
 
@@ -656,7 +661,7 @@ export default MyRewardsTab;
 
 Run: `yarn test --run src/pages/Loyalty/index.test.tsx`
 
-Expected: every Loyalty test passes **except** the four pre-existing `FAQ` failures.
+Expected: every Loyalty test passes except the three pre-existing FAQ failures listed in Global Constraints (i.e. 3 failed | N passed, with N grown by your new tests).
 
 - [ ] **Step 7: Type-check and lint**
 
@@ -812,7 +817,29 @@ export const removeCartCoupon = (cartId: string, code: string): Promise<string[]
 
 - [ ] **Step 5: Add the remove mutation and button**
 
-In `MyRewardsTab.tsx`, add `removeCartCoupon` to the `@/shared/service/bc/api/cart` import, then add this mutation after `applyMutation`:
+In `MyRewardsTab.tsx`, add `removeCartCoupon` to the `@/shared/service/bc/api/cart` import.
+
+This task creates the **second** call site for the cache write, so extract it now (Task 1 deliberately left it inline — a helper for a single caller would have been premature). Add this above `applyMutation`:
+
+```tsx
+  // Both writes return the cart's new applied-code set; the cart id is unchanged.
+  const storeAppliedCodes = (codes: string[]) =>
+    queryClient.setQueryData<CartCoupons>(CART_COUPONS_KEY, (previous) => ({
+      cartId: previous?.cartId ?? null,
+      appliedCodes: codes,
+    }));
+```
+
+Then rewrite `applyMutation`'s `onSuccess` to use it, leaving its snackbar line intact:
+
+```tsx
+    onSuccess: (codes) => {
+      storeAppliedCodes(codes);
+      snackbar.success(b3Lang('loyalty.myRewards.applySuccess'));
+    },
+```
+
+Then add this mutation after `applyMutation`:
 
 ```tsx
   const removeMutation = useMutation({
@@ -823,10 +850,7 @@ In `MyRewardsTab.tsx`, add `removeCartCoupon` to the `@/shared/service/bc/api/ca
       return removeCartCoupon(cartId, code);
     },
     onSuccess: (codes) => {
-      queryClient.setQueryData<CartCoupons>(CART_COUPONS_KEY, (previous) => ({
-        cartId: previous?.cartId ?? null,
-        appliedCodes: codes,
-      }));
+      storeAppliedCodes(codes);
       snackbar.success(b3Lang('loyalty.myRewards.removeSuccess'));
     },
     // Always generic: the apply-specific "may have already been used" copy is wrong
@@ -872,7 +896,7 @@ Replace the applied-status branch so the label is followed by a Remove button:
 
 Run: `yarn test --run src/pages/Loyalty/index.test.tsx`
 
-Expected: all pass except the four pre-existing `FAQ` failures.
+Expected: all pass except the three pre-existing FAQ failures listed in Global Constraints.
 
 - [ ] **Step 7: Type-check and lint**
 
@@ -1008,7 +1032,7 @@ Change the apply button's `disabled`:
 
 Run: `yarn test --run src/pages/Loyalty/index.test.tsx`
 
-Expected: all pass except the four pre-existing `FAQ` failures.
+Expected: all pass except the three pre-existing FAQ failures listed in Global Constraints.
 
 - [ ] **Step 6: Full verification**
 
@@ -1021,7 +1045,7 @@ yarn test --run src/pages/Loyalty
 yarn build
 ```
 
-Expected: `tsc` clean, `lint` (dependency-cruiser + eslint + knip) clean, Loyalty suite green except the four `FAQ` baseline failures, `build` exit 0.
+Expected: `tsc` clean, `lint` (dependency-cruiser + eslint + knip) clean, Loyalty suite green except the three FAQ baseline failures, `build` exit 0.
 
 - [ ] **Step 7: Commit**
 
