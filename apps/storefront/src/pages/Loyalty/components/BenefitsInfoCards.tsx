@@ -54,15 +54,16 @@ function matchCreditRateTier(tierDisplayName: string | null): CreditRateTier | n
   return CREDIT_RATE_TIERS.find((tier) => tier === normalized) ?? null;
 }
 
-const CREDIT_RATE_KEYS: Record<CreditRateTier, string> = {
-  essential: 'loyalty.benefits.credit.point2Essential',
-  select: 'loyalty.benefits.credit.point2Select',
-  signature: 'loyalty.benefits.credit.point2Signature',
-};
-
 function BenefitsInfoCards({ tierDisplayName }: BenefitsInfoCardsProps) {
   const b3Lang = useB3Lang();
   const creditRateTier = matchCreditRateTier(tierDisplayName);
+
+  const point2 = (() => {
+    if (creditRateTier === 'essential') return b3Lang('loyalty.benefits.credit.point2Essential');
+    if (creditRateTier === 'select') return b3Lang('loyalty.benefits.credit.point2Select');
+    if (creditRateTier === 'signature') return b3Lang('loyalty.benefits.credit.point2Signature');
+    return b3Lang('loyalty.benefits.credit.point2Generic');
+  })();
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -71,11 +72,7 @@ function BenefitsInfoCards({ tierDisplayName }: BenefitsInfoCardsProps) {
         Icon={SavingsOutlined}
         points={[
           b3Lang('loyalty.benefits.credit.point1'),
-          b3Lang(
-            creditRateTier
-              ? CREDIT_RATE_KEYS[creditRateTier]
-              : 'loyalty.benefits.credit.point2Generic',
-          ),
+          point2,
           b3Lang('loyalty.benefits.credit.point3'),
           b3Lang('loyalty.benefits.credit.point4'),
         ]}
