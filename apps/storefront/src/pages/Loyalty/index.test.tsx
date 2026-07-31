@@ -144,6 +144,7 @@ const buildEarnedRewardWith = builder<EarnedReward>(() => ({
 
 const cartsUrl = 'http://localhost:3000/api/storefront/carts';
 const couponsUrl = 'http://localhost:3000/api/storefront/checkouts/:checkoutId/coupons';
+const couponUrl = 'http://localhost:3000/api/storefront/checkouts/:checkoutId/coupons/:couponCode';
 
 interface StorefrontCart {
   id: string;
@@ -1297,6 +1298,87 @@ it('tells the shopper to fill the cart when the coupon write reports an empty ca
 
   await waitFor(() => {
     expect(snackbar.error).toHaveBeenCalledWith('Add items to your cart before applying a reward.');
+  });
+});
+
+it('shows a reward the cart already has as applied, matching the code case-insensitively', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockRedeemRules([]);
+  mockCart(buildCartWith({ id: 'cart-1', coupons: [{ code: 'save-123' }] }));
+  server.use(
+    http.get(`${launcherBase}/customer/all-rewards`, () =>
+      HttpResponse.json({
+        items: [buildEarnedRewardWith({ title: '$5 credit', couponCode: 'SAVE-123' })],
+        nextToken: null,
+      }),
+    ),
+  );
+
+  renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=my-rewards' }] });
+
+  expect(await screen.findByText('Applied to your cart')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Apply to cart' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Remove' })).toBeInTheDocument();
+});
+
+it('removes an applied reward from the cart', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockRedeemRules([]);
+  mockCart(buildCartWith({ id: 'cart-1', coupons: [{ code: 'SAVE 123' }] }));
+  const removeRequest = vi.fn();
+  server.use(
+    http.get(`${launcherBase}/customer/all-rewards`, () =>
+      HttpResponse.json({
+        items: [buildEarnedRewardWith({ title: '$5 credit', couponCode: 'SAVE 123' })],
+        nextToken: null,
+      }),
+    ),
+    http.delete(couponUrl, ({ params }) => {
+      removeRequest({ checkoutId: params.checkoutId, couponCode: params.couponCode });
+      return HttpResponse.json({ coupons: [] });
+    }),
+  );
+
+  const { user } = renderWithProviders(<Loyalty />, {
+    initialEntries: [{ search: '?tab=my-rewards' }],
+  });
+
+  await user.click(await screen.findByRole('button', { name: 'Remove' }));
+
+  expect(await screen.findByRole('button', { name: 'Apply to cart' })).toBeInTheDocument();
+  // MSW decodes path params, so this asserts the code was encoded on the way out:
+  // a raw space in the URL path would not have round-tripped.
+  expect(removeRequest).toHaveBeenCalledWith({ checkoutId: 'cart-1', couponCode: 'SAVE 123' });
+  await waitFor(() => {
+    expect(snackbar.success).toHaveBeenCalledWith('Reward removed from your cart.');
+  });
+  expect(screen.queryByText('Applied to your cart')).not.toBeInTheDocument();
+});
+
+it('reports a generic error when removing an applied reward fails', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockRedeemRules([]);
+  mockCart(buildCartWith({ id: 'cart-1', coupons: [{ code: 'SAVE-123' }] }));
+  server.use(
+    http.get(`${launcherBase}/customer/all-rewards`, () =>
+      HttpResponse.json({
+        items: [buildEarnedRewardWith({ title: '$5 credit', couponCode: 'SAVE-123' })],
+        nextToken: null,
+      }),
+    ),
+    http.delete(couponUrl, () => HttpResponse.json({}, { status: 404 })),
+  );
+
+  const { user } = renderWithProviders(<Loyalty />, {
+    initialEntries: [{ search: '?tab=my-rewards' }],
+  });
+
+  await user.click(await screen.findByRole('button', { name: 'Remove' }));
+
+  // Not the apply-specific "couldn't be applied" copy — that reads as nonsense on a
+  // removal. The refetch is what resolves the true state.
+  await waitFor(() => {
+    expect(snackbar.error).toHaveBeenCalledWith('Something went wrong. Please try again.');
   });
 });
 

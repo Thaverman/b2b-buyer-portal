@@ -126,3 +126,7 @@ const couponWrite = async (
 
 export const applyCartCoupon = (cartId: string, code: string): Promise<string[]> =>
   couponWrite(`/checkouts/${cartId}/coupons`, 'POST', JSON.stringify({ couponCode: code }));
+
+export const removeCartCoupon = (cartId: string, code: string): Promise<string[]> =>
+  // The code travels in the PATH, so it must be encoded — codes may contain spaces.
+  couponWrite(`/checkouts/${cartId}/coupons/${encodeURIComponent(code)}`, 'DELETE');

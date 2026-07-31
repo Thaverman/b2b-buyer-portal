@@ -835,6 +835,8 @@
   "loyalty.myRewards.introApply": "Apply one to your cart below — only one reward can be used per order.",
   "loyalty.myRewards.empty": "You haven't redeemed any rewards yet. Visit Get rewards to turn your points into store credit.",
   "loyalty.myRewards.apply": "Apply to cart",
+  "loyalty.myRewards.remove": "Remove",
+  "loyalty.myRewards.removeSuccess": "Reward removed from your cart.",
   "loyalty.myRewards.appliedStatus": "Applied to your cart",
   "loyalty.myRewards.applySuccess": "Reward applied to your cart.",
   "loyalty.myRewards.needsCart": "Add items to your cart before applying a reward.",

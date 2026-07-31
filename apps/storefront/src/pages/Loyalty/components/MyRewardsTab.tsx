@@ -8,6 +8,7 @@ import {
   CartCoupons,
   fetchCartCoupons,
   isSameCouponCode,
+  removeCartCoupon,
 } from '@/shared/service/bc/api/cart';
 import { snackbar } from '@/utils/b3Tip';
 
@@ -49,6 +50,13 @@ function MyRewardsTab({ identity }: MyRewardsTabProps) {
   const cartId = cartQuery.data?.cartId ?? null;
   const appliedCodes = cartQuery.data?.appliedCodes ?? [];
 
+  // Both writes return the cart's new applied-code set; the cart id is unchanged.
+  const storeAppliedCodes = (codes: string[]) =>
+    queryClient.setQueryData<CartCoupons>(CART_COUPONS_KEY, (previous) => ({
+      cartId: previous?.cartId ?? null,
+      appliedCodes: codes,
+    }));
+
   const applyMutation = useMutation({
     mutationFn: (code: string) => {
       if (!cartId) {
@@ -57,10 +65,7 @@ function MyRewardsTab({ identity }: MyRewardsTabProps) {
       return applyCartCoupon(cartId, code);
     },
     onSuccess: (codes) => {
-      queryClient.setQueryData<CartCoupons>(CART_COUPONS_KEY, (previous) => ({
-        cartId: previous?.cartId ?? null,
-        appliedCodes: codes,
-      }));
+      storeAppliedCodes(codes);
       snackbar.success(b3Lang('loyalty.myRewards.applySuccess'));
     },
     onError: (error) => {
@@ -78,6 +83,27 @@ function MyRewardsTab({ identity }: MyRewardsTabProps) {
       snackbar.error(b3Lang('loyalty.errors.generic'));
     },
   });
+
+  const removeMutation = useMutation({
+    mutationFn: (code: string) => {
+      if (!cartId) {
+        return Promise.reject(new CartCouponError('emptyCart'));
+      }
+      return removeCartCoupon(cartId, code);
+    },
+    onSuccess: (codes) => {
+      storeAppliedCodes(codes);
+      snackbar.success(b3Lang('loyalty.myRewards.removeSuccess'));
+    },
+    // Always generic: the apply-specific "may have already been used" copy is wrong
+    // for a removal, and the refetch below is what resolves the real state anyway.
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: CART_COUPONS_KEY });
+      snackbar.error(b3Lang('loyalty.errors.generic'));
+    },
+  });
+
+  const isMutating = applyMutation.isPending || removeMutation.isPending;
 
   // The first reward whose code the cart reports as applied. Keyed by id so that
   // two rewards sharing a code cannot both render as applied.
@@ -122,18 +148,28 @@ function MyRewardsTab({ identity }: MyRewardsTabProps) {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             {reward.couponCode !== '' &&
               (appliedReward?.id === reward.id ? (
-                <Typography
-                  sx={{ textTransform: 'uppercase', fontWeight: 700, color: 'text.secondary' }}
-                >
-                  {b3Lang('loyalty.myRewards.appliedStatus')}
-                </Typography>
+                <>
+                  <Typography
+                    sx={{ textTransform: 'uppercase', fontWeight: 700, color: 'text.secondary' }}
+                  >
+                    {b3Lang('loyalty.myRewards.appliedStatus')}
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    disabled={isMutating}
+                    onClick={() => removeMutation.mutate(reward.couponCode)}
+                  >
+                    {b3Lang('loyalty.myRewards.remove')}
+                  </Button>
+                </>
               ) : (
                 <Button
                   variant="outlined"
                   size="small"
                   // No cartId means the cart read is still in flight, failed, or found
                   // no cart — in none of those can a coupon be applied.
-                  disabled={applyMutation.isPending || !cartId}
+                  disabled={isMutating || !cartId}
                   onClick={() => applyMutation.mutate(reward.couponCode)}
                 >
                   {b3Lang('loyalty.myRewards.apply')}
