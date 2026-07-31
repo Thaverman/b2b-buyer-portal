@@ -1324,12 +1324,12 @@ it('shows a reward the cart already has as applied, matching the code case-insen
 it('removes an applied reward from the cart', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
   mockRedeemRules([]);
-  mockCart(buildCartWith({ id: 'cart-1', coupons: [{ code: 'SAVE 123' }] }));
+  mockCart(buildCartWith({ id: 'cart-1', coupons: [{ code: 'SAVE/123' }] }));
   const removeRequest = vi.fn();
   server.use(
     http.get(`${launcherBase}/customer/all-rewards`, () =>
       HttpResponse.json({
-        items: [buildEarnedRewardWith({ title: '$5 credit', couponCode: 'SAVE 123' })],
+        items: [buildEarnedRewardWith({ title: '$5 credit', couponCode: 'SAVE/123' })],
         nextToken: null,
       }),
     ),
@@ -1346,9 +1346,12 @@ it('removes an applied reward from the cart', async () => {
   await user.click(await screen.findByRole('button', { name: 'Remove' }));
 
   expect(await screen.findByRole('button', { name: 'Apply to cart' })).toBeInTheDocument();
-  // MSW decodes path params, so this asserts the code was encoded on the way out:
-  // a raw space in the URL path would not have round-tripped.
-  expect(removeRequest).toHaveBeenCalledWith({ checkoutId: 'cart-1', couponCode: 'SAVE 123' });
+  // The '/' is the point: encodeURIComponent turns it into %2F, which stays one path
+  // segment and matches the :couponCode route (MSW then decodes it back). Unencoded it
+  // would split into two segments, no handler would match, and the request would hang
+  // on the catch-all — so this assertion fails if the encoding is ever dropped. A space
+  // would NOT prove this: WHATWG URL percent-encodes spaces in paths automatically.
+  expect(removeRequest).toHaveBeenCalledWith({ checkoutId: 'cart-1', couponCode: 'SAVE/123' });
   await waitFor(() => {
     expect(snackbar.success).toHaveBeenCalledWith('Reward removed from your cart.');
   });
