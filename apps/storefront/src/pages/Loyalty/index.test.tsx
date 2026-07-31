@@ -1385,6 +1385,62 @@ it('reports a generic error when removing an applied reward fails', async () => 
   });
 });
 
+it('blocks a second reward while one is applied and says why', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockRedeemRules([]);
+  mockCart(buildCartWith({ id: 'cart-1', coupons: [{ code: 'SAVE-5' }] }));
+  server.use(
+    http.get(`${launcherBase}/customer/all-rewards`, () =>
+      HttpResponse.json({
+        items: [
+          buildEarnedRewardWith({ title: '$5 credit', couponCode: 'SAVE-5' }),
+          buildEarnedRewardWith({ title: '$10 credit', couponCode: 'SAVE-10' }),
+        ],
+        nextToken: null,
+      }),
+    ),
+  );
+
+  renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=my-rewards' }] });
+
+  expect(await screen.findByText('Applied to your cart')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Apply to cart' })).toBeDisabled();
+  expect(
+    screen.getByText(
+      'Only one reward can be applied per order. Remove the applied reward to use a different one.',
+    ),
+  ).toBeInTheDocument();
+});
+
+it('blocks every reward when a discount code the portal did not apply is on the cart', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockRedeemRules([]);
+  mockCart(buildCartWith({ id: 'cart-1', coupons: [{ code: 'SUMMER-SALE' }] }));
+  server.use(
+    http.get(`${launcherBase}/customer/all-rewards`, () =>
+      HttpResponse.json({
+        items: [buildEarnedRewardWith({ title: '$5 credit', couponCode: 'SAVE-5' })],
+        nextToken: null,
+      }),
+    ),
+  );
+
+  renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=my-rewards' }] });
+
+  expect(
+    await screen.findByText(
+      'A discount code is already applied to your cart. Only one code can be used per order.',
+    ),
+  ).toBeInTheDocument();
+  // findByRole, not getByRole: the hint is gated only on the (fast) cart query, while
+  // this button is gated on the (slower) digest -> all-rewards chain — see
+  // pattern_dropped-tab-click-race.md. A sync getByRole right after the hint can run
+  // before the reward row has mounted at all.
+  expect(await screen.findByRole('button', { name: 'Apply to cart' })).toBeDisabled();
+  // The portal never offers to remove a coupon it did not apply.
+  expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument();
+});
+
 it('renders the four Smart Rewards tabs and defaults to My benefits', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
 

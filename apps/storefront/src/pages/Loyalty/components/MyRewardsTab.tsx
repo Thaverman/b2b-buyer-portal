@@ -111,8 +111,16 @@ function MyRewardsTab({ identity }: MyRewardsTabProps) {
     appliedCodes.some((code) => isSameCouponCode(code, reward.couponCode)),
   );
 
+  const hasAnyCoupon = appliedCodes.length > 0;
+
   let hint = '';
-  if (cartQuery.isSuccess && !cartId) {
+  if (appliedReward) {
+    hint = b3Lang('loyalty.myRewards.oneAtATime');
+  } else if (hasAnyCoupon) {
+    // A coupon is applied that matches no LOADED reward. It may be a non-reward
+    // discount, or a reward on an unfetched page — so the copy claims neither.
+    hint = b3Lang('loyalty.myRewards.otherCoupon');
+  } else if (cartQuery.isSuccess && !cartId) {
     hint = b3Lang('loyalty.myRewards.needsCart');
   } else if (cartQuery.isError) {
     hint = b3Lang('loyalty.errors.generic');
@@ -169,7 +177,7 @@ function MyRewardsTab({ identity }: MyRewardsTabProps) {
                   size="small"
                   // No cartId means the cart read is still in flight, failed, or found
                   // no cart — in none of those can a coupon be applied.
-                  disabled={isMutating || !cartId}
+                  disabled={isMutating || hasAnyCoupon || !cartId}
                   onClick={() => applyMutation.mutate(reward.couponCode)}
                 >
                   {b3Lang('loyalty.myRewards.apply')}

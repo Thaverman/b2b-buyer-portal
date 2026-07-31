@@ -840,6 +840,8 @@
   "loyalty.myRewards.appliedStatus": "Applied to your cart",
   "loyalty.myRewards.applySuccess": "Reward applied to your cart.",
   "loyalty.myRewards.needsCart": "Add items to your cart before applying a reward.",
+  "loyalty.myRewards.oneAtATime": "Only one reward can be applied per order. Remove the applied reward to use a different one.",
+  "loyalty.myRewards.otherCoupon": "A discount code is already applied to your cart. Only one code can be used per order.",
   "loyalty.myRewards.rejected": "This reward couldn't be applied. It may have already been used.",
   "loyalty.loadMore": "Load more",
   "loyalty.errors.rateLimited": "Too many requests — please try again in a minute.",
