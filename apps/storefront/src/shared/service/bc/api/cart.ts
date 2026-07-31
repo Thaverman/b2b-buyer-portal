@@ -54,14 +54,23 @@ export const fetchCartCoupons = async (): Promise<CartCoupons> => {
       credentials: 'same-origin',
       headers: { Accept: 'application/json' },
     });
-  } catch {
+  } catch (error) {
+    b2bLogger.error(`Cart coupon read failed: network error "${error}"`);
     throw new CartCouponError('upstream');
   }
   // Emptying a cart deletes it; both of these mean "no active cart", not a failure.
   if (response.status === 404 || response.status === 204) {
+    // 404 is treated as "no cart" per BigCommerce's own troubleshooting docs, so this is
+    // plausibly correct rather than a guess — but it's logged anyway so a support ticket
+    // about a false "no cart" is diagnosable, not something we have to assume away. The
+    // live sandbox probe (see design doc) will confirm this.
+    if (response.status === 404) {
+      b2bLogger.error(`Cart coupon read: 404 "${response.statusText}" (treated as no active cart)`);
+    }
     return { cartId: null, appliedCodes: [] };
   }
   if (!response.ok) {
+    b2bLogger.error(`Cart coupon read failed: ${response.status} "${response.statusText}"`);
     throw new CartCouponError('upstream');
   }
 
@@ -89,6 +98,11 @@ const writeError = async (response: Response): Promise<CartCouponError> => {
   if (body.type === 'empty_cart') {
     return new CartCouponError('emptyCart');
   }
+  if (response.status === 401 || response.status === 403) {
+    // Never a statement about the coupon — a broken session or CSRF configuration.
+    // The b2bLogger line above is the diagnostic path for this.
+    return new CartCouponError('upstream');
+  }
   // Any 4xx is the server refusing the code — which is what the buyer needs told.
   // BigCommerce documents no status for a bad coupon, so keying on the class rather
   // than guessing members makes the useful message the default, not the exception.
@@ -103,7 +117,7 @@ const couponWrite = async (
   path: string,
   method: 'POST' | 'DELETE',
   body?: string,
-): Promise<string[]> => {
+): Promise<string[] | null> => {
   let response: Response;
   try {
     response = await fetch(`${STOREFRONT_API_BASE}${path}`, {
@@ -118,15 +132,22 @@ const couponWrite = async (
   if (!response.ok) {
     throw await writeError(response);
   }
-  // Both writes return the whole recomputed checkout, so the new applied set is
-  // readable straight off the response with no follow-up read.
-  const checkout = (await response.json()) as { coupons?: RawCoupon[] };
-  return couponCodes(checkout.coupons);
+  // Both writes return the whole recomputed checkout, so the new applied set is normally
+  // readable straight off the response with no follow-up read. But the write already
+  // succeeded by this point, so a 204 or other empty/non-JSON body is not a failure —
+  // just an unreadable one. Return null rather than throwing, so the caller can report
+  // the write as the success it was and resync the applied codes from the server instead.
+  try {
+    const checkout = (await response.json()) as { coupons?: RawCoupon[] };
+    return couponCodes(checkout.coupons);
+  } catch {
+    return null;
+  }
 };
 
-export const applyCartCoupon = (cartId: string, code: string): Promise<string[]> =>
+export const applyCartCoupon = (cartId: string, code: string): Promise<string[] | null> =>
   couponWrite(`/checkouts/${cartId}/coupons`, 'POST', JSON.stringify({ couponCode: code }));
 
-export const removeCartCoupon = (cartId: string, code: string): Promise<string[]> =>
+export const removeCartCoupon = (cartId: string, code: string): Promise<string[] | null> =>
   // The code travels in the PATH, so it must be encoded — codes may contain spaces.
   couponWrite(`/checkouts/${cartId}/coupons/${encodeURIComponent(code)}`, 'DELETE');

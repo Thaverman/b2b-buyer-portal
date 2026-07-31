@@ -2,6 +2,7 @@ import {
   buildB2BFeaturesStateWith,
   buildCompanyStateWith,
   builder,
+  delay,
   faker,
   fireEvent,
   http,
@@ -366,6 +367,7 @@ it('renders the tabs with mockup labels and defaults to My benefits', async () =
 
 it('selects the tab named by the URL search param', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockCart(buildCartWith({}));
 
   renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=my-rewards' }] });
 
@@ -1123,6 +1125,7 @@ it('applies an earned reward to the cart from its My rewards row', async () => {
 it('offers no apply action when a reward has no coupon code', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
   mockRedeemRules([]);
+  mockCart(buildCartWith({}));
   server.use(
     http.get(`${launcherBase}/customer/all-rewards`, () =>
       HttpResponse.json({
@@ -1141,6 +1144,7 @@ it('offers no apply action when a reward has no coupon code', async () => {
 it('shows the intro copy and the empty nudge when nothing has been redeemed', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
   mockRedeemRules([]);
+  mockCart(buildCartWith({}));
   server.use(
     http.get(`${launcherBase}/customer/all-rewards`, () =>
       HttpResponse.json({ items: [], nextToken: null }),
@@ -1165,6 +1169,7 @@ it('shows the intro copy and the empty nudge when nothing has been redeemed', as
 it('keeps the empty nudge off when the rewards fetch fails', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
   mockRedeemRules([]);
+  mockCart(buildCartWith({}));
   server.use(
     http.get(`${launcherBase}/customer/all-rewards`, () => HttpResponse.json({}, { status: 500 })),
   );
@@ -1216,6 +1221,74 @@ it('shows a rejection message when the cart refuses the reward code', async () =
     );
   });
   expect(screen.queryByText('Applied to your cart')).not.toBeInTheDocument();
+});
+
+it('shows a generic error when the cart write fails with a server error', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockRedeemRules([]);
+  mockCart(buildCartWith({ id: 'cart-1' }));
+  server.use(
+    http.get(`${launcherBase}/customer/all-rewards`, () =>
+      HttpResponse.json({
+        items: [buildEarnedRewardWith({ title: '$5 credit', couponCode: 'SAVE-123' })],
+        nextToken: null,
+      }),
+    ),
+    // A 5xx is our problem, not a statement about the coupon, so it must not get the
+    // 4xx "couldn't be applied" copy.
+    http.post(couponsUrl, () => HttpResponse.json({}, { status: 500 })),
+  );
+
+  const { user } = renderWithProviders(<Loyalty />, {
+    initialEntries: [{ search: '?tab=my-rewards' }],
+  });
+
+  const applyButton = await screen.findByRole('button', { name: 'Apply to cart' });
+  await waitFor(() => expect(applyButton).toBeEnabled());
+  await user.click(applyButton);
+
+  await waitFor(() => {
+    expect(snackbar.error).toHaveBeenCalledWith('Something went wrong. Please try again.');
+  });
+  expect(screen.queryByText('Applied to your cart')).not.toBeInTheDocument();
+});
+
+it('disables every apply button while a reward write is in flight', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockRedeemRules([]);
+  mockCart(buildCartWith({ id: 'cart-1' }));
+  server.use(
+    http.get(`${launcherBase}/customer/all-rewards`, () =>
+      HttpResponse.json({
+        items: [
+          buildEarnedRewardWith({ title: '$5 credit', couponCode: 'SAVE-A' }),
+          buildEarnedRewardWith({ title: '$10 credit', couponCode: 'SAVE-B' }),
+        ],
+        nextToken: null,
+      }),
+    ),
+    http.post(couponsUrl, async () => {
+      await delay(50);
+      return HttpResponse.json({ coupons: [{ code: 'SAVE-A' }] });
+    }),
+  );
+
+  const { user } = renderWithProviders(<Loyalty />, {
+    initialEntries: [{ search: '?tab=my-rewards' }],
+  });
+
+  const applyButtons = await screen.findAllByRole('button', { name: 'Apply to cart' });
+  expect(applyButtons).toHaveLength(2);
+  await waitFor(() => applyButtons.forEach((button) => expect(button).toBeEnabled()));
+
+  await user.click(applyButtons[0]);
+
+  // The write has not resolved yet, so every row's Apply button — including the one
+  // just clicked and the sibling row's — must be disabled, per the spec's row-state
+  // table: "Either mutation in flight -> all buttons disabled".
+  applyButtons.forEach((button) => expect(button).toBeDisabled());
+
+  expect(await screen.findByText('Applied to your cart')).toBeInTheDocument();
 });
 
 it('offers no apply action and explains why when the shopper has no cart', async () => {

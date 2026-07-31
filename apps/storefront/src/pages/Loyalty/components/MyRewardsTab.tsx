@@ -65,7 +65,13 @@ function MyRewardsTab({ identity }: MyRewardsTabProps) {
       return applyCartCoupon(cartId, code);
     },
     onSuccess: (codes) => {
-      storeAppliedCodes(codes);
+      if (codes === null) {
+        // The write succeeded but returned no readable body (e.g. an empty 204), so the
+        // new applied set is unknown — resync from the server rather than guess.
+        queryClient.invalidateQueries({ queryKey: CART_COUPONS_KEY });
+      } else {
+        storeAppliedCodes(codes);
+      }
       snackbar.success(b3Lang('loyalty.myRewards.applySuccess'));
     },
     onError: (error) => {
@@ -92,7 +98,13 @@ function MyRewardsTab({ identity }: MyRewardsTabProps) {
       return removeCartCoupon(cartId, code);
     },
     onSuccess: (codes) => {
-      storeAppliedCodes(codes);
+      if (codes === null) {
+        // The write succeeded but returned no readable body (e.g. an empty 204), so the
+        // new applied set is unknown — resync from the server rather than guess.
+        queryClient.invalidateQueries({ queryKey: CART_COUPONS_KEY });
+      } else {
+        storeAppliedCodes(codes);
+      }
       snackbar.success(b3Lang('loyalty.myRewards.removeSuccess'));
     },
     // Always generic: the apply-specific "may have already been used" copy is wrong
@@ -116,9 +128,12 @@ function MyRewardsTab({ identity }: MyRewardsTabProps) {
   let hint = '';
   if (appliedReward) {
     hint = b3Lang('loyalty.myRewards.oneAtATime');
-  } else if (hasAnyCoupon) {
+  } else if (hasAnyCoupon && earnedQuery.isFetched) {
     // A coupon is applied that matches no LOADED reward. It may be a non-reward
     // discount, or a reward on an unfetched page — so the copy claims neither.
+    // Gated on the earned list having resolved: it needs a 3-hop chain (jwt → digest →
+    // all-rewards) while the cart query is a single hop, so without this gate the hint
+    // would flash on every visit where a reward IS applied, before oneAtATime can win.
     hint = b3Lang('loyalty.myRewards.otherCoupon');
   } else if (cartQuery.isSuccess && !cartId) {
     hint = b3Lang('loyalty.myRewards.needsCart');
