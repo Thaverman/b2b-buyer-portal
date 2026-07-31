@@ -89,7 +89,11 @@ const writeError = async (response: Response): Promise<CartCouponError> => {
   if (body.type === 'empty_cart') {
     return new CartCouponError('emptyCart');
   }
-  if (response.status === 404 || response.status === 422) {
+  // Any 4xx is the server refusing the code — which is what the buyer needs told.
+  // BigCommerce documents no status for a bad coupon, so keying on the class rather
+  // than guessing members makes the useful message the default, not the exception.
+  // 5xx and network failures are our problem, not the code's.
+  if (response.status >= 400 && response.status < 500) {
     return new CartCouponError('rejected');
   }
   return new CartCouponError('upstream');

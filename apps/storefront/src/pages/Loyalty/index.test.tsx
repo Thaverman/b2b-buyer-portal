@@ -1197,7 +1197,7 @@ it('shows a rejection message when the cart refuses the reward code', async () =
       }),
     ),
     http.post(couponsUrl, () =>
-      HttpResponse.json({ status: 404, title: 'Coupon code is invalid' }, { status: 404 }),
+      HttpResponse.json({ status: 400, title: 'Coupon code is invalid' }, { status: 400 }),
     ),
   );
 
