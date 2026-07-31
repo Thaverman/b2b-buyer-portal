@@ -1340,6 +1340,16 @@ it('shows the benefits banner and explainer cards with the tier name', async () 
       'Once you reach $500 in annual purchases, your rate is 1% of your total order.',
     ),
   ).toBeInTheDocument();
+  expect(
+    screen.getByText('Redeem your points for a certificate on the Get Rewards page.'),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText('Certificates can be used alongside product discounts.'),
+  ).toBeInTheDocument();
+
+  const creditCard = screen.getByText('Earning and Redeeming Credit').closest('div')?.parentElement;
+  expect(within(creditCard as HTMLElement).getAllByRole('listitem')).toHaveLength(4);
+
   expect(screen.getByText('Free Shipping')).toBeInTheDocument();
   expect(
     screen.getByText('Orders over $300 ship ground for free, every time.'),
@@ -1402,6 +1412,15 @@ it('falls back to a generic credit rate line for a tier name outside Essential/S
   renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('Your rate depends on your membership tier.')).toBeInTheDocument();
+});
+
+it('matches the tier rate case-insensitively and trims whitespace', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't1' }));
+  mockTiers([buildTierWith({ id: 't1', title: ' SELECT ' })]);
+
+  renderWithProviders(<Loyalty />);
+
+  expect(await screen.findByText('Your rate is 2% of your total order.')).toBeInTheDocument();
 });
 
 it('frames the benefits banner photo on the subject rather than centring the crop', async () => {

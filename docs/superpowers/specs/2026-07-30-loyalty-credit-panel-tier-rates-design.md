@@ -80,6 +80,14 @@ const CREDIT_RATE_KEYS: Record<CreditRateTier, string> = {
 };
 ```
 
+**Implementation note:** The Record-lookup approach shown above was replaced in
+implementation with explicit literal-keyed if/else branches. Indexing
+`CREDIT_RATE_KEYS[creditRateTier]` inside the `b3Lang(...)` call is a computed
+key expression, which conflicts with the plan's global constraint: *every
+`b3Lang(...)` call site must use a literal key string*. The shipped code uses an
+IIFE with explicit if-branches to ensure each `b3Lang()` call passes a literal
+key argument.
+
 Unmatched (`null` — no tier resolved, or a name outside the three known tiers,
 e.g. a future 4th tier) falls back to `loyalty.benefits.credit.point2Generic`,
 which drops the specific percentage and $500 mention rather than guessing.
