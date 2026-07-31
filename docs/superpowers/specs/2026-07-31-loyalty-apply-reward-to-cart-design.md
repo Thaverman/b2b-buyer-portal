@@ -172,10 +172,20 @@ confused with "no cart":
 One line below the list, first match wins:
 
 1. A **loaded** reward is applied → `oneAtATime`
-2. Some coupon is applied but no loaded reward matches → `otherCoupon`
+2. Some coupon is applied, the earned list **has finished fetching**, and no loaded
+   reward matches → `otherCoupon`
 3. Cart query succeeded with no cart → `needsCart`
 4. Cart query errored → `loyalty.errors.generic`
 5. Otherwise nothing
+
+Rule 2's "has finished fetching" guard exists because the two queries resolve in a
+**fixed** order, not a racing one: the cart read is a single request, while the
+earned list waits on a JWT fetch then a digest POST before it can even start. So
+without the guard, every visit where a reward is applied would show `otherCoupon`
+first and then swap to `oneAtATime` — a guaranteed misleading flash, not an
+occasional one. Gating on `isFetched` (which TanStack sets on error too, so a
+failed rewards fetch still gets its hint) shows nothing until the list can be
+matched.
 
 Rule 2 is what keeps pagination honest: the applied reward may sit on a page of
 the earned list that has not been fetched, so the copy must not claim the code
