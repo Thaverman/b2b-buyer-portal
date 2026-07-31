@@ -98,7 +98,12 @@ Expected: `200` and an empty (or shorter) `coupons` array.
 
 - [ ] **Step 6: Reconcile with Task 1's mapping**
 
-Task 1 maps `body.type === 'empty_cart'` → `emptyCart`, `404`/`422` → `rejected`, everything else → `upstream`. If Step 4 produced a different status for an invalid or already-used code (e.g. `400`), **add that status to the `rejected` branch in Task 1 Step 3** and note it in the commit message. If a status you observed would fall through to `upstream`, the buyer would see the vague generic error instead of the useful one — so this reconciliation is the point of the whole task.
+Task 1 maps `body.type === 'empty_cart'` → `emptyCart`, **any 4xx** → `rejected`, everything else (5xx, network) → `upstream`. So an invalid or already-used code produces the useful message whatever 4xx it returns, and this step's job is now to catch the two cases that mapping still gets wrong:
+
+- **A 5xx for a bad coupon.** The buyer would see the vague generic error. Move that status into the `rejected` branch explicitly.
+- **A 4xx that is NOT about the coupon** — most importantly `403`, which would mean a CSRF token is required (see Step 3). Under the 4xx rule that surfaces as "may have already been used", which is misleading. If Step 3 returned 403, the whole approach needs revisiting anyway, so stop and report rather than adjusting the mapping.
+
+Either way, record the observed status/body in the commit message.
 
 ---
 
@@ -449,7 +454,11 @@ const writeError = async (response: Response): Promise<CartCouponError> => {
   if (body.type === 'empty_cart') {
     return new CartCouponError('emptyCart');
   }
-  if (response.status === 404 || response.status === 422) {
+  // Any 4xx is the server refusing the code — which is what the buyer needs told.
+  // BigCommerce documents no status for a bad coupon, so keying on the class rather
+  // than guessing members makes the useful message the default, not the exception.
+  // 5xx and network failures are our problem, not the code's.
+  if (response.status >= 400 && response.status < 500) {
     return new CartCouponError('rejected');
   }
   return new CartCouponError('upstream');
