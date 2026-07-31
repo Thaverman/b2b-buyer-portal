@@ -246,6 +246,27 @@ it('renders the storefront-hosted banner image and hides it if it fails to load'
   ).not.toBeInTheDocument();
 });
 
+it('renders the hero banner photo full-width as a background behind the greeting', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  renderWithProviders(<Loyalty />);
+
+  const image = await waitFor(() => {
+    const el = document.querySelector(
+      'img[src="/content/images/loyalty/loyalty-account-banner.jpg"]',
+    );
+    expect(el).toBeInTheDocument();
+    return el as Element;
+  });
+
+  // The photo's subject sits in roughly the right third of the frame, so anchoring the crop
+  // there (rather than the default centered crop) keeps her in view on narrow/tall boxes too.
+  const style = window.getComputedStyle(image);
+  expect(style.width).toBe('100%');
+  expect(style.objectFit).toBe('cover');
+  expect(style.objectPosition).toBe('right center');
+});
+
 it('shows the session-expired state when the jwt fetch fails', async () => {
   server.use(http.get(currentJwtUrl, () => HttpResponse.text('{"errors":[]}', { status: 401 })));
 

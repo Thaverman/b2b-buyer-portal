@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { WorkspacePremium } from '@mui/icons-material';
-import { Box, Button, Chip, Typography } from '@mui/material';
+import { alpha, Box, Button, Chip, Typography } from '@mui/material';
 
 import { useB3Lang } from '@/lib/lang';
 
@@ -51,21 +51,26 @@ function LoyaltyHero({
             sx={{
               position: 'absolute',
               top: 0,
-              right: 0,
+              left: 0,
+              width: '100%',
               height: '100%',
-              width: { xs: 0, md: '55%' },
               objectFit: 'cover',
-              // Decorative: the gradient below keeps the copy legible over it.
-              display: { xs: 'none', md: 'block' },
+              // loyalty-account-banner.jpg's subject sits in roughly the right third of the
+              // frame; the default centered crop pushes her out of frame entirely on narrow
+              // (mobile-width, tall) boxes, where object-fit:cover crops from the sides.
+              objectPosition: 'right center',
             }}
           />
         )}
+        {/* A flat neutral scrim, not this theme's own primary blue: the default banner asset
+            already bakes in its own solid-blue field on the left fading into the photo on the
+            right, so stacking another primary-colored layer on top double-tints that field and
+            makes the seam between "flat" and "photo" more visible instead of less. */}
         <Box
           sx={{
             position: 'absolute',
             inset: 0,
-            background: (theme) =>
-              `linear-gradient(to right, ${theme.palette.primary.main} 45%, transparent 100%)`,
+            bgcolor: (theme) => alpha(theme.palette.common.black, 0.5),
           }}
         />
         <Box sx={{ position: 'relative' }}>
@@ -75,51 +80,47 @@ function LoyaltyHero({
               {b3Lang('loyalty.hero.brand')}
             </Typography>
           </Box>
-          {/* Capped so long copy wraps before it reaches the photo, rather than drifting across
-              it — the gradient above only keeps text legible up to about the image's left edge. */}
-          <Box sx={{ maxWidth: { md: '55%' } }}>
-            <Typography variant="h4" sx={{ fontWeight: 800, mt: 1 }}>
-              {b3Lang('loyalty.hero.welcomeBack', { name: firstName || companyName })}
+          <Typography variant="h4" sx={{ fontWeight: 800, mt: 1 }}>
+            {b3Lang('loyalty.hero.welcomeBack', { name: firstName || companyName })}
+          </Typography>
+          {showEarnCta && (
+            <Button
+              href={`${window.location.origin}/`}
+              variant="outlined"
+              sx={{
+                mt: 2,
+                borderRadius: 8,
+                color: 'primary.contrastText',
+                borderColor: 'primary.contrastText',
+              }}
+            >
+              {b3Lang('loyalty.hero.cta')}
+            </Button>
+          )}
+          {gateSummary && (
+            <Typography variant="body2" sx={{ mt: 2, opacity: 0.9 }}>
+              {gateSummary}
             </Typography>
-            {showEarnCta && (
-              <Button
-                href={`${window.location.origin}/`}
-                variant="outlined"
-                sx={{
-                  mt: 2,
-                  borderRadius: 8,
-                  color: 'primary.contrastText',
-                  borderColor: 'primary.contrastText',
-                }}
-              >
-                {b3Lang('loyalty.hero.cta')}
-              </Button>
-            )}
-            {gateSummary && (
-              <Typography variant="body2" sx={{ mt: 2, opacity: 0.9 }}>
-                {gateSummary}
+          )}
+          {tierTitle && (
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                {b3Lang('loyalty.hero.currentTier')}
               </Typography>
-            )}
-            {tierTitle && (
-              <Box sx={{ mt: 3 }}>
-                <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                  {b3Lang('loyalty.hero.currentTier')}
-                </Typography>
-                <Chip
-                  icon={<WorkspacePremium />}
-                  label={tierTitle}
-                  sx={{
-                    mt: 1,
-                    fontWeight: 700,
-                    bgcolor: 'common.black',
-                    color: 'common.white',
-                    '& .MuiChip-icon': { color: 'common.white' },
-                  }}
-                />
-              </Box>
-            )}
-            <ShippingTracker />
-          </Box>
+              <Chip
+                icon={<WorkspacePremium />}
+                label={tierTitle}
+                sx={{
+                  mt: 1,
+                  fontWeight: 700,
+                  bgcolor: 'common.black',
+                  color: 'common.white',
+                  '& .MuiChip-icon': { color: 'common.white' },
+                }}
+              />
+            </Box>
+          )}
+          <ShippingTracker />
         </Box>
       </Box>
       {pointBalance !== null && (
