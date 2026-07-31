@@ -142,6 +142,25 @@ const buildEarnedRewardWith = builder<EarnedReward>(() => ({
   createdAt: faker.date.past().toISOString(),
 }));
 
+const cartsUrl = 'http://localhost:3000/api/storefront/carts';
+const couponsUrl = 'http://localhost:3000/api/storefront/checkouts/:checkoutId/coupons';
+
+interface StorefrontCart {
+  id: string;
+  coupons: { code: string }[];
+}
+
+const buildCartWith = builder<StorefrontCart>(() => ({
+  id: faker.string.uuid(),
+  coupons: [],
+}));
+
+// The file's catch-all handler leaves unmatched requests pending forever, so a My
+// rewards test without this renders with the cart query stuck pending — which is
+// indistinguishable from "no cart", and Apply never enables.
+const mockCart = (cart: StorefrontCart | null) =>
+  server.use(http.get(cartsUrl, () => HttpResponse.json(cart ? [cart] : [])));
+
 type RawShippingCalculation = Awaited<
   ReturnType<NonNullable<Window['getLoyaltyShippingCalculation']>>
 >;
@@ -608,6 +627,7 @@ it('lists previously earned rewards and loads more pages', async () => {
 
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
   mockRedeemRules([]);
+  mockCart(buildCartWith({}));
   server.use(
     http.get(`${launcherBase}/customer/all-rewards`, ({ request }) => {
       const token = new URL(request.url).searchParams.get('nextToken');
@@ -629,7 +649,6 @@ it('lists previously earned rewards and loads more pages', async () => {
 
   expect(await screen.findByText('$10 credit')).toBeInTheDocument();
   expect(screen.getByText('$5 credit')).toBeInTheDocument();
-  expect(screen.getAllByText('Ready to use at checkout')).toHaveLength(2);
 });
 
 it('shows the free-shipping progress bar with remaining amount and caption', async () => {
@@ -1042,6 +1061,7 @@ it('keeps earned rewards away from the catalog', async () => {
 
   mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 600 }));
   mockRedeemRules([buildRedeemRuleWith({ title: 'Free shipping', pointCost: 500 })]);
+  mockCart(buildCartWith({}));
   server.use(
     http.get(`${launcherBase}/customer/all-rewards`, () =>
       HttpResponse.json({ items: [earned], nextToken: null }),
@@ -1057,13 +1077,14 @@ it('keeps earned rewards away from the catalog', async () => {
 
   await user.click(screen.getByRole('tab', { name: 'My rewards' }));
   expect(await screen.findByText('$5 discount')).toBeInTheDocument();
-  expect(screen.getByText('Ready to use at checkout')).toBeInTheDocument();
   expect(screen.queryByText('SAVE-123')).not.toBeInTheDocument();
 });
 
-it('copies an earned reward code from its My rewards row', async () => {
+it('applies an earned reward to the cart from its My rewards row', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
   mockRedeemRules([]);
+  mockCart(buildCartWith({ id: 'cart-1' }));
+  const applyRequest = vi.fn();
   server.use(
     http.get(`${launcherBase}/customer/all-rewards`, () =>
       HttpResponse.json({
@@ -1071,21 +1092,34 @@ it('copies an earned reward code from its My rewards row', async () => {
         nextToken: null,
       }),
     ),
+    http.post(couponsUrl, async ({ request, params }) => {
+      applyRequest({ checkoutId: params.checkoutId, body: await request.json() });
+      return HttpResponse.json({ coupons: [{ code: 'SAVE-123' }] });
+    }),
   );
 
   const { user } = renderWithProviders(<Loyalty />, {
     initialEntries: [{ search: '?tab=my-rewards' }],
   });
 
-  await user.click(await screen.findByRole('button', { name: 'Copy code' }));
+  const applyButton = await screen.findByRole('button', { name: 'Apply to cart' });
+  // The button stays disabled until the cart read supplies the checkout id, and
+  // MUI disabled buttons carry pointer-events: none, which userEvent rejects.
+  await waitFor(() => expect(applyButton).toBeEnabled());
+  await user.click(applyButton);
 
-  await waitFor(() => {
-    expect(snackbar.success).toHaveBeenCalledWith('Code copied');
+  expect(await screen.findByText('Applied to your cart')).toBeInTheDocument();
+  expect(applyRequest).toHaveBeenCalledWith({
+    checkoutId: 'cart-1',
+    body: { couponCode: 'SAVE-123' },
   });
-  expect(await window.navigator.clipboard.readText()).toBe('SAVE-123');
+  await waitFor(() => {
+    expect(snackbar.success).toHaveBeenCalledWith('Reward applied to your cart.');
+  });
+  expect(screen.queryByRole('button', { name: 'Apply to cart' })).not.toBeInTheDocument();
 });
 
-it('hides the copy affordance when a reward has no coupon code', async () => {
+it('offers no apply action when a reward has no coupon code', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
   mockRedeemRules([]);
   server.use(
@@ -1100,7 +1134,7 @@ it('hides the copy affordance when a reward has no coupon code', async () => {
   renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=my-rewards' }] });
 
   expect(await screen.findByText('$5 credit')).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Copy code' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Apply to cart' })).not.toBeInTheDocument();
 });
 
 it('shows the intro copy and the empty nudge when nothing has been redeemed', async () => {
@@ -1118,9 +1152,7 @@ it('shows the intro copy and the empty nudge when nothing has been redeemed', as
     await screen.findByText("Here's what you've redeemed and have ready to use."),
   ).toBeInTheDocument();
   expect(
-    screen.getByText(
-      "At checkout, you'll choose one to apply to your order — only one reward can be used per order.",
-    ),
+    screen.getByText('Apply one to your cart below — only one reward can be used per order.'),
   ).toBeInTheDocument();
   expect(
     await screen.findByText(
@@ -1153,9 +1185,42 @@ it('keeps the empty nudge off when the rewards fetch fails', async () => {
   ).rejects.toThrow();
 });
 
-it('shows an error snackbar when copying a reward code fails', async () => {
+it('shows a rejection message when the cart refuses the reward code', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
   mockRedeemRules([]);
+  mockCart(buildCartWith({}));
+  server.use(
+    http.get(`${launcherBase}/customer/all-rewards`, () =>
+      HttpResponse.json({
+        items: [buildEarnedRewardWith({ title: '$5 credit', couponCode: 'SAVE-123' })],
+        nextToken: null,
+      }),
+    ),
+    http.post(couponsUrl, () =>
+      HttpResponse.json({ status: 404, title: 'Coupon code is invalid' }, { status: 404 }),
+    ),
+  );
+
+  const { user } = renderWithProviders(<Loyalty />, {
+    initialEntries: [{ search: '?tab=my-rewards' }],
+  });
+
+  const applyButton = await screen.findByRole('button', { name: 'Apply to cart' });
+  await waitFor(() => expect(applyButton).toBeEnabled());
+  await user.click(applyButton);
+
+  await waitFor(() => {
+    expect(snackbar.error).toHaveBeenCalledWith(
+      "This reward couldn't be applied. It may have already been used.",
+    );
+  });
+  expect(screen.queryByText('Applied to your cart')).not.toBeInTheDocument();
+});
+
+it('offers no apply action and explains why when the shopper has no cart', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockRedeemRules([]);
+  mockCart(null);
   server.use(
     http.get(`${launcherBase}/customer/all-rewards`, () =>
       HttpResponse.json({
@@ -1164,20 +1229,75 @@ it('shows an error snackbar when copying a reward code fails', async () => {
       }),
     ),
   );
-  const writeText = vi
-    .spyOn(window.navigator.clipboard, 'writeText')
-    .mockRejectedValueOnce(new Error('denied'));
+
+  renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=my-rewards' }] });
+
+  expect(
+    await screen.findByText('Add items to your cart before applying a reward.'),
+  ).toBeInTheDocument();
+  // The hint depends only on the cart query, while the reward row depends on the
+  // slower identity → earned-rewards chain, so the row can still be loading when the
+  // hint first appears.
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: 'Apply to cart' })).toBeDisabled();
+  });
+});
+
+it('keeps apply disabled when the cart read fails', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockRedeemRules([]);
+  server.use(
+    http.get(cartsUrl, () => HttpResponse.json({}, { status: 500 })),
+    http.get(`${launcherBase}/customer/all-rewards`, () =>
+      HttpResponse.json({
+        items: [buildEarnedRewardWith({ title: '$5 credit', couponCode: 'SAVE-123' })],
+        nextToken: null,
+      }),
+    ),
+  );
+
+  renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=my-rewards' }] });
+
+  expect(await screen.findByText('$5 credit')).toBeInTheDocument();
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: 'Apply to cart' })).toBeDisabled();
+  });
+  // A failed read must not claim the cart is empty — that would be a guess.
+  expect(
+    screen.queryByText('Add items to your cart before applying a reward.'),
+  ).not.toBeInTheDocument();
+  expect(screen.getByText('Something went wrong. Please try again.')).toBeInTheDocument();
+});
+
+it('tells the shopper to fill the cart when the coupon write reports an empty cart', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockRedeemRules([]);
+  // The cart exists at read time and is emptied before the write — the only route to
+  // the empty_cart discriminator, and otherwise dead error-mapping code.
+  mockCart(buildCartWith({ id: 'cart-1' }));
+  server.use(
+    http.get(`${launcherBase}/customer/all-rewards`, () =>
+      HttpResponse.json({
+        items: [buildEarnedRewardWith({ title: '$5 credit', couponCode: 'SAVE-123' })],
+        nextToken: null,
+      }),
+    ),
+    http.post(couponsUrl, () =>
+      HttpResponse.json({ type: 'empty_cart', title: 'Cart is empty' }, { status: 400 }),
+    ),
+  );
 
   const { user } = renderWithProviders(<Loyalty />, {
     initialEntries: [{ search: '?tab=my-rewards' }],
   });
 
-  await user.click(await screen.findByRole('button', { name: 'Copy code' }));
+  const applyButton = await screen.findByRole('button', { name: 'Apply to cart' });
+  await waitFor(() => expect(applyButton).toBeEnabled());
+  await user.click(applyButton);
 
   await waitFor(() => {
-    expect(snackbar.error).toHaveBeenCalledWith('Something went wrong. Please try again.');
+    expect(snackbar.error).toHaveBeenCalledWith('Add items to your cart before applying a reward.');
   });
-  writeText.mockRestore();
 });
 
 it('renders the four Smart Rewards tabs and defaults to My benefits', async () => {

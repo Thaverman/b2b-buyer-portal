@@ -1,11 +1,19 @@
-import { ContentCopy } from '@mui/icons-material';
-import { alpha, Box, Button, IconButton, Typography } from '@mui/material';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { alpha, Box, Button, Typography } from '@mui/material';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useB3Lang } from '@/lib/lang';
+import {
+  applyCartCoupon,
+  CartCouponError,
+  CartCoupons,
+  fetchCartCoupons,
+  isSameCouponCode,
+} from '@/shared/service/bc/api/cart';
 import { snackbar } from '@/utils/b3Tip';
 
 import { EarnedReward, fetchEarnedRewards, LoyaltyIdentity } from '../api';
+
+const CART_COUPONS_KEY = ['cartCoupons'];
 
 interface MyRewardsTabProps {
   identity: LoyaltyIdentity | undefined;
@@ -13,6 +21,7 @@ interface MyRewardsTabProps {
 
 function MyRewardsTab({ identity }: MyRewardsTabProps) {
   const b3Lang = useB3Lang();
+  const queryClient = useQueryClient();
 
   const earnedQuery = useInfiniteQuery({
     queryKey: ['loyaltyRewards', identity?.customerId ?? ''],
@@ -31,14 +40,57 @@ function MyRewardsTab({ identity }: MyRewardsTabProps) {
   });
   const earnedRewards: EarnedReward[] = earnedQuery.data?.pages.flatMap((page) => page.items) ?? [];
 
-  const copyCode = async (couponCode: string) => {
-    try {
-      await navigator.clipboard.writeText(couponCode);
-      snackbar.success(b3Lang('loyalty.redeem.copied'));
-    } catch {
+  // Independent of identity: the cart belongs to the storefront session, not to the
+  // loyalty provider. One call yields both the checkout id and its applied codes.
+  const cartQuery = useQuery({
+    queryKey: CART_COUPONS_KEY,
+    queryFn: fetchCartCoupons,
+  });
+  const cartId = cartQuery.data?.cartId ?? null;
+  const appliedCodes = cartQuery.data?.appliedCodes ?? [];
+
+  const applyMutation = useMutation({
+    mutationFn: (code: string) => {
+      if (!cartId) {
+        return Promise.reject(new CartCouponError('emptyCart'));
+      }
+      return applyCartCoupon(cartId, code);
+    },
+    onSuccess: (codes) => {
+      queryClient.setQueryData<CartCoupons>(CART_COUPONS_KEY, (previous) => ({
+        cartId: previous?.cartId ?? null,
+        appliedCodes: codes,
+      }));
+      snackbar.success(b3Lang('loyalty.myRewards.applySuccess'));
+    },
+    onError: (error) => {
+      // Resync: the write may have failed because our view of the cart was stale.
+      queryClient.invalidateQueries({ queryKey: CART_COUPONS_KEY });
+      const kind = error instanceof CartCouponError ? error.kind : 'upstream';
+      if (kind === 'emptyCart') {
+        snackbar.error(b3Lang('loyalty.myRewards.needsCart'));
+        return;
+      }
+      if (kind === 'rejected') {
+        snackbar.error(b3Lang('loyalty.myRewards.rejected'));
+        return;
+      }
       snackbar.error(b3Lang('loyalty.errors.generic'));
-    }
-  };
+    },
+  });
+
+  // The first reward whose code the cart reports as applied. Keyed by id so that
+  // two rewards sharing a code cannot both render as applied.
+  const appliedReward = earnedRewards.find((reward) =>
+    appliedCodes.some((code) => isSameCouponCode(code, reward.couponCode)),
+  );
+
+  let hint = '';
+  if (cartQuery.isSuccess && !cartId) {
+    hint = b3Lang('loyalty.myRewards.needsCart');
+  } else if (cartQuery.isError) {
+    hint = b3Lang('loyalty.errors.generic');
+  }
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -68,23 +120,33 @@ function MyRewardsTab({ identity }: MyRewardsTabProps) {
         >
           <Typography sx={{ textTransform: 'uppercase' }}>{reward.title}</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography
-              sx={{ textTransform: 'uppercase', fontWeight: 700, color: 'text.secondary' }}
-            >
-              {b3Lang('loyalty.myRewards.readyStatus')}
-            </Typography>
-            {reward.couponCode !== '' && (
-              <IconButton
-                size="small"
-                aria-label={b3Lang('loyalty.redeem.copy')}
-                onClick={() => copyCode(reward.couponCode)}
-              >
-                <ContentCopy fontSize="small" />
-              </IconButton>
-            )}
+            {reward.couponCode !== '' &&
+              (appliedReward?.id === reward.id ? (
+                <Typography
+                  sx={{ textTransform: 'uppercase', fontWeight: 700, color: 'text.secondary' }}
+                >
+                  {b3Lang('loyalty.myRewards.appliedStatus')}
+                </Typography>
+              ) : (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  // No cartId means the cart read is still in flight, failed, or found
+                  // no cart — in none of those can a coupon be applied.
+                  disabled={applyMutation.isPending || !cartId}
+                  onClick={() => applyMutation.mutate(reward.couponCode)}
+                >
+                  {b3Lang('loyalty.myRewards.apply')}
+                </Button>
+              ))}
           </Box>
         </Box>
       ))}
+      {hint !== '' && (
+        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+          {hint}
+        </Typography>
+      )}
       {earnedQuery.hasNextPage && (
         <Button
           size="small"
