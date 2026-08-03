@@ -421,9 +421,12 @@ it('withholds the loyalty route when the host has no loyalty config, even if ent
 });
 ```
 
-If `buildGlobalStateWith({})` does not satisfy the `GlobalState` argument, read
-`tests/storeStateBuilders/globalStateBuilder.ts` and pass whatever it does export;
-do not weaken the type with a cast.
+**Correction (found during execution):** `buildGlobalStateWith({})` does **not**
+satisfy this parameter. There are two different interfaces both named `GlobalState` —
+`@/store/slices/global` (what the builder makes) and `@/shared/global/context/config`
+(what `getAllowedRoutesWithoutComponent` actually takes, ~20 more required props).
+Build off the real `initState` export from `@/shared/global/context/config`:
+`builder<GlobalState>(() => initState)`. Do not weaken the type with a cast.
 
 **If priming the singleton store proves unworkable, do not fight it** — assert through
 the rendered nav instead (`renderWithProviders` with `preloadedState`, then assert on the
