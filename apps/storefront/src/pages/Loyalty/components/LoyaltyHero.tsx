@@ -32,15 +32,27 @@ function LoyaltyHero({
   return (
     <>
       <Box
-        sx={{
+        sx={(theme) => ({
           position: 'relative',
           overflow: 'hidden',
           bgcolor: 'primary.main',
           color: 'primary.contrastText',
           borderRadius: 2,
-          p: { xs: 3, sm: 4 },
           mb: 2,
-        }}
+          // The banner asset is 1920x600 (3.2:1), but this box is sized by its content, so its
+          // own ratio swung from ~7:1 (greeting only) to ~3:1 (with the shipping tracker) and
+          // object-fit: cover quietly cropped away up to half the photo's height. The floated
+          // zero-width ::before makes the box AT LEAST as tall as the asset's ratio
+          // (600/1920 = 31.25% of the width), so desktop crops nothing at any panel width.
+          // aspect-ratio cannot do this job: it pins the height and, with overflow hidden,
+          // clips the tallest hero states (gate CTA + summary + chip + tracker) instead of
+          // growing. Percentage padding resolves against the content-box width, which is why
+          // the padding moved to the inner Box below.
+          [theme.breakpoints.up('md')]: {
+            '&::before': { content: '""', float: 'left', width: 0, paddingBottom: '31.25%' },
+            '&::after': { content: '""', display: 'table', clear: 'both' },
+          },
+        })}
       >
         {!imageFailed && (
           <Box
@@ -73,7 +85,7 @@ function LoyaltyHero({
             bgcolor: (theme) => alpha(theme.palette.common.black, 0.5),
           }}
         />
-        <Box sx={{ position: 'relative' }}>
+        <Box sx={{ position: 'relative', p: { xs: 3, sm: 4 } }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <WorkspacePremium />
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
@@ -86,6 +98,9 @@ function LoyaltyHero({
           {showEarnCta && (
             <Button
               href={`${window.location.origin}/`}
+              // The portal lives in the ThemeFrame iframe; without _top the storefront home
+              // page loads inside the account panel instead of closing the portal.
+              target="_top"
               variant="outlined"
               sx={{
                 mt: 2,

@@ -46,20 +46,62 @@ every `TargetKind` except `NextTier`).
   and passed down as today).
 - **PrePointsGate block** (only when `tierProgress?.targetKind === 'PrePointsGate'`):
   outlined CTA button "Start shopping to earn points" (`loyalty.hero.cta`)
-  linking to the storefront home (`window.location.origin + '/'`, plain
-  anchor — it leaves the SPA), with the server's `summary` string verbatim
-  beneath it.
+  linking to the storefront home (`window.location.origin + '/'`, anchor with
+  `target="_top"` — it leaves the SPA, and the target is what makes it leave:
+  the portal renders inside the `ThemeFrame` iframe, so a default-target anchor
+  loads the home page *inside* the account panel instead of closing the
+  portal), with the server's `summary` string verbatim beneath it.
 - **Status line:** tier chip (existing `displayTierTitle` = SSW
   `currentTierName` || Influence title — logic unchanged) + "You have
   {points} points available." (`loyalty.hero.pointsAvailable`,
   `pointBalance.toLocaleString()`).
 - **Member-since chip:** kept (existing `memberSince` behavior).
-- **Background image:** right-aligned `background-size: cover` photo with a
-  blue gradient overlay (`linear-gradient` from the brand blue over the left
-  ~60%) so text keeps contrast; **hidden on `xs`** (plain blue banner on
-  mobile). The URL is **storefront-hosted, not bundled** — see §2c for the
-  resolution order. The banner must render correctly when the image is absent
-  or 404s (gradient-only), so implementation is never blocked on the file.
+- **Background image** (as shipped in `a86b00b0`, superseding this section's
+  original right-aligned-gradient treatment): full-bleed `object-fit: cover`
+  photo behind the copy at **every** breakpoint — no longer hidden on `xs` —
+  with `objectPosition: 'right center'`, because the default asset's subject
+  sits in its right third and a centred crop pushes her out of frame on narrow
+  boxes. Over it sits a flat neutral scrim, `alpha(common.black, 0.5)`, rather
+  than a primary-colored gradient: the asset already bakes in its own solid-blue
+  field, and a second blue layer double-tints it. The URL is
+  **storefront-hosted, not bundled** — see §2c for the resolution order. The
+  banner must render correctly when the image is absent or 404s (scrim only), so
+  implementation is never blocked on the file.
+- **Banner height — a ratio floor, not a fixed height** (2026-08-03): the box is
+  otherwise sized by its content, so its own aspect ratio swung with customer
+  state (~6.8:1 greeting-only, ~3.1:1 with the gate CTA and tier chip) and
+  `object-fit: cover` silently cropped away up to half the photo's height. From
+  `md` up, the outer Box carries a floated zero-width `::before` with
+  `padding-bottom: 31.25%` (= 600/1920, the default asset's ratio) plus an
+  `::after` clearfix. That makes the banner **at least** as tall as the asset's
+  own ratio while still growing for tall content. Two constraints that are easy
+  to get wrong:
+  - The padding lives on the **inner** content Box. Percentage padding resolves
+    against the content-box width, so padding on the outer box inflates the
+    floor (~44px too tall at 1000px).
+  - Do **not** substitute `aspect-ratio: 16 / 5`. It pins the height and does
+    not grow for over-tall content, so with this box's `overflow: hidden` the
+    tallest hero state is clipped. `min-height: fit-content` does not rescue it
+    and collapses `xs` to a 117px band. Both verified in Chromium, not assumed.
+
+  `xs`/`sm` stay content-driven and unchanged: a 3.2:1 box at 375px wide is a
+  117px band, far shorter than the copy needs, so the floor is `md`-only and the
+  mobile crop stays compensated by `objectPosition` alone.
+
+  Measured on the real DOM with the emitted CSS (Chromium 1071), share of the
+  1920×600 asset visible through `cover`:
+
+  | Panel width | Greeting-only | Fullest state (CTA + summary + chip) |
+  |---|---|---|
+  | 375px (`xs`) | 130px box, 90% — unchanged | 323px box, 36% — unchanged |
+  | 900px | 281px, **100%** | 319px, 88% |
+  | 1000px | 313px, **100%** | 319px, 98% |
+  | 1200px | 375px, **100%** | 375px, **100%** |
+  | 1450px (max) | 453px, **100%** | 453px, **100%** |
+
+  Nothing clips in any of the ten cases. Zero-crop is guaranteed only while
+  content is shorter than width ÷ 3.2; past that the box grows and the crop
+  moves from top/bottom to the sides, where `'right center'` keeps the subject.
 - ShippingTracker renders below the banner exactly as today.
 
 ## 2. Data layer (`src/pages/Loyalty/api.ts`, `src/index.d.ts`)
