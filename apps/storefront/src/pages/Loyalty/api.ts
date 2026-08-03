@@ -11,6 +11,7 @@ interface LoyaltyConfig {
   progressSite?: string;
   bannerUrl?: string;
   benefitsBannerUrl?: string;
+  tierAttributeId?: number;
 }
 
 const LAUNCHER_API_BASE = 'https://launcher.api.influence.io/launcher/v1';
@@ -29,6 +30,47 @@ export const isLoyaltyAvailable = () => platform === 'bigcommerce' && Boolean(ge
 
 export const isTierProgressAvailable = (): boolean =>
   isLoyaltyAvailable() && Boolean(getLoyaltyConfig()?.progressSite);
+
+/** The `loyaltyTier` alias returned by the login customer query. */
+export interface RawTierAttribute {
+  entityId?: number;
+  name?: string;
+  value?: string | null;
+}
+
+const TIER_ATTRIBUTE_NAME = 'Loyalty Tier';
+
+// Number.isInteger both validates and makes interpolating the id into a GraphQL
+// document safe — the value comes from a host-set global and is not to be trusted.
+export const getTierAttributeId = (): number | undefined => {
+  const configured = getLoyaltyConfig()?.tierAttributeId;
+  return Number.isInteger(configured) ? configured : undefined;
+};
+
+// TRUE keeps Loyalty visible. It closes ONLY on a successfully-read, blank attribute:
+// "we could not find out" is not a verdict about this customer, and treating it as one
+// would hide Loyalty from everybody the moment the id drifted or the schema changed.
+export const resolveLoyaltyEntitlement = (
+  rawAttribute: RawTierAttribute | null | undefined,
+): boolean => {
+  const tierAttributeId = getTierAttributeId();
+  if (tierAttributeId === undefined) {
+    return true;
+  }
+  if (!rawAttribute) {
+    b2bLogger.error(
+      `Loyalty: attribute ${tierAttributeId} was requested but nothing came back — leaving Loyalty visible`,
+    );
+    return true;
+  }
+  if (rawAttribute.name !== TIER_ATTRIBUTE_NAME) {
+    b2bLogger.error(
+      `Loyalty: attribute ${tierAttributeId} is named "${rawAttribute.name ?? ''}", not "${TIER_ATTRIBUTE_NAME}" — check BC_CONTEXT.loyalty.tierAttributeId; leaving Loyalty visible`,
+    );
+    return true;
+  }
+  return (rawAttribute.value ?? '').trim() !== '';
+};
 
 type LoyaltyErrorKind =
   | 'sessionExpired'

@@ -52,6 +52,7 @@ const initialState: CompanyState = {
     userType: UserTypes.DOES_NOT_EXIST,
     loginType: LoginTypes.WAITING_LOGIN,
     companyRoleName: '',
+    isLoyaltyEntitled: true,
   },
   tokens: {
     B2BToken: '',

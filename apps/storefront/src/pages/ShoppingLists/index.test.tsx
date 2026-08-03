@@ -38,6 +38,7 @@ const buildCustomerWith = builder<Customer>(() => ({
   userType: UserTypes.DOES_NOT_EXIST,
   loginType: LoginTypes.WAITING_LOGIN,
   companyRoleName: 'Tester',
+  isLoyaltyEntitled: true,
 }));
 
 // TODO: we should use faker to generate random data once faker is in place

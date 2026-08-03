@@ -1,3 +1,8 @@
+import {
+  getTierAttributeId,
+  RawTierAttribute,
+  resolveLoyaltyEntitlement,
+} from '@/pages/Loyalty/api';
 import { prefetchLoyaltyLanding } from '@/pages/Loyalty/loyaltyLanding';
 import {
   endUserMasqueradingCompany,
@@ -240,7 +245,7 @@ export const getCurrentCustomerInfo = async (
   }
 
   try {
-    const data = await getCustomerInfo();
+    const data = await getCustomerInfo(getTierAttributeId());
 
     if (data?.detail) return undefined;
 
@@ -253,6 +258,7 @@ export const getCurrentCustomerInfo = async (
       lastName,
       email: emailAddress = '',
       customerGroupId,
+      attributes,
     } = loginCustomer;
 
     const companyUserInfo = await getCompanyUserInfo();
@@ -289,6 +295,9 @@ export const getCurrentCustomerInfo = async (
         b2bId: id,
         loginType,
         companyRoleName,
+        isLoyaltyEntitled: resolveLoyaltyEntitlement(
+          attributes?.loyaltyTier as RawTierAttribute | undefined,
+        ),
       };
       const quoteUserId = id || customerId || 0;
       const companyPayload = {

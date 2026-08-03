@@ -22,6 +22,7 @@ export const buildCompanyStateWith = builder<CompanyState & PersistPartial>(() =
     userType: UserTypes.DOES_NOT_EXIST,
     loginType: LoginTypes.WAITING_LOGIN,
     companyRoleName: '',
+    isLoyaltyEntitled: true,
   },
   tokens: {
     B2BToken: '',

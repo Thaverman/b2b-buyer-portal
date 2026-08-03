@@ -22,6 +22,7 @@ import {
   getFaqSections,
   getLoyaltyDigest,
   getShippingCalculation,
+  getTierAttributeId,
   isRedeemableCatalogRule,
   isShippingTrackerAvailable,
   isTierAllowed,
@@ -31,6 +32,7 @@ import {
   LoyaltyTierProgress,
   parseAllowedTiers,
   redeemReward,
+  resolveLoyaltyEntitlement,
 } from './api';
 
 vi.mock('@/utils/b3Logger');
@@ -851,5 +853,79 @@ describe('getFaqSections and getFaqIntro', () => {
     window.loyaltyFaqConfig = {};
 
     expect(getFaqSections()).toEqual([]);
+  });
+});
+
+describe('resolveLoyaltyEntitlement', () => {
+  const withTierAttributeId = (tierAttributeId?: number) => {
+    window.BC_CONTEXT = {
+      loyalty: {
+        shopKey: 'shop-key',
+        apiBase: 'https://ssw.example.com/customers',
+        appClientId: 'app-client-id',
+        ...(tierAttributeId === undefined ? {} : { tierAttributeId }),
+      },
+    };
+  };
+
+  it('is entitled when the attribute has a value', () => {
+    withTierAttributeId(2);
+
+    expect(
+      resolveLoyaltyEntitlement({ entityId: 2, name: 'Loyalty Tier', value: 'Signature' }),
+    ).toBe(true);
+  });
+
+  it('is NOT entitled when the attribute was read and is blank', () => {
+    withTierAttributeId(2);
+
+    expect(resolveLoyaltyEntitlement({ entityId: 2, name: 'Loyalty Tier', value: '' })).toBe(false);
+    expect(resolveLoyaltyEntitlement({ entityId: 2, name: 'Loyalty Tier', value: '   ' })).toBe(
+      false,
+    );
+    expect(resolveLoyaltyEntitlement({ entityId: 2, name: 'Loyalty Tier', value: null })).toBe(
+      false,
+    );
+  });
+
+  // The gate is a rollout lever a store opts into; an un-opted store keeps today's behaviour.
+  it('stays entitled when no tierAttributeId is configured, whatever the payload says', () => {
+    withTierAttributeId(undefined);
+
+    expect(resolveLoyaltyEntitlement({ entityId: 2, name: 'Loyalty Tier', value: '' })).toBe(true);
+    expect(resolveLoyaltyEntitlement(undefined)).toBe(true);
+  });
+
+  // THE important case: "the API did not answer" must never read as "no tier".
+  it('stays entitled when the attribute object is absent despite being configured', () => {
+    withTierAttributeId(2);
+
+    expect(resolveLoyaltyEntitlement(undefined)).toBe(true);
+    expect(resolveLoyaltyEntitlement(null)).toBe(true);
+  });
+
+  // Guards against the configured id drifting onto a different attribute, which would
+  // otherwise hide Loyalty from everyone.
+  it('stays entitled and logs when the id points at a differently-named attribute', () => {
+    withTierAttributeId(2);
+
+    expect(
+      resolveLoyaltyEntitlement({ entityId: 2, name: 'SxeCustomerNumber', value: '5137301' }),
+    ).toBe(true);
+    expect(b2bLogger.error).toHaveBeenCalled();
+  });
+
+  it('ignores a non-integer configured id rather than injecting it into the query', () => {
+    window.BC_CONTEXT = {
+      loyalty: {
+        shopKey: 'shop-key',
+        apiBase: 'https://ssw.example.com/customers',
+        appClientId: 'app-client-id',
+        tierAttributeId: '2 } malformed' as unknown as number,
+      },
+    };
+
+    expect(getTierAttributeId()).toBeUndefined();
+    expect(resolveLoyaltyEntitlement({ entityId: 2, name: 'Loyalty Tier', value: '' })).toBe(true);
   });
 });

@@ -37,6 +37,7 @@ const buildCustomerWith = builder<Customer>(() => ({
   userType: UserTypes.DOES_NOT_EXIST,
   loginType: LoginTypes.WAITING_LOGIN,
   companyRoleName: 'Tester',
+  isLoyaltyEntitled: true,
 }));
 
 describe('B2B Upgrade Banner', () => {

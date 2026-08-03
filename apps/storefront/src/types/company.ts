@@ -25,6 +25,13 @@ export interface Customer {
   loginType: LoginTypes;
   role: CustomerRole;
   companyRoleName: string;
+  /**
+   * Whether Loyalty is visible to this customer, decided at login from the
+   * BigCommerce "Loyalty Tier" customer attribute. True when entitled AND when the
+   * gate is inactive (unconfigured, misconfigured, or unreadable); false only when
+   * the attribute was genuinely read and is blank.
+   */
+  isLoyaltyEntitled: boolean;
 }
 // 99: default, Distinguish between bc and b2b;
 // 0: pending; 1: approved; 2: rejected; 3: inactive; 4: deleted

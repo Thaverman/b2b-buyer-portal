@@ -73,6 +73,12 @@ declare global {
         apiBase: string;
         /** SSW app client id used to mint the Current Customer JWT. */
         appClientId: string;
+        /**
+         * entityId of the BigCommerce "Loyalty Tier" customer attribute. Absent =
+         * the visibility gate is OFF and Loyalty shows for everyone, as before.
+         * Find it with GET /v3/customers/attributes?name=Loyalty Tier (server-side).
+         */
+        tierAttributeId?: number;
         /** SSW site key for GetDetailWithProgress (e.g. "StoreSupply"); absent = tier progress off. */
         progressSite?: string;
         /** Theme override for the hero banner image; absent = the relative default. */
