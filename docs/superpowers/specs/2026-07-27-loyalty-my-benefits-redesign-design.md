@@ -176,9 +176,11 @@ Props `{ tiers: LoyaltyTier[], currentTierId: string | null }`. Data-driven:
 - `loyalty.benefits.contact`: "Questions? Contact us at 1-833-397-2619"
   (bold; always rendered).
 - Full-width `error.main` contained button `loyalty.benefits.orderCta` =
-  "Place your next order" (MUI uppercases), plain anchor to the storefront
-  home (`window.location.origin + '/'`) — same pattern as the hero CTA.
-  Always rendered.
+  "Place your next order" (MUI uppercases), anchor to the storefront home
+  (`window.location.origin + '/'`) with `target="_top"` — same pattern as the
+  hero CTA. The target is load-bearing: the portal renders inside the
+  `ThemeFrame` iframe, so a default-target anchor loads the home page *inside*
+  the account panel instead of closing the portal. Always rendered.
 
 ## File structure
 

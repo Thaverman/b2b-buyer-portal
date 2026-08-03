@@ -147,6 +147,9 @@ function BenefitsTab({ customer, tiers, tierProgress, tierDisplayName }: Benefit
       </Typography>
       <Button
         href={`${window.location.origin}/`}
+        // The portal lives in the ThemeFrame iframe; without _top the storefront home
+        // page loads inside the account panel instead of closing the portal.
+        target="_top"
         variant="contained"
         color="error"
         size="large"

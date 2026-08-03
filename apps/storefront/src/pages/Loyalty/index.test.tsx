@@ -1059,6 +1059,21 @@ it('shows no CTA for a customer who is already earning', async () => {
   ).not.toBeInTheDocument();
 });
 
+// The portal renders inside the ThemeFrame iframe, so a storefront link without an
+// explicit target loads the home page *inside* the account panel instead of leaving
+// the portal. _top navigates the hosting page, which tears the portal down with it.
+it('points the hero CTA at the top-level window, not the portal frame', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockTierProgress(buildTierProgressWith({ targetKind: 'PrePointsGate' }));
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  const cta = await screen.findByRole('link', { name: 'Start shopping to earn points' });
+
+  expect(cta).toHaveAttribute('href', `${window.location.origin}/`);
+  expect(cta).toHaveAttribute('target', '_top');
+});
+
 it('keeps earned rewards away from the catalog', async () => {
   const earned = buildEarnedRewardWith({ couponCode: 'SAVE-123', title: '$5 discount' });
 
@@ -1917,6 +1932,19 @@ it('hides the tier ladder for a top-tier customer but keeps the contact footer',
   expect(screen.getByRole('link', { name: 'Place your next order' })).toBeInTheDocument();
   // Influence ordering alone never earns the top-tier message; only SSW's AtTop does.
   expect(screen.queryByText(/our top tier/)).not.toBeInTheDocument();
+});
+
+// Same iframe escape as the hero CTA above.
+it('points the order CTA at the top-level window, not the portal frame', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockTiers(rewardTiers());
+
+  renderWithProviders(<Loyalty />);
+
+  const cta = await screen.findByRole('link', { name: 'Place your next order' });
+
+  expect(cta).toHaveAttribute('href', `${window.location.origin}/`);
+  expect(cta).toHaveAttribute('target', '_top');
 });
 
 it('hides the tier ladder when the customer tier is unknown', async () => {
