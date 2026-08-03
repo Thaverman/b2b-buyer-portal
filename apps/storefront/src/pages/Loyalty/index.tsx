@@ -13,6 +13,7 @@ import MyRewardsTab from './components/MyRewardsTab';
 import RewardsTab from './components/RewardsTab';
 import {
   fetchLoyaltyCustomer,
+  fetchMemberships,
   fetchTierProgress,
   fetchTiers,
   getAllowedTiers,
@@ -93,6 +94,14 @@ function Loyalty() {
     staleTime: Infinity,
   });
   const tiers = tiersQuery.data ?? [];
+
+  const membershipsQuery = useQuery({
+    queryKey: ['loyaltyMemberships'],
+    queryFn: fetchMemberships,
+    enabled: isAvailable,
+    staleTime: Infinity,
+  });
+  const memberships = membershipsQuery.data ?? [];
 
   const tierProgressQuery = useQuery({
     queryKey: ['loyaltyTierProgress', customerId],
