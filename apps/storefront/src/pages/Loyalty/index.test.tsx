@@ -251,7 +251,7 @@ const buildTierProgressWith = builder<LoyaltyTierProgress>(() => ({
 
 const progressUrl = `${apiBase}/loyaltycustomersclient/GetDetailWithProgress`;
 
-// Sets the progressSite config AND the endpoint mock; callers must also pass a
+// Sets the loyalty_site_name global AND the endpoint mock; callers must also pass a
 // preloadedState customer id so the query's enabled gate opens.
 const mockTierProgress = (progress: LoyaltyTierProgress) => {
   window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId } };
@@ -1975,13 +1975,7 @@ it('shows only the memberships above the customer, not current or lower ones', a
 it('hides the membership ladder for a top-tier customer but keeps the contact footer', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
   mockMemberships(rewardMemberships());
-  mockTierProgress(
-    buildTierProgressWith({
-      targetKind: 'AtTop',
-      currentTierName: 'Signature',
-      targetTierName: '',
-    }),
-  );
+  mockTierProgress(buildTierProgressWith({ targetKind: 'NextTier', currentTierName: 'Signature' }));
 
   renderWithProviders(<Loyalty />, customerPreloadedState);
 
@@ -1991,6 +1985,22 @@ it('hides the membership ladder for a top-tier customer but keeps the contact fo
     screen.queryByText('When you reach the next level, your tier upgrades automatically.'),
   ).not.toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Place your next order' })).toBeInTheDocument();
+  // Only SSW's AtTop earns the top-tier message; NextTier at the last rung must not.
+  expect(screen.queryByText(/our top tier/)).not.toBeInTheDocument();
+});
+
+it('drops a membership missing from the catalog but still renders the rest of the ladder', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockMemberships(rewardMemberships().slice(0, 2)); // Essential + Select only — no Signature in the catalog
+  mockTierProgress(buildTierProgressWith({ targetKind: 'NextTier', currentTierName: 'Essential' }));
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  expect(await screen.findByText('Select Tier')).toBeInTheDocument();
+  expect(
+    screen.getByText('As your orders grow, so do your rewards. 1 more level is available:'),
+  ).toBeInTheDocument();
+  expect(screen.queryByText('Signature Tier')).not.toBeInTheDocument();
 });
 
 // Same iframe escape as the hero CTA above.

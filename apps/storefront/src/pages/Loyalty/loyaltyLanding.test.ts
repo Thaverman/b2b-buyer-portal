@@ -84,7 +84,7 @@ it('resolves false when the endpoint is slower than the budget', async () => {
   expect(await resolveLoyaltyLanding(50)).toBe(false);
 });
 
-it('does not call the endpoint without progressSite config', async () => {
+it('does not call the endpoint without the loyalty_site_name global', async () => {
   const requests = vi.fn();
   window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId } };
   server.use(
