@@ -1,7 +1,7 @@
 # Gate Loyalty on the "Loyalty Tier" customer attribute — design
 
 **Date:** 2026-08-03
-**Status:** Draft — one decision awaiting confirmation (see [Assumptions](#assumptions-confirm-before-implementation))
+**Status:** Approved (design) — allowlist gate confirmed additive-only, 2026-08-03
 **Area:** B2B buyer portal · nav + routing (`src/shared/routeList.ts`), login boot (`src/utils/loginInfo.ts`), Loyalty page and login-landing redirect
 **Related:** [2026-07-14-loyalty-tier-allowlist-gate-design.md](2026-07-14-loyalty-tier-allowlist-gate-design.md)
 (the existing rollout gate, which this does **not** replace — see Assumptions),
@@ -68,17 +68,37 @@ verified attributes only against the direct same-origin endpoint, never through
 the proxy.** Whether the proxy's customer context also returns `attributes` is
 unknown.
 
-This is the same shape of unknown that produced the CSRF bug on the previous
-feature, where a plausible inference held right up until it was measured. So
-**step one of implementation is a live proxy probe**, before any UI work:
+### Measured 2026-08-03 — mostly resolved, Approach A is viable
 
-1. Add `attributes { loyaltyTier: attribute(entityId: 2) { entityId name value } }`
-   to `getCustomer()` and log the result of `getCustomerInfo()` on the sandbox.
-2. If `attributes` comes back populated → proceed with Approach A (below).
-3. If it comes back `null`/absent/errored → **stop and switch to Approach B**,
-   and record what the proxy returned.
+Probed the proxy directly at
+`https://api-b2b.bigcommerce.com/api/v3/proxy/bc-storefront/graphql` with
+`Store-Hash: 24erkpw9h6` / `BC-Channel-Id: 1` (unauthenticated mode, no B2BToken):
 
-### Approach A (preferred): extend the existing login query
+| Query | Response |
+|---|---|
+| `customer { entityId firstName }` (control) | `{"data":{"customer":null}}` |
+| `customer { attributeCount attributes { loyaltyTier: attribute(entityId: 2) { entityId name value } } }` | `{"data":{"customer":null}}` |
+
+**The `attributes` selection produced no validation error.** GraphQL rejects
+unknown fields at parse time, so had the proxied schema lacked
+`attributes` / `attribute(entityId:)` the response would have been
+`Cannot query field 'attributes' on type 'Customer'`. It passed the selection
+through, so the schema supports it. `customer: null` is solely the absence of an
+authenticated customer.
+
+Combined with the fact that `getCustomerInfo()` already returns `entityId` and
+`firstName` through this exact path for a logged-in shopper, **Approach A is the
+plan of record.**
+
+**Residual, small but real:** this proves the schema accepts the selection and
+that the proxy resolves *some* customer context, not that it returns attribute
+*values* for an authenticated customer — the proxy could resolve a restricted
+context. So a live confirmation stays in the plan (run under `yarn dev` against
+the sandbox, logged in), but as a verification step rather than a blocking gate
+before implementation. If it comes back empty, fall back to Approach B, which is
+already measured to work.
+
+### Approach A (plan of record): extend the existing login query
 
 Zero extra round trips; value present in Redux before first nav render.
 
