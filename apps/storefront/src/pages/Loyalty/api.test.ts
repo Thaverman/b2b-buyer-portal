@@ -60,7 +60,6 @@ beforeEach(() => {
 
 afterEach(() => {
   delete window.BC_CONTEXT;
-  delete window.loyalty_site_name;
   delete window.loyaltyShippingConfig;
   delete window.getLoyaltyShippingCalculation;
   delete window.loyaltyRolloutConfig;
@@ -580,18 +579,17 @@ describe('getAllowedTiers', () => {
 const progressUrl =
   'https://ssw.example.com/customers/loyaltycustomersclient/GetDetailWithProgress';
 
-const withProgressSite = () => {
-  window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId } };
-  window.loyalty_site_name = 'StoreSupply';
+const withSiteName = () => {
+  window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId, siteName: 'StoreSupply' } };
 };
 
 describe('isTierProgressAvailable', () => {
-  it('is false when loyalty_site_name is not configured', () => {
+  it('is false when siteName is not configured', () => {
     expect(isTierProgressAvailable()).toBe(false);
   });
 
-  it('is true when loyalty_site_name is set', () => {
-    withProgressSite();
+  it('is true when the loyalty config includes siteName', () => {
+    withSiteName();
 
     expect(isTierProgressAvailable()).toBe(true);
   });
@@ -599,7 +597,7 @@ describe('isTierProgressAvailable', () => {
 
 describe('fetchTierProgress', () => {
   it('sends site, store hash, customer id and take=0, and maps the PascalCase payload', async () => {
-    withProgressSite();
+    withSiteName();
     server.use(
       http.get(progressUrl, ({ request }) => {
         assertQueryParams(request, {
@@ -654,7 +652,7 @@ describe('fetchTierProgress', () => {
       { Success: true, Result: { TierProgress: { TargetKind: 'Unrecognized' } } },
     ],
   ])('returns null for %s', async (_label, payload) => {
-    withProgressSite();
+    withSiteName();
     server.use(http.get(progressUrl, () => HttpResponse.json(payload)));
 
     expect(await fetchTierProgress(264074)).toBeNull();
@@ -664,7 +662,7 @@ describe('fetchTierProgress', () => {
     [429, 'rateLimited'],
     [500, 'upstream'],
   ])('maps status %i to %s', async (status, kind) => {
-    withProgressSite();
+    withSiteName();
     server.use(http.get(progressUrl, () => HttpResponse.json({}, { status })));
 
     const error = await fetchTierProgress(264074).catch((e) => e);
@@ -674,7 +672,7 @@ describe('fetchTierProgress', () => {
   });
 
   it('maps a network failure to upstream', async () => {
-    withProgressSite();
+    withSiteName();
     server.use(http.get(progressUrl, () => HttpResponse.error()));
 
     const error = await fetchTierProgress(264074).catch((e) => e);
@@ -686,7 +684,7 @@ describe('fetchTierProgress', () => {
 
 describe('fetchTierProgress target kinds', () => {
   it('maps a PrePointsGate payload, keeping the spend gate and summary', async () => {
-    withProgressSite();
+    withSiteName();
     server.use(
       http.get(progressUrl, () =>
         HttpResponse.json({
@@ -728,7 +726,7 @@ describe('fetchTierProgress target kinds', () => {
   });
 
   it('still maps NextTier with its target kind', async () => {
-    withProgressSite();
+    withSiteName();
     server.use(
       http.get(progressUrl, () =>
         HttpResponse.json({
@@ -745,7 +743,7 @@ describe('fetchTierProgress target kinds', () => {
   });
 
   it('maps AtTop with the current tier name and zeroed quotas', async () => {
-    withProgressSite();
+    withSiteName();
     server.use(
       http.get(progressUrl, () =>
         HttpResponse.json({

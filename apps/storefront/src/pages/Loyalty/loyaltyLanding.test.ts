@@ -14,9 +14,8 @@ const apiBase = 'https://ssw.example.com/customers';
 const appClientId = 'ssw-app-client-id';
 const progressUrl = `${apiBase}/loyaltycustomersclient/GetDetailWithProgress`;
 
-const withProgressSite = () => {
-  window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId } };
-  window.loyalty_site_name = 'StoreSupply';
+const withSiteName = () => {
+  window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId, siteName: 'StoreSupply' } };
 };
 
 const mockProgress = (targetKind: string) =>
@@ -31,7 +30,6 @@ const mockProgress = (targetKind: string) =>
 
 afterEach(() => {
   delete window.BC_CONTEXT;
-  delete window.loyalty_site_name;
 });
 
 // Module state persists within this file: this MUST stay the first test.
@@ -40,7 +38,7 @@ it('resolves false when no prefetch has happened', async () => {
 });
 
 it('resolves true for a NextTier customer', async () => {
-  withProgressSite();
+  withSiteName();
   mockProgress('NextTier');
 
   prefetchLoyaltyLanding(264074, false);
@@ -49,7 +47,7 @@ it('resolves true for a NextTier customer', async () => {
 });
 
 it('resolves true for a PrePointsGate customer', async () => {
-  withProgressSite();
+  withSiteName();
   mockProgress('PrePointsGate');
 
   prefetchLoyaltyLanding(264074, false);
@@ -58,7 +56,7 @@ it('resolves true for a PrePointsGate customer', async () => {
 });
 
 it('resolves false for an AtTop customer', async () => {
-  withProgressSite();
+  withSiteName();
   mockProgress('AtTop');
 
   prefetchLoyaltyLanding(264074, false);
@@ -67,7 +65,7 @@ it('resolves false for an AtTop customer', async () => {
 });
 
 it('resolves false when the endpoint fails', async () => {
-  withProgressSite();
+  withSiteName();
   server.use(http.get(progressUrl, () => HttpResponse.json({}, { status: 500 })));
 
   prefetchLoyaltyLanding(264074, false);
@@ -76,7 +74,7 @@ it('resolves false when the endpoint fails', async () => {
 });
 
 it('resolves false when the endpoint is slower than the budget', async () => {
-  withProgressSite();
+  withSiteName();
   server.use(http.get(progressUrl, () => new Promise<never>(() => {})));
 
   prefetchLoyaltyLanding(264074, false);
@@ -84,7 +82,7 @@ it('resolves false when the endpoint is slower than the budget', async () => {
   expect(await resolveLoyaltyLanding(50)).toBe(false);
 });
 
-it('does not call the endpoint without the loyalty_site_name global', async () => {
+it('does not call the endpoint without a siteName config', async () => {
   const requests = vi.fn();
   window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId } };
   server.use(
@@ -102,7 +100,7 @@ it('does not call the endpoint without the loyalty_site_name global', async () =
 
 it('does not call the endpoint while masquerading', async () => {
   const requests = vi.fn();
-  withProgressSite();
+  withSiteName();
   server.use(
     http.get(progressUrl, () => {
       requests();
@@ -120,7 +118,7 @@ it('does not redirect a customer who is not loyalty-entitled', async () => {
   // Config in place so a reverted gate would genuinely hit the endpoint and could
   // resolve true; without this the check is vacuous either way (see task-3-report.md).
   const requests = vi.fn();
-  withProgressSite();
+  withSiteName();
   server.use(
     http.get(progressUrl, () => {
       requests();
@@ -139,7 +137,7 @@ it('does not redirect a customer who is not loyalty-entitled', async () => {
 
 it('does not call the endpoint without a customer id', async () => {
   const requests = vi.fn();
-  withProgressSite();
+  withSiteName();
   server.use(
     http.get(progressUrl, () => {
       requests();
@@ -154,7 +152,7 @@ it('does not call the endpoint without a customer id', async () => {
 });
 
 it('replaces the previous check on a new prefetch', async () => {
-  withProgressSite();
+  withSiteName();
   mockProgress('NextTier');
   prefetchLoyaltyLanding(264074, false);
   expect(await resolveLoyaltyLanding()).toBe(true);
@@ -165,7 +163,7 @@ it('replaces the previous check on a new prefetch', async () => {
 });
 
 it('prefetchLoyaltyLandingIfIdle does not replace a pending check', async () => {
-  withProgressSite();
+  withSiteName();
   mockProgress('NextTier');
   prefetchLoyaltyLanding(264074, false);
 
@@ -179,7 +177,7 @@ it('prefetchLoyaltyLandingIfIdle does not replace a pending check', async () => 
 it('prefetchLoyaltyLandingIfIdle leaves a stored resolved-null check in place', async () => {
   // A resolved-null check (from an ineligible prefetch) still counts as stored:
   // IfIdle only ever fills a slot that no prefetch has touched.
-  withProgressSite();
+  withSiteName();
   prefetchLoyaltyLanding(0, false); // stores resolved-null
   mockProgress('NextTier');
   prefetchLoyaltyLandingIfIdle(264074, false);
@@ -188,7 +186,7 @@ it('prefetchLoyaltyLandingIfIdle leaves a stored resolved-null check in place', 
 });
 
 it('clearLoyaltyLanding forgets the stored check so IfIdle can refill', async () => {
-  withProgressSite();
+  withSiteName();
   mockProgress('NextTier');
   prefetchLoyaltyLanding(264074, false);
   expect(await resolveLoyaltyLanding()).toBe(true);

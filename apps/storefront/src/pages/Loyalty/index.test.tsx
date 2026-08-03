@@ -45,7 +45,6 @@ beforeEach(() => {
 
 afterEach(() => {
   delete window.BC_CONTEXT;
-  delete window.loyalty_site_name;
   delete window.loyaltyShippingConfig;
   delete window.getLoyaltyShippingCalculation;
   delete window.loyaltyRolloutConfig;
@@ -251,11 +250,10 @@ const buildTierProgressWith = builder<LoyaltyTierProgress>(() => ({
 
 const progressUrl = `${apiBase}/loyaltycustomersclient/GetDetailWithProgress`;
 
-// Sets the loyalty_site_name global AND the endpoint mock; callers must also pass a
+// Sets the siteName config AND the endpoint mock; callers must also pass a
 // preloadedState customer id so the query's enabled gate opens.
 const mockTierProgress = (progress: LoyaltyTierProgress) => {
-  window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId } };
-  window.loyalty_site_name = 'StoreSupply';
+  window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId, siteName: 'StoreSupply' } };
   server.use(
     http.get(progressUrl, () =>
       HttpResponse.json({
@@ -1004,8 +1002,7 @@ it('shows the SSW tier name in the hero when tier progress is available', async 
 
 it('hides the tier progress card when the endpoint reports no progress', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
-  window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId } };
-  window.loyalty_site_name = 'StoreSupply';
+  window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId, siteName: 'StoreSupply' } };
   server.use(http.get(progressUrl, () => HttpResponse.json({ Success: false })));
 
   renderWithProviders(<Loyalty />, customerPreloadedState);
@@ -1018,8 +1015,7 @@ it('hides the tier progress card when the endpoint reports no progress', async (
 
 it('shows no error banner when the tier-progress endpoint fails', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 2465 }));
-  window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId } };
-  window.loyalty_site_name = 'StoreSupply';
+  window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId, siteName: 'StoreSupply' } };
   server.use(http.get(progressUrl, () => HttpResponse.json({}, { status: 500 })));
 
   renderWithProviders(<Loyalty />, customerPreloadedState);

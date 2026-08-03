@@ -8,6 +8,7 @@ interface LoyaltyConfig {
   shopKey: string;
   apiBase: string;
   appClientId: string;
+  siteName?: string;
   bannerUrl?: string;
   benefitsBannerUrl?: string;
   tierAttributeId?: number;
@@ -28,7 +29,7 @@ const getLoyaltyConfig = (): LoyaltyConfig | undefined => {
 export const isLoyaltyAvailable = () => platform === 'bigcommerce' && Boolean(getLoyaltyConfig());
 
 export const isTierProgressAvailable = (): boolean =>
-  isLoyaltyAvailable() && Boolean(window.loyalty_site_name);
+  isLoyaltyAvailable() && Boolean(getLoyaltyConfig()?.siteName);
 
 /** The `loyaltyTier` alias returned by the login customer query. */
 export interface RawTierAttribute {
@@ -365,7 +366,7 @@ export const fetchTierProgress = async (
   customerId: string | number,
 ): Promise<LoyaltyTierProgress | null> => {
   const config = requireConfig();
-  const site = window.loyalty_site_name;
+  const site = config.siteName;
   if (!site) {
     throw new Error('Loyalty tier progress is not configured on this store');
   }
