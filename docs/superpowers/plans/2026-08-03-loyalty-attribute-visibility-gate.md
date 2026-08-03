@@ -533,11 +533,33 @@ it('shows the unavailable state when the customer is not loyalty-entitled', asyn
 
 In `apps/storefront/src/pages/Loyalty/loyaltyLanding.test.ts`, add — mirroring the existing `prefetchLoyaltyLanding(264074, true)` masquerade test, which is the closest precedent:
 
+**Correction (found during execution): the obvious version of this test is vacuous.**
+`prefetchLoyaltyLanding` bails on `!isTierProgressAvailable() || isAgenting ||
+!customerId || !isLoyaltyEntitled`, and without `BC_CONTEXT.loyalty.progressSite`
+configured the FIRST term already short-circuits — so a test that omits it passes
+whether or not the entitlement gate exists. Configure `progressSite` so a reverted
+gate would genuinely reach the endpoint, and assert the endpoint was never called:
+
 ```ts
 it('does not redirect a customer who is not loyalty-entitled', async () => {
+  // Config in place so a reverted gate would genuinely hit the endpoint and could
+  // resolve true; without this the check is vacuous either way.
+  const requests = vi.fn();
+  withProgressSite();
+  server.use(
+    http.get(progressUrl, () => {
+      requests();
+      return HttpResponse.json({
+        Success: true,
+        Result: { TierProgress: { TargetKind: 'NextTier', TargetTierName: 'Signature' } },
+      });
+    }),
+  );
+
   prefetchLoyaltyLanding(264074, false, false);
 
-  await expect(resolveLoyaltyLanding()).resolves.toBe(false);
+  expect(await resolveLoyaltyLanding()).toBe(false);
+  expect(requests).not.toHaveBeenCalled();
 });
 ```
 
