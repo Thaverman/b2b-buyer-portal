@@ -671,6 +671,8 @@ Smart Rewards appears in the nav, `/loyalty` loads, and — if this customer has
 
 Clear that customer's "Loyalty Tier" value in the BigCommerce control panel, sign out, sign back in. Confirm: no Smart Rewards nav entry; visiting `#/loyalty` directly does not render the page; login does not land there. Then restore the attribute value.
 
+While here, note the response shape for the cleared attribute (`value: ""` vs `value: null`) — both must resolve to hidden, and the spec predicts an object with a blank value rather than a bare `null`. **If a customer who has *never* had the attribute set is available, check that one too**; the spec's measurement says it behaves identically, and this is the cheapest possible confirmation.
+
 - [ ] **Step 5: Confirm the un-opted path**
 
 Remove `tierAttributeId` from `BC_CONTEXT.loyalty`, reload, and confirm Smart Rewards is visible again for a customer with **no** tier value — proving an un-opted store is unaffected.

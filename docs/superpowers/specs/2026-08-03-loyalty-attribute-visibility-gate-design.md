@@ -200,13 +200,33 @@ requirement is presence, not which tier.
 **Why "no answer" must not mean "hidden".** These two look similar in a response
 but mean opposite things:
 
-- `attributes: { loyaltyTier: null }` — the API answered; this customer has no
-  tier. A verdict. Hide.
-- `attributes` absent, or the selection errored — the API did not answer. **No
-  verdict.** If this were treated as "hidden", a BigCommerce schema change, a
+- `attributes: { loyaltyTier: { entityId: 2, name: "Loyalty Tier", value: null } }`
+  — the API answered with the attribute object; this customer has no tier.
+  A verdict. **Hide.**
+- `attributes` absent entirely, or the selection errored — the API did not answer.
+  **No verdict.** If this were treated as "hidden", a BigCommerce schema change, a
   proxy regression, or a revoked token would hide Smart Rewards from *every*
   customer at once, silently and with no error to explain it. The safer failure
   is the status quo plus a loud log.
+
+**Which shape BigCommerce actually returns — measured, not assumed.** During the
+2026-08-03 live probe, aliases for entityIds 1–20 were requested at once. Every id
+came back as a **non-null object** (`{ entityId, value: null }` for the eighteen with
+no value), and introspection reports `attribute(entityId: Int)` with a NON_NULL
+return type. So:
+
+- A customer who has never had "Loyalty Tier" set yields
+  `{ entityId: 2, name: "Loyalty Tier", value: null }` — name matches, value blank →
+  **hidden**, which is the required behaviour.
+- A `tierAttributeId` pointing at an id with no definition yields an object whose
+  `name` is not `"Loyalty Tier"` → **name mismatch → visible + log**.
+- A bare `loyaltyTier: null` does **not** occur. The resolver's `!rawAttribute`
+  branch is therefore reachable only when `attributes` itself is missing — exactly
+  the systemic case it is meant for, and not a per-customer verdict in disguise.
+
+This closes the question of whether the two branches could be confused at runtime:
+they key off different levels of the response, and only one of them is reachable
+per-customer.
 
 This is a deliberate departure from the allowlist gate's blanket "fail-closed on
 the data surface". That gate is a *rollout* lever, where over-restricting is
