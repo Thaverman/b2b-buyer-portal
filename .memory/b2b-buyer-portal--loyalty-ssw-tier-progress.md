@@ -2,8 +2,8 @@
 title: Loyalty tier progress comes from SSW GetDetailWithProgress (dual orders/spend quotas), not Influence thresholds — SSW tier names are display-only, the allowlist gate stays Influence-keyed; endpoint is unauthenticated by accepted decision
 type: decision
 created: 2026-07-20
-updated: 2026-07-20
-lastVerified: 2026-07-20
+updated: 2026-08-03
+lastVerified: 2026-08-03
 repo: b2b-buyer-portal
 storeHash: 24erkpw9h6
 website: SSW
@@ -37,7 +37,7 @@ tier-`threshold` model entirely (`tierProgress.ts`/`findNextTier`/`parseThreshol
 were deleted):
 
 `GET {BC_CONTEXT.loyalty.apiBase}/loyaltycustomersclient/GetDetailWithProgress`
-`?site={progressSite}&bigCommerceStoreId={store_hash}&bigCommerceCustomerId={id}&recentTransactionsTake=0`
+`?site={window.loyalty_site_name}&bigCommerceStoreId={store_hash}&bigCommerceCustomerId={id}&recentTransactionsTake=0`
 
 PascalCase Newtonsoft envelope `{ Success, Result: { TierProgress } }`. Dual
 quotas: orders and/or spend over a rolling window, per-quota percentages, and a
@@ -56,11 +56,15 @@ Plus"). Decision (user, 2026-07-20):
   `isTierAllowed(tierTitle, …)` must never be re-pointed at SSW data (it mirrors
   the theme's canon; test-locked in index.test.tsx).
 - Tiers-tab cards + Overview benefits box remain Influence data (perks live there).
+- The "What's Available as Your Orders Grow?" ladder is now membership-sourced
+  (`NextMembershipsSection.tsx`), anchored on the SSW `currentTierName` against a
+  hardcoded Essential→Select→Signature order — Influence tier ids/thresholds are
+  no longer consulted for the ladder itself (2026-08-03).
 
 ## Gating & failure posture
 
-- Dormant until the theme ships `BC_CONTEXT.loyalty.progressSite` (optional
-  field; absent = no card anywhere, zero behavior change) — same pattern as the
+- Dormant until the theme sets `window.loyalty_site_name` (optional global;
+  absent = no card anywhere, zero behavior change) — same pattern as the
   shipping tracker, see [[b2b-buyer-portal--bc-context-host-config-gating]].
 - Fail-quiet: `tierProgressQuery` joins neither the page error aggregation nor
   the gate verdict; endpoint failure/`Success:false`/top-tier ⇒ no card, page
