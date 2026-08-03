@@ -1,17 +1,19 @@
 import B3Request from '../../request/b3Fetch';
 
-// Omitted entirely when no id is configured, so an un-opted store sends exactly the
-// query it sends today. The id is Number.isInteger-checked by its caller.
+// Omitted entirely when no id is configured: the newline and indent live inside the
+// branch, so an un-opted store's query text is byte-identical to what it sent before
+// this feature existed. The id is Number.isInteger-checked by its caller.
 const tierAttributeSelection = (tierAttributeId?: number) =>
   tierAttributeId === undefined
     ? ''
-    : `attributes {
-    loyaltyTier: attribute(entityId: ${tierAttributeId}) {
-      entityId,
-      name,
-      value,
-    }
-  }`;
+    : `
+    attributes {
+      loyaltyTier: attribute(entityId: ${tierAttributeId}) {
+        entityId,
+        name,
+        value,
+      }
+    }`;
 
 const getCustomer = (tierAttributeId?: number) => `query customer {
   customer{
@@ -20,8 +22,7 @@ const getCustomer = (tierAttributeId?: number) => `query customer {
     firstName,
     lastName,
     email,
-    customerGroupId,
-    ${tierAttributeSelection(tierAttributeId)}
+    customerGroupId,${tierAttributeSelection(tierAttributeId)}
   }
 }`;
 
