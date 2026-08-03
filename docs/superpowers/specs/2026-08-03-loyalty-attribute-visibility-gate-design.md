@@ -51,7 +51,7 @@ Ruled out, so nobody re-treads them:
 | **Customer form fields / metafields** | Not on the Storefront GraphQL customer type. |
 | **`window.LG_PAGE_DATA.gqlCustomer.attributes.loyaltyTier.value`** | Already on the page and synchronous — but it belongs to a third-party app. Coupling portal routing to another vendor's global is fragile; rejected. |
 
-## ⚠️ Primary implementation risk — verify first
+## Where the value comes from, and the one risk in it
 
 The value must land in Redux **before the nav first renders**, so the natural
 home is the customer query the portal already runs at login:
@@ -63,10 +63,9 @@ home is the customer query the portal already runs at login:
 same-origin `graphqlBC`.** The proxy posts to the B2B API
 (`/api/v3/proxy/bc-storefront/graphql`) with the `B2BToken`; the shopper's
 storefront session cookie is *not* sent, and customer identity is resolved by
-the proxy. It demonstrably resolves `entityId`/`firstName` today — but **I
-verified attributes only against the direct same-origin endpoint, never through
-the proxy.** Whether the proxy's customer context also returns `attributes` is
-unknown.
+the proxy. It demonstrably resolves `entityId`/`firstName` today — but the
+attribute read was first verified only against the direct same-origin endpoint,
+never through the proxy. That gap is now closed; see below.
 
 ### Measured 2026-08-03 — mostly resolved, Approach A is viable
 
