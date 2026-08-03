@@ -192,6 +192,7 @@ const gotoAllowedAppPage = async (
     prefetchLoyaltyLanding(
       company.customer.id,
       currentState.b2bFeatures.masqueradeCompany.isAgenting,
+      company.customer.isLoyaltyEntitled,
     );
     if (await resolveLoyaltyLanding()) {
       url = '/loyalty';

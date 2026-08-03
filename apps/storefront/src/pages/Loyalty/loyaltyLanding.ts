@@ -3,8 +3,14 @@ import { clearLoyaltyLanding, getPendingLanding, setPendingLanding } from './loy
 
 export { clearLoyaltyLanding };
 
-export const prefetchLoyaltyLanding = (customerId: number, isAgenting: boolean): void => {
-  if (!isTierProgressAvailable() || isAgenting || !customerId) {
+export const prefetchLoyaltyLanding = (
+  customerId: number,
+  isAgenting: boolean,
+  // Defaults to entitled so the many existing callers and tests are unaffected; the
+  // three production call sites all pass the real verdict.
+  isLoyaltyEntitled = true,
+): void => {
+  if (!isTierProgressAvailable() || isAgenting || !customerId || !isLoyaltyEntitled) {
     setPendingLanding(Promise.resolve(null));
     return;
   }
@@ -15,9 +21,13 @@ export const prefetchLoyaltyLanding = (customerId: number, isAgenting: boolean):
 // Safety net for flows where the early prefetch didn't run (and for tests that
 // mock the login-info module): only fills an empty slot, never restarts an
 // in-flight check — the production head start survives.
-export const prefetchLoyaltyLandingIfIdle = (customerId: number, isAgenting: boolean): void => {
+export const prefetchLoyaltyLandingIfIdle = (
+  customerId: number,
+  isAgenting: boolean,
+  isLoyaltyEntitled = true,
+): void => {
   if (getPendingLanding() === null) {
-    prefetchLoyaltyLanding(customerId, isAgenting);
+    prefetchLoyaltyLanding(customerId, isAgenting, isLoyaltyEntitled);
   }
 };
 

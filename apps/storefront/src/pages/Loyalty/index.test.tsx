@@ -113,6 +113,19 @@ const mockLoyaltyApis = (customer: LoyaltyCustomer) => {
   mockCustomer(customer);
 };
 
+it('shows the unavailable state when the customer is not loyalty-entitled', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  renderWithProviders(<Loyalty />, {
+    preloadedState: {
+      company: buildCompanyStateWith({ customer: { isLoyaltyEntitled: false } }),
+    },
+  });
+
+  expect(await screen.findByText('Rewards are not available.')).toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: 'My rewards' })).not.toBeInTheDocument();
+});
+
 const buildTierWith = builder<LoyaltyTier>(() => ({
   id: faker.string.uuid(),
   title: faker.commerce.productAdjective(),

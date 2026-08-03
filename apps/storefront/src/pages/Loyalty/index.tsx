@@ -52,8 +52,11 @@ function Loyalty() {
   const companyName = useAppSelector(({ company }) => company.companyInfo.companyName);
   const firstName = useAppSelector(({ company }) => company.customer.firstName);
   const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
+  const isLoyaltyEntitled = useAppSelector(({ company }) => company.customer.isLoyaltyEntitled);
   // The digest identifies the logged-in customer, so a masquerading rep must not see points here.
-  const isAvailable = isLoyaltyAvailable() && !isAgenting;
+  // Belt and braces: Task 2 removes the <Route>, but gotoAllowedAppPage checks the
+  // UNFILTERED routes array, so a programmatic push could still mount this page.
+  const isAvailable = isLoyaltyAvailable() && !isAgenting && isLoyaltyEntitled;
 
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = toLoyaltyTab(searchParams.get('tab'));

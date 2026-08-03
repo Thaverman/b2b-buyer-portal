@@ -19,7 +19,11 @@ export async function navigateAfterSuccessfulLogin(
   // Safety net: the login sequence normally prefetches earlier (head start);
   // this fills the slot only if that didn't happen.
   const { company, b2bFeatures } = store.getState();
-  prefetchLoyaltyLandingIfIdle(company.customer.id, b2bFeatures.masqueradeCompany.isAgenting);
+  prefetchLoyaltyLandingIfIdle(
+    company.customer.id,
+    b2bFeatures.masqueradeCompany.isAgenting,
+    company.customer.isLoyaltyEntitled,
+  );
 
   if (quoteDetailToCheckoutUrl) {
     navigate(quoteDetailToCheckoutUrl);

@@ -353,7 +353,11 @@ export const getCurrentCustomerInfo = async (
       store.dispatch(setCustomerInfo(customerInfo));
       {
         const { company, b2bFeatures } = store.getState();
-        prefetchLoyaltyLanding(company.customer.id, b2bFeatures.masqueradeCompany.isAgenting);
+        prefetchLoyaltyLanding(
+          company.customer.id,
+          b2bFeatures.masqueradeCompany.isAgenting,
+          company.customer.isLoyaltyEntitled,
+        );
       }
       store.dispatch(setQuoteUserId(quoteUserId));
       B3SStorage.set('isB2BUser', isB2BUser);

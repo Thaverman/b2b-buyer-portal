@@ -114,6 +114,27 @@ it('does not call the endpoint while masquerading', async () => {
   expect(requests).not.toHaveBeenCalled();
 });
 
+it('does not redirect a customer who is not loyalty-entitled', async () => {
+  // Config in place so a reverted gate would genuinely hit the endpoint and could
+  // resolve true; without this the check is vacuous either way (see task-3-report.md).
+  const requests = vi.fn();
+  withProgressSite();
+  server.use(
+    http.get(progressUrl, () => {
+      requests();
+      return HttpResponse.json({
+        Success: true,
+        Result: { TierProgress: { TargetKind: 'NextTier', TargetTierName: 'Signature' } },
+      });
+    }),
+  );
+
+  prefetchLoyaltyLanding(264074, false, false);
+
+  expect(await resolveLoyaltyLanding()).toBe(false);
+  expect(requests).not.toHaveBeenCalled();
+});
+
 it('does not call the endpoint without a customer id', async () => {
   const requests = vi.fn();
   withProgressSite();
