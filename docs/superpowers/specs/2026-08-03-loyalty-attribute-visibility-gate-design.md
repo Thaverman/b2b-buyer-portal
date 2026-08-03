@@ -116,22 +116,56 @@ would not re-run when a late value lands, so the nav would keep a stale verdict.
 
 ### The gate value
 
-Add one optional field to the existing customer type — **not** a new slice,
-Context, or storage (all forbidden by AGENTS.md):
+Add one field to the existing customer type — **not** a new slice, Context, or
+storage (all forbidden by AGENTS.md):
 
 ```ts
 // src/types/company.ts, interface Customer
 /**
- * Value of the BigCommerce "Loyalty Tier" customer attribute, read at login.
- * Empty string when the attribute exists but is blank; undefined when it is
- * unset, unconfigured, or unreadable. Gates Loyalty visibility.
+ * Whether Loyalty is visible to this customer, decided once at login from the
+ * BigCommerce "Loyalty Tier" customer attribute. TRUE when the attribute has a
+ * value, and also when the gate is inactive (unconfigured id, name mismatch, or
+ * the attribute object was not returned at all). FALSE only when the attribute
+ * was genuinely read and is blank. Defaults to true so that no failure mode
+ * hides Loyalty from everyone.
  */
-loyaltyTier?: string;
+isLoyaltyEntitled: boolean;
 ```
+
+**Why a resolved boolean and not the raw tier string.** An optional
+`loyaltyTier?: string` *cannot express the verdict this gate needs*: "the API did
+not answer" and "the API answered, and the value is blank" would both arrive as
+`undefined`/`''`, yet the gate semantics above require them to produce **opposite**
+outcomes. Encoding that as `undefined` vs `null` on one field is exactly the kind
+of subtlety that gets flattened by the next person's `if (!value)`. Resolving it
+once, at the only place that knows whether an answer arrived, and storing the
+answer as a boolean removes the ambiguity entirely — and gives all three surfaces
+a single value to read instead of three copies of the same predicate.
+
+The raw tier string is deliberately **not** stored: nothing consumes it (the hero
+already gets its tier name from Influence/SSW), so keeping it would be
+speculative.
 
 `setCustomerInfo` already replaces the whole `Customer` payload
 ([company.ts:96-98](../../apps/storefront/src/store/slices/company.ts)), so no
-reducer change is needed.
+reducer change is needed — but the slice's `initialState.customer` must seed
+`isLoyaltyEntitled: true`, so that any code path reaching the gate before login
+completes does not hide the nav.
+
+### The resolver
+
+One pure function, living beside the other loyalty predicates in
+[Loyalty/api.ts](../../apps/storefront/src/pages/Loyalty/api.ts) (`isLoyaltyAvailable`,
+`getAllowedTiers`, `isTierAllowed`):
+
+```ts
+resolveLoyaltyEntitlement(rawAttribute: unknown): boolean
+```
+
+It receives whatever the `loyaltyTier` alias produced and applies the table above.
+`utils/loginInfo.ts` already imports from `@/pages/Loyalty/loyaltyLanding`
+(loginInfo.ts:1), so this import direction is established. `routeList.ts` reads
+only the resolved boolean out of Redux, so it never imports from `pages/`.
 
 ### Configuration, and why the id is not hardcoded
 
@@ -190,7 +224,7 @@ redirect are separate surfaces.
 
 | # | Surface | File | Change |
 |---|---|---|---|
-| 1 | **Nav entry + route** | [routeList.ts:298-304](../../apps/storefront/src/shared/routeList.ts) | Add the condition to the existing `/loyalty` early-return. One edit covers both, because the same filtered list feeds `B3Nav` and the router. Reads `store.getState().company.customer.loyaltyTier` — the function already reads Redux imperatively, so no import from `pages/` is introduced. |
+| 1 | **Nav entry + route** | [routeList.ts:298-304](../../apps/storefront/src/shared/routeList.ts) | Add `!isLoyaltyEntitled` to the existing `/loyalty` early-return. One edit covers both, because the same filtered list feeds `B3Nav` and the router. Reads `store.getState().company.customer.isLoyaltyEntitled` — the function already reads Redux imperatively, so no import from `pages/` is introduced. |
 | 2 | **Page body** | [Loyalty/index.tsx:56](../../apps/storefront/src/pages/Loyalty/index.tsx) | Fold into `isAvailable` so a stale tab, a bookmark, or a programmatic push cannot render the page. Surface 1 removes the `<Route>`, but `gotoAllowedAppPage` checks the *unfiltered* `routes` array, so defence in depth is warranted. |
 | 3 | **Login-landing redirect** | [loyaltyLanding.ts:6-13](../../apps/storefront/src/pages/Loyalty/loyaltyLanding.ts) | Add the condition to the prefetch gate. Without this a hidden-out customer is redirected to `/loyalty` as their post-login page and lands on a route that no longer exists. |
 
