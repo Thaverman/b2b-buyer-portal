@@ -1,9 +1,21 @@
+import Cookies from 'js-cookie';
+
 import b2bLogger from '@/utils/b3Logger';
 import { BigCommerceStorefrontAPIBaseURL } from '@/utils/basicConfig';
 
 // Same-origin REST Storefront API. On stencil BigCommerceStorefrontAPIBaseURL is
-// window.origin, which is what these endpoints require — they take no token.
+// window.origin, which is what these endpoints require — they take no bearer token.
 const STOREFRONT_API_BASE = `${BigCommerceStorefrontAPIBaseURL}/api/storefront`;
+
+// Writes are CSRF-protected with a double-submit cookie: the storefront sets a
+// non-HttpOnly SF-CSRF-TOKEN cookie, and a write must echo its value in this header
+// or BigCommerce answers 403 Forbidden. Verified against the live sandbox store:
+// header matching the cookie -> processed; wrong value -> 403; cookie but no header
+// -> 403; no cookie at all -> processed. Reads (GET /carts) are not protected.
+// Do NOT trust @bigcommerce/checkout-sdk on this — the bundle vendored in the
+// checkout fork (1.936.2) sends no such header, which predates this enforcement.
+const CSRF_COOKIE = 'SF-CSRF-TOKEN';
+const CSRF_HEADER = 'X-SF-CSRF-TOKEN';
 
 export interface CartCoupons {
   cartId: string | null;
@@ -118,12 +130,20 @@ const couponWrite = async (
   method: 'POST' | 'DELETE',
   body?: string,
 ): Promise<string[] | null> => {
+  // Omitted rather than sent empty when the cookie is absent: a blank value reads as a
+  // mismatch and is rejected, whereas presenting no token at all is accepted.
+  const csrfToken = Cookies.get(CSRF_COOKIE);
+
   let response: Response;
   try {
     response = await fetch(`${STOREFRONT_API_BASE}${path}`, {
       method,
       credentials: 'same-origin',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        ...(csrfToken ? { [CSRF_HEADER]: csrfToken } : {}),
+      },
       body,
     });
   } catch {

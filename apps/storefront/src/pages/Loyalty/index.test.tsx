@@ -1122,6 +1122,42 @@ it('applies an earned reward to the cart from its My rewards row', async () => {
   expect(screen.queryByRole('button', { name: 'Apply to cart' })).not.toBeInTheDocument();
 });
 
+it('echoes the storefront CSRF cookie back as a header on a coupon write', async () => {
+  // BigCommerce protects storefront writes with a double-submit cookie: without an
+  // X-SF-CSRF-TOKEN header matching the SF-CSRF-TOKEN cookie it answers 403, so
+  // without this every apply and remove fails for every shopper. Verified live.
+  document.cookie = 'SF-CSRF-TOKEN=token-abc123';
+  const csrfHeader = vi.fn();
+
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockRedeemRules([]);
+  mockCart(buildCartWith({ id: 'cart-1' }));
+  server.use(
+    http.get(`${launcherBase}/customer/all-rewards`, () =>
+      HttpResponse.json({
+        items: [buildEarnedRewardWith({ title: '$5 credit', couponCode: 'SAVE-123' })],
+        nextToken: null,
+      }),
+    ),
+    http.post(couponsUrl, ({ request }) => {
+      csrfHeader(request.headers.get('X-SF-CSRF-TOKEN'));
+      return HttpResponse.json({ coupons: [{ code: 'SAVE-123' }] });
+    }),
+  );
+
+  const { user } = renderWithProviders(<Loyalty />, {
+    initialEntries: [{ search: '?tab=my-rewards' }],
+  });
+
+  const applyButton = await screen.findByRole('button', { name: 'Apply to cart' });
+  await waitFor(() => expect(applyButton).toBeEnabled());
+  await user.click(applyButton);
+
+  await waitFor(() => expect(csrfHeader).toHaveBeenCalledWith('token-abc123'));
+
+  document.cookie = 'SF-CSRF-TOKEN=; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+});
+
 it('offers no apply action when a reward has no coupon code', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
   mockRedeemRules([]);

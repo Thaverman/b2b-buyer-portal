@@ -64,7 +64,7 @@ Rejected alternatives:
 | Verified | How |
 |---|---|
 | Cart id **is** checkout id, so no checkout-creation step | BC spec: "The ID of the subject checkout. Identical to the cart ID." |
-| **No CSRF token needed for the writes** | BC's docs contradict themselves ("write requests require a CSRF token" on the endpoint page vs. "no token is required" in the Storefront overview). Settled by reading BigCommerce's own `@bigcommerce/checkout-sdk` bundle in the `ssw-checkout` fork: `applyCoupon` POSTs with only `Accept` + `X-Checkout-SDK-Version` + cookies, and "csrf" appears nowhere in the bundle. The doc note targets Stencil-CLI local dev. |
+| ~~No CSRF token needed for the writes~~ **— WRONG, corrected 2026-08-03** | **Writes DO require a CSRF token.** BigCommerce protects them with a double-submit cookie: the storefront sets a non-HttpOnly `SF-CSRF-TOKEN` cookie, and a write must echo its value in an `X-SF-CSRF-TOKEN` header. Measured against the live sandbox: matching header → processed; wrong value → **403**; cookie present but no header → **403**; no cookie at all → processed. `GET /carts` is not protected. **How the original claim went wrong:** it rested on reading `@bigcommerce/checkout-sdk` in the `ssw-checkout` fork, where "csrf" genuinely appears nowhere — but that bundle is pinned at **1.936.2** and predates the enforcement. A vendored dependency is evidence about that version, never about the live API. The endpoint doc page saying "write requests require a CSRF token" was simply right, and the Storefront overview's "no token is required" refers only to bearer/API tokens. |
 | Same-origin requirement is already met | Loyalty is gated to `platform === 'bigcommerce'` (`isLoyaltyAvailable`, api.ts:28), and on that platform `BigCommerceStorefrontAPIBaseURL` is `window.origin` (basicConfig.ts:8-15). |
 
 Residual risk: the endpoints' OpenAPI specs document **only** 200 and 409.
@@ -109,6 +109,12 @@ Requests are `fetch` with `credentials: 'same-origin'`,
 | read | `GET /carts` |
 | apply | `POST /checkouts/{cartId}/coupons`, body `{ couponCode }` |
 | remove | `DELETE /checkouts/{cartId}/coupons/{encodeURIComponent(code)}` |
+
+**Both writes must also send `X-SF-CSRF-TOKEN`,** read from the `SF-CSRF-TOKEN`
+cookie via `js-cookie`, or BigCommerce answers 403 (see the corrected row above).
+The header is omitted entirely when the cookie is absent — a blank value reads as a
+mismatch and is rejected, whereas presenting no token at all is accepted. This is the
+one cookie the feature reads; the `cartId` cookie is still never touched.
 
 Details that matter:
 
