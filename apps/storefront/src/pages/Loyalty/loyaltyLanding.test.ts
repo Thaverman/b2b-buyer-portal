@@ -15,7 +15,8 @@ const appClientId = 'ssw-app-client-id';
 const progressUrl = `${apiBase}/loyaltycustomersclient/GetDetailWithProgress`;
 
 const withProgressSite = () => {
-  window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId, progressSite: 'StoreSupply' } };
+  window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId } };
+  window.loyalty_site_name = 'StoreSupply';
 };
 
 const mockProgress = (targetKind: string) =>
@@ -30,6 +31,7 @@ const mockProgress = (targetKind: string) =>
 
 afterEach(() => {
   delete window.BC_CONTEXT;
+  delete window.loyalty_site_name;
 });
 
 // Module state persists within this file: this MUST stay the first test.

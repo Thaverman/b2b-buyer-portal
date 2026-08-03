@@ -37,6 +37,7 @@ describe('LoginPage', () => {
 
   afterEach(() => {
     delete window.BC_CONTEXT;
+    delete window.loyalty_site_name;
   });
 
   describe('successful login and redirects', () => {
@@ -128,9 +129,9 @@ describe('LoginPage', () => {
           shopKey: 'store-key',
           apiBase: 'https://ssw.example.com/customers',
           appClientId: 'ssw-app-client-id',
-          progressSite: 'StoreSupply',
         },
       };
+      window.loyalty_site_name = 'StoreSupply';
       server.use(
         graphql.mutation('Login', () => {
           return HttpResponse.json({
@@ -186,9 +187,9 @@ describe('LoginPage', () => {
           shopKey: 'store-key',
           apiBase: 'https://ssw.example.com/customers',
           appClientId: 'ssw-app-client-id',
-          progressSite: 'StoreSupply',
         },
       };
+      window.loyalty_site_name = 'StoreSupply';
       server.use(
         graphql.mutation('Login', () => {
           return HttpResponse.json({

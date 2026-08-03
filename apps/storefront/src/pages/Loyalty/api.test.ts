@@ -59,6 +59,7 @@ beforeEach(() => {
 
 afterEach(() => {
   delete window.BC_CONTEXT;
+  delete window.loyalty_site_name;
   delete window.loyaltyShippingConfig;
   delete window.getLoyaltyShippingCalculation;
   delete window.loyaltyRolloutConfig;
@@ -526,15 +527,16 @@ const progressUrl =
   'https://ssw.example.com/customers/loyaltycustomersclient/GetDetailWithProgress';
 
 const withProgressSite = () => {
-  window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId, progressSite: 'StoreSupply' } };
+  window.BC_CONTEXT = { loyalty: { shopKey, apiBase, appClientId } };
+  window.loyalty_site_name = 'StoreSupply';
 };
 
 describe('isTierProgressAvailable', () => {
-  it('is false when progressSite is not configured', () => {
+  it('is false when loyalty_site_name is not configured', () => {
     expect(isTierProgressAvailable()).toBe(false);
   });
 
-  it('is true when the loyalty config includes progressSite', () => {
+  it('is true when loyalty_site_name is set', () => {
     withProgressSite();
 
     expect(isTierProgressAvailable()).toBe(true);

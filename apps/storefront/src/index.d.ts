@@ -79,8 +79,6 @@ declare global {
          * Find it with GET /v3/customers/attributes?name=Loyalty Tier (server-side).
          */
         tierAttributeId?: number;
-        /** SSW site key for GetDetailWithProgress (e.g. "StoreSupply"); absent = tier progress off. */
-        progressSite?: string;
         /** Theme override for the hero banner image; absent = the relative default. */
         bannerUrl?: string;
         /** Theme override for the My-benefits banner image; absent = the relative default. */
@@ -115,6 +113,8 @@ declare global {
         items?: { question?: string; answer?: string; bullets?: string[] }[];
       }[];
     };
+    /** SSW site key for GetDetailWithProgress (e.g. "StoreSupply"); absent = tier progress off. */
+    loyalty_site_name?: string;
     B3: {
       setting: {
         channel_id: number;
