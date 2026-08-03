@@ -70,18 +70,25 @@ is confirmed already correct — no change there.
 
 ## Part A — `fetchTierProgress` site param (`api.ts`, `index.d.ts`)
 
-- `src/index.d.ts`: add a new top-level `Window` property
-  `loyalty_site_name?: string;` (alongside `loyaltyRolloutConfig`/`loyaltyFaqConfig`).
-  Remove `progressSite?: string;` from `BC_CONTEXT.loyalty` (now unused).
+- `src/index.d.ts`: add `siteName?: string;` to `BC_CONTEXT.loyalty`
+  (after `appClientId: string;`). Remove `progressSite?: string;` from
+  `BC_CONTEXT.loyalty` (now unused).
 - `api.ts`:
-  - Remove `progressSite?: string;` from the `LoyaltyConfig` interface.
-  - `isTierProgressAvailable`: `isLoyaltyAvailable() && Boolean(window.loyalty_site_name)`
+  - Add `siteName?: string;` to the `LoyaltyConfig` interface (after `appClientId`).
+  - `isTierProgressAvailable`: `isLoyaltyAvailable() && Boolean(getLoyaltyConfig()?.siteName)`
     (was `Boolean(getLoyaltyConfig()?.progressSite)`).
   - `fetchTierProgress`: replace the `config.progressSite` guard/read with
-    `window.loyalty_site_name`; `bigCommerceStoreId: window.B3.setting.store_hash`
+    `config.siteName`; `bigCommerceStoreId: window.B3.setting.store_hash`
     is unchanged. Same thrown-error message and shape on absence.
 - No change to `RawTierProgress`, the response mapping, or any other field —
   this is purely a request-param source swap.
+
+### **As-built note (2026-08-03):**
+Live-sandbox verification showed that `window.loyalty_site_name` is not a
+**runtime** global set by the theme. Instead, `"loyalty_site_name"` is the key
+name for the site setting in the Stencil bootstrap JSON; the theme emits the
+value as `BC_CONTEXT.loyalty.siteName = 'StoreSupply'` at initialization.
+The implementation reads from that config field instead of a separate global.
 
 ## Part B — restore the membership catalog (`api.ts`)
 

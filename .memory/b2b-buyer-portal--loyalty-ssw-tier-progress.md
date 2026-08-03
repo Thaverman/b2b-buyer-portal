@@ -37,7 +37,7 @@ tier-`threshold` model entirely (`tierProgress.ts`/`findNextTier`/`parseThreshol
 were deleted):
 
 `GET {BC_CONTEXT.loyalty.apiBase}/loyaltycustomersclient/GetDetailWithProgress`
-`?site={window.loyalty_site_name}&bigCommerceStoreId={store_hash}&bigCommerceCustomerId={id}&recentTransactionsTake=0`
+`?site={BC_CONTEXT.loyalty.siteName}&bigCommerceStoreId={store_hash}&bigCommerceCustomerId={id}&recentTransactionsTake=0`
 
 PascalCase Newtonsoft envelope `{ Success, Result: { TierProgress } }`. Dual
 quotas: orders and/or spend over a rolling window, per-quota percentages, and a
@@ -63,9 +63,10 @@ Plus"). Decision (user, 2026-07-20):
 
 ## Gating & failure posture
 
-- Dormant until the theme sets `window.loyalty_site_name` (optional global;
+- Dormant until the theme sets `BC_CONTEXT.loyalty.siteName` (optional config;
   absent = no card anywhere, zero behavior change) — same pattern as the
-  shipping tracker, see [[b2b-buyer-portal--bc-context-host-config-gating]].
+  shipping tracker's `loyaltyShippingConfig`, see [[b2b-buyer-portal--bc-context-host-config-gating]].
+  (`siteName` is a config field within `BC_CONTEXT.loyalty`, not a separate runtime global.)
 - Fail-quiet: `tierProgressQuery` joins neither the page error aggregation nor
   the gate verdict; endpoint failure/`Success:false`/top-tier ⇒ no card, page
   intact (test-locked: endpoint-500 shows no error banner).
