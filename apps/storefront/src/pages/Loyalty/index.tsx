@@ -56,7 +56,10 @@ function Loyalty() {
   // The digest identifies the logged-in customer, so a masquerading rep must not see points here.
   // Belt and braces: Task 2 removes the <Route>, but gotoAllowedAppPage checks the
   // UNFILTERED routes array, so a programmatic push could still mount this page.
-  const isAvailable = isLoyaltyAvailable() && !isAgenting && isLoyaltyEntitled;
+  // isLoyaltyEntitled !== false (not a falsy test): a session rehydrated from a bundle
+  // that predates this field has no isLoyaltyEntitled at all, and undefined must mean
+  // "visible", not "hidden".
+  const isAvailable = isLoyaltyAvailable() && !isAgenting && isLoyaltyEntitled !== false;
 
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = toLoyaltyTab(searchParams.get('tab'));

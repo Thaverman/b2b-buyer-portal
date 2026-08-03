@@ -298,12 +298,15 @@ export const getAllowedRoutesWithoutComponent = (globalState: GlobalState): Buye
     // digest identifies the logged-in rep, not the masqueraded buyer — and hidden
     // unless the "Loyalty Tier" customer attribute has a value (resolved at login;
     // defaults to entitled so no failure mode hides it from everyone).
+    // isLoyaltyEntitled === false (not a falsy test): a session rehydrated from a
+    // bundle that predates this field has no isLoyaltyEntitled at all, and undefined
+    // must mean "visible", not "hidden".
     if (
       path === '/loyalty' &&
       (platform !== 'bigcommerce' ||
         !window.BC_CONTEXT?.loyalty ||
         isAgenting ||
-        !isLoyaltyEntitled)
+        isLoyaltyEntitled === false)
     ) {
       return false;
     }

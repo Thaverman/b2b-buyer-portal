@@ -928,4 +928,35 @@ describe('resolveLoyaltyEntitlement', () => {
     expect(getTierAttributeId()).toBeUndefined();
     expect(resolveLoyaltyEntitlement({ entityId: 2, name: 'Loyalty Tier', value: '' })).toBe(true);
   });
+
+  // The value is cast from an untyped GraphQL response; a numeric tier must read as
+  // entitled rather than throw inside .trim() (which would surface in login's
+  // try-block and log the shopper out — the opposite of fail-open).
+  it('is entitled without throwing when the attribute value is numeric', () => {
+    withTierAttributeId(2);
+
+    expect(
+      resolveLoyaltyEntitlement({
+        entityId: 2,
+        name: 'Loyalty Tier',
+        value: 5137301 as unknown as string,
+      }),
+    ).toBe(true);
+  });
+
+  // Number.isInteger(1e21) is true, but `${1e21}` serializes as "1e+21", not a valid
+  // GraphQL Int literal — an absurdly large configured id must degrade to gate-off
+  // rather than break login.
+  it('ignores an implausibly large configured id', () => {
+    window.BC_CONTEXT = {
+      loyalty: {
+        shopKey: 'shop-key',
+        apiBase: 'https://ssw.example.com/customers',
+        appClientId: 'app-client-id',
+        tierAttributeId: 1e21,
+      },
+    };
+
+    expect(getTierAttributeId()).toBeUndefined();
+  });
 });

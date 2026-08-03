@@ -42,9 +42,16 @@ const TIER_ATTRIBUTE_NAME = 'Loyalty Tier';
 
 // Number.isInteger both validates and makes interpolating the id into a GraphQL
 // document safe — the value comes from a host-set global and is not to be trusted.
+// The range guard rejects ids too large to serialize as a valid GraphQL Int literal
+// (e.g. 1e21 renders as "1e+21", not digits) or plainly bogus (<= 0).
 export const getTierAttributeId = (): number | undefined => {
   const configured = getLoyaltyConfig()?.tierAttributeId;
-  return Number.isInteger(configured) ? configured : undefined;
+  const isPlausibleId =
+    typeof configured === 'number' &&
+    Number.isInteger(configured) &&
+    configured > 0 &&
+    configured < 2 ** 31;
+  return isPlausibleId ? configured : undefined;
 };
 
 // TRUE keeps Loyalty visible. It closes ONLY on a successfully-read, blank attribute:
@@ -69,7 +76,11 @@ export const resolveLoyaltyEntitlement = (
     );
     return true;
   }
-  return (rawAttribute.value ?? '').trim() !== '';
+  // String(), not a direct .trim(): the value is cast from an untyped GraphQL
+  // response, and a non-string (e.g. numeric) value must read as entitled rather
+  // than throw — a throw here would surface inside login's try-block and log the
+  // shopper out, the opposite of this resolver's fail-open design.
+  return String(rawAttribute.value ?? '').trim() !== '';
 };
 
 type LoyaltyErrorKind =

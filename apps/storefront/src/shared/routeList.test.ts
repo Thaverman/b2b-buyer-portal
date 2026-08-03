@@ -55,3 +55,15 @@ it('withholds the loyalty route when the host has no loyalty config, even if ent
 
   expect(hasLoyaltyRoute()).toBe(false);
 });
+
+// A session rehydrated from a bundle that predates this field has no
+// isLoyaltyEntitled at all; redux-persist's autoMergeLevel1 hard-sets the
+// persisted `customer` over initialState, so the `true` seed is gone.
+it('offers the loyalty route when the persisted customer predates isLoyaltyEntitled', () => {
+  window.BC_CONTEXT = { loyalty: loyaltyConfig };
+  const { customer } = buildCompanyStateWith({});
+  const { isLoyaltyEntitled: discardedIsLoyaltyEntitled, ...withoutTheField } = customer;
+  store.dispatch(setCustomerInfo(withoutTheField as typeof customer));
+
+  expect(hasLoyaltyRoute()).toBe(true);
+});

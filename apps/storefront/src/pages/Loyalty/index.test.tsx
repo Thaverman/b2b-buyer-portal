@@ -113,17 +113,39 @@ const mockLoyaltyApis = (customer: LoyaltyCustomer) => {
   mockCustomer(customer);
 };
 
-it('shows the unavailable state when the customer is not loyalty-entitled', async () => {
-  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
-
+it('shows the unavailable state when the customer is not loyalty-entitled', () => {
   renderWithProviders(<Loyalty />, {
     preloadedState: {
       company: buildCompanyStateWith({ customer: { isLoyaltyEntitled: false } }),
     },
   });
 
-  expect(await screen.findByText('Rewards are not available.')).toBeInTheDocument();
+  expect(screen.getByText('Rewards are not available.')).toBeInTheDocument();
   expect(screen.queryByRole('tab', { name: 'My rewards' })).not.toBeInTheDocument();
+});
+
+// A session rehydrated from a bundle that predates this field has no
+// isLoyaltyEntitled at all; redux-persist's autoMergeLevel1 hard-sets the
+// persisted `customer` over initialState, so the `true` seed is gone.
+it('renders the page when the persisted customer predates isLoyaltyEntitled', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  // buildCompanyStateWith deep-merges overrides onto its defaults (isLoyaltyEntitled:
+  // true), so passing a customer override without the key would silently restore it.
+  // Build the full state once, then replace `customer` directly (no re-merge) to
+  // reproduce the omission.
+  const companyState = buildCompanyStateWith({});
+  const { isLoyaltyEntitled: discardedIsLoyaltyEntitled, ...withoutTheField } =
+    companyState.customer;
+
+  renderWithProviders(<Loyalty />, {
+    preloadedState: {
+      company: { ...companyState, customer: withoutTheField as typeof companyState.customer },
+    },
+  });
+
+  expect(await screen.findByRole('tab', { name: 'My benefits' })).toBeInTheDocument();
+  expect(screen.queryByText('Rewards are not available.')).not.toBeInTheDocument();
 });
 
 const buildTierWith = builder<LoyaltyTier>(() => ({
