@@ -277,10 +277,11 @@ spec fixes it only for the new gate; see Non-goals.
 - **The query:** the attribute selection is sent with the configured id; a
   `name` mismatch logs and leaves the gate off; a blank/`null` value closes it.
 - **The two failure modes must be distinguished by tests, not just by code:** a
-  response with `attributes: { loyaltyTier: null }` hides Loyalty, while a
-  response with **no `attributes` object at all** leaves it visible and logs. A
-  single test cannot cover both, and collapsing them is the specific bug this
-  design is guarding against.
+  response carrying the attribute object with a blank value —
+  `attributes: { loyaltyTier: { name: "Loyalty Tier", value: null } }` — hides
+  Loyalty, while a response with **no `attributes` object at all** leaves it
+  visible and logs. A single test cannot cover both, and collapsing them is the
+  specific bug this design is guarding against.
 - **Untouched:** the existing allowlist-gate tests, masquerade tests, and every
   Loyalty tab test must stay green.
 
