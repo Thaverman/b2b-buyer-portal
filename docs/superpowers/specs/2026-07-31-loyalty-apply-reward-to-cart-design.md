@@ -67,11 +67,37 @@ Rejected alternatives:
 | ~~No CSRF token needed for the writes~~ **— WRONG, corrected 2026-08-03** | **Writes DO require a CSRF token.** BigCommerce protects them with a double-submit cookie: the storefront sets a non-HttpOnly `SF-CSRF-TOKEN` cookie, and a write must echo its value in an `X-SF-CSRF-TOKEN` header. Measured against the live sandbox: matching header → processed; wrong value → **403**; cookie present but no header → **403**; no cookie at all → processed. `GET /carts` is not protected. **How the original claim went wrong:** it rested on reading `@bigcommerce/checkout-sdk` in the `ssw-checkout` fork, where "csrf" genuinely appears nowhere — but that bundle is pinned at **1.936.2** and predates the enforcement. A vendored dependency is evidence about that version, never about the live API. The endpoint doc page saying "write requests require a CSRF token" was simply right, and the Storefront overview's "no token is required" refers only to bearer/API tokens. |
 | Same-origin requirement is already met | Loyalty is gated to `platform === 'bigcommerce'` (`isLoyaltyAvailable`, api.ts:28), and on that platform `BigCommerceStorefrontAPIBaseURL` is `window.origin` (basicConfig.ts:8-15). |
 
-Residual risk: the endpoints' OpenAPI specs document **only** 200 and 409.
-There is no documented status or body for an invalid, expired, already-used, or
-ineligible coupon, nor for an empty cart. Error handling is therefore
-defensive by design (below), and the first implementation step is a live
-sandbox smoke test.
+### Measured contract (live sandbox, logged-in shopper, 2026-08-03)
+
+The OpenAPI specs document only 200 and 409, so the following was measured
+end-to-end against `sandbox.storesupply.com` with a real cart and real redeemed
+reward codes. **This table, not the docs, is the authority.**
+
+| Case | Status | Response | Our mapping → buyer sees |
+|---|---|---|---|
+| Apply a valid code | `200` | full checkout, `coupons: [{code, couponType: "per_total_discount", discountedAmount: 10}]` | success → "Reward applied to your cart." |
+| Apply an invalid code | **`400`** | `{"code":"invalid","title":"Invalid coupon","detail":"The coupon code … is not valid."}` | any-4xx → `rejected` → "This reward couldn't be applied…" |
+| Re-apply the code already applied | **`200`** | unchanged, still one coupon | success (harmless; `isMutating` blocks the double-click anyway) |
+| Apply a **second** code while one is applied | **`200`** | **silently REPLACES the first** — see below | unreachable: `hasAnyCoupon` disables Apply |
+| Remove an applied code | `200` | `coupons: []` | success → "Reward removed from your cart." |
+| Remove a code that is *not* applied | **`404`** | — | remove errors → generic + resync, which then shows the truth |
+| Any write without the CSRF header | **`403`** | `{"title":"Forbidden"}` | `401`/`403` → `upstream` → generic (and now prevented) |
+| `GET /carts` with no cart | `200` | `[]` | `cartId: null` → `needsCart` hint |
+
+Everything the shipped error mapping does is confirmed correct by this table. Two
+findings deserve emphasis:
+
+- **`400` is why the any-4xx rule matters.** The plan's original `404`/`422`
+  mapping would have missed the single most common failure — an invalid or spent
+  code — and shown the vague generic error instead of the useful one.
+- **BigCommerce enforces one-coupon-per-order by silent replacement, not by
+  rejection.** Applying a second code returns `200` and the first coupon is simply
+  gone, with nothing in the response to say so. That makes the `hasAnyCoupon`
+  blocking rule **load-bearing, not cosmetic**: without it a buyer clicking Apply
+  on a second reward would silently lose the first and still be shown a success
+  message. Decision 1's "block, never swap" is therefore the only safe option of
+  the three considered — and "allow stacking" would have been quietly broken,
+  since only one coupon ever survives.
 
 ## New service module: `src/shared/service/bc/api/cart.ts`
 
