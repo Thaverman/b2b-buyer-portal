@@ -270,7 +270,7 @@ export const getAllowedRoutesWithoutComponent = (globalState: GlobalState): Buye
   const { storefrontConfig, quoteConfig } = globalState;
   const { company, b2bFeatures } = store.getState();
   const { isAgenting } = b2bFeatures.masqueradeCompany;
-  const { role } = company.customer;
+  const { role, isLoyaltyEntitled } = company.customer;
   let isB2BUser = false;
 
   if (
@@ -294,11 +294,16 @@ export const getAllowedRoutesWithoutComponent = (globalState: GlobalState): Buye
       return false;
     }
 
-    // /loyalty is Stencil-only, host-configured, and hidden while agenting —
-    // the loyalty digest identifies the logged-in rep, not the masqueraded buyer.
+    // /loyalty is Stencil-only, host-configured, hidden while agenting — the loyalty
+    // digest identifies the logged-in rep, not the masqueraded buyer — and hidden
+    // unless the "Loyalty Tier" customer attribute has a value (resolved at login;
+    // defaults to entitled so no failure mode hides it from everyone).
     if (
       path === '/loyalty' &&
-      (platform !== 'bigcommerce' || !window.BC_CONTEXT?.loyalty || isAgenting)
+      (platform !== 'bigcommerce' ||
+        !window.BC_CONTEXT?.loyalty ||
+        isAgenting ||
+        !isLoyaltyEntitled)
     ) {
       return false;
     }
