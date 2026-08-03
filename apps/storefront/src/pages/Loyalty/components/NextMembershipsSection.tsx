@@ -3,44 +3,48 @@ import { Box, Typography } from '@mui/material';
 
 import { useB3Lang } from '@/lib/lang';
 
-import { LoyaltyTier } from '../api';
+import { LoyaltyMembership } from '../api';
 
-interface NextTiersSectionProps {
-  tiers: LoyaltyTier[];
-  currentTierId: string | null;
+interface NextMembershipsSectionProps {
+  memberships: LoyaltyMembership[];
   currentTierName: string | null;
   atTop: boolean;
 }
 
-function NextTiersSection({ tiers, currentTierId, currentTierName, atTop }: NextTiersSectionProps) {
+const MEMBERSHIP_LADDER_ORDER = ['essential', 'select', 'signature'];
+
+function NextMembershipsSection({
+  memberships,
+  currentTierName,
+  atTop,
+}: NextMembershipsSectionProps) {
   const b3Lang = useB3Lang();
 
-  const sswTierName = currentTierName?.trim() ?? '';
+  const sswName = currentTierName?.trim() ?? '';
 
-  // SSW is the only trustworthy source for "topped out": Influence tier ids live in a
-  // separate id space, so an id match cannot tell us the customer's real position.
+  // SSW is the only source consulted for placement (per the 2026-08-03 decision):
+  // Influence is no longer trusted for "which membership is this customer in."
   if (atTop) {
     return (
       <Typography sx={{ textAlign: 'center' }}>
-        {sswTierName
-          ? b3Lang('loyalty.benefits.atTopTier', { tier: sswTierName })
+        {sswName
+          ? b3Lang('loyalty.benefits.atTopTier', { tier: sswName })
           : b3Lang('loyalty.benefits.atTopTierGeneric')}
       </Typography>
     );
   }
 
-  const sswName = sswTierName.toLowerCase();
-  const byName = sswName
-    ? tiers.findIndex((tier) => tier.title.trim().toLowerCase() === sswName)
-    : -1;
-  // Prefer the SSW name; fall back to the Influence id both when SSW sent no usable
-  // name and when the name matches no tier title (the safety net for name drift).
-  const currentIndex =
-    byName === -1 ? tiers.findIndex((tier) => tier.id === currentTierId) : byName;
-  // Unknown current tier: we cannot say what is "above", so show nothing.
-  const nextTiers = currentIndex === -1 ? [] : tiers.slice(currentIndex + 1);
+  const anchorIndex = MEMBERSHIP_LADDER_ORDER.indexOf(sswName.toLowerCase());
+  // Unknown or absent current membership: we cannot say what is "above," so show nothing.
+  if (anchorIndex === -1) {
+    return null;
+  }
 
-  if (nextTiers.length === 0) {
+  const nextMemberships = MEMBERSHIP_LADDER_ORDER.slice(anchorIndex + 1)
+    .map((name) => memberships.find((membership) => membership.title.trim().toLowerCase() === name))
+    .filter((membership): membership is LoyaltyMembership => Boolean(membership));
+
+  if (nextMemberships.length === 0) {
     return null;
   }
 
@@ -50,14 +54,14 @@ function NextTiersSection({ tiers, currentTierId, currentTierName, atTop }: Next
         {b3Lang('loyalty.benefits.nextTiersTitle')}
       </Typography>
       <Typography sx={{ textAlign: 'center' }}>
-        {nextTiers.length === 1
+        {nextMemberships.length === 1
           ? b3Lang('loyalty.benefits.nextTiersIntroOne')
-          : b3Lang('loyalty.benefits.nextTiersIntroMany', { count: nextTiers.length })}
+          : b3Lang('loyalty.benefits.nextTiersIntroMany', { count: nextMemberships.length })}
       </Typography>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-        {nextTiers.map((tier) => (
+        {nextMemberships.map((membership) => (
           <Box
-            key={tier.id}
+            key={membership.id}
             sx={{
               bgcolor: 'primary.main',
               color: 'primary.contrastText',
@@ -71,18 +75,18 @@ function NextTiersSection({ tiers, currentTierId, currentTierName, atTop }: Next
               sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}
             >
               <Typography variant="h5" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
-                {b3Lang('loyalty.benefits.nextTierName', { title: tier.title })}
+                {b3Lang('loyalty.benefits.nextTierName', { title: membership.title })}
               </Typography>
               <ArrowOutward sx={{ fontSize: 32 }} />
             </Box>
-            {tier.threshold.trim() !== '' && (
+            {membership.description.trim() !== '' && (
               <Typography variant="body2" sx={{ fontWeight: 700, mt: 1 }}>
-                {`(${tier.threshold}) :`}
+                {`(${membership.description}) :`}
               </Typography>
             )}
-            {tier.perks.length > 0 && (
+            {membership.perks.length > 0 && (
               <Typography variant="body2" sx={{ mt: 1 }}>
-                {tier.perks.join(', ')}
+                {membership.perks.join(', ')}
               </Typography>
             )}
           </Box>
@@ -93,4 +97,4 @@ function NextTiersSection({ tiers, currentTierId, currentTierName, atTop }: Next
   );
 }
 
-export default NextTiersSection;
+export default NextMembershipsSection;

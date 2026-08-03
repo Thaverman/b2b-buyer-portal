@@ -20,6 +20,7 @@ import {
   EarnedReward,
   LoyaltyCustomer,
   LoyaltyIdentity,
+  LoyaltyMembership,
   LoyaltyTier,
   LoyaltyTierProgress,
   RedeemRule,
@@ -158,6 +159,18 @@ const buildTierWith = builder<LoyaltyTier>(() => ({
 
 const mockTiers = (tiers: LoyaltyTier[]) =>
   server.use(http.get(`${launcherBase}/shop/tiers`, () => HttpResponse.json({ rules: tiers })));
+
+const buildMembershipWith = builder<LoyaltyMembership>(() => ({
+  id: faker.string.uuid(),
+  title: faker.commerce.productAdjective(),
+  description: faker.company.catchPhrase(),
+  perks: [faker.company.catchPhrase()],
+}));
+
+const mockMemberships = (memberships: LoyaltyMembership[]) =>
+  server.use(
+    http.get(`${launcherBase}/shop/memberships`, () => HttpResponse.json({ memberships })),
+  );
 
 const buildRedeemRuleWith = builder<RedeemRule>(() => ({
   id: faker.string.uuid(),
@@ -1908,27 +1921,28 @@ it('hides the benefits banner image when it fails to load', async () => {
   ).not.toBeInTheDocument();
 });
 
-const rewardTiers = () => [
-  buildTierWith({ id: 't1', title: 'Essential', threshold: '' }),
-  buildTierWith({
-    id: 't2',
+const rewardMemberships = () => [
+  buildMembershipWith({ id: 'm1', title: 'Essential', description: '' }),
+  buildMembershipWith({
+    id: 'm2',
     title: 'Select',
-    threshold: '8+ orders/year or $2,000+ annual spend',
+    description: '8+ orders/year or $2,000+ annual spend',
     perks: ['2% monthly credit', 'an account rep'],
   }),
-  buildTierWith({
-    id: 't3',
+  buildMembershipWith({
+    id: 'm3',
     title: 'Signature',
-    threshold: '16+ orders/year or $5,000+ annual spend',
+    description: '16+ orders/year or $5,000+ annual spend',
     perks: ['3% monthly credit'],
   }),
 ];
 
-it('shows the tiers above the customer with their quota and perks', async () => {
-  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't1' }));
-  mockTiers(rewardTiers());
+it('shows the memberships above the customer with their quota and perks', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockMemberships(rewardMemberships());
+  mockTierProgress(buildTierProgressWith({ targetKind: 'NextTier', currentTierName: 'Essential' }));
 
-  renderWithProviders(<Loyalty />);
+  renderWithProviders(<Loyalty />, customerPreloadedState);
 
   expect(await screen.findByText("What's Available as Your Orders Grow?")).toBeInTheDocument();
   expect(
@@ -1943,11 +1957,12 @@ it('shows the tiers above the customer with their quota and perks', async () => 
   ).toBeInTheDocument();
 });
 
-it('shows only the tiers above the customer, not current or lower ones', async () => {
-  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't2' }));
-  mockTiers(rewardTiers());
+it('shows only the memberships above the customer, not current or lower ones', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockMemberships(rewardMemberships());
+  mockTierProgress(buildTierProgressWith({ targetKind: 'NextTier', currentTierName: 'Select' }));
 
-  renderWithProviders(<Loyalty />);
+  renderWithProviders(<Loyalty />, customerPreloadedState);
 
   expect(await screen.findByText('Signature Tier')).toBeInTheDocument();
   expect(
@@ -1957,11 +1972,18 @@ it('shows only the tiers above the customer, not current or lower ones', async (
   expect(screen.queryByText('Essential Tier')).not.toBeInTheDocument();
 });
 
-it('hides the tier ladder for a top-tier customer but keeps the contact footer', async () => {
-  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't3' }));
-  mockTiers(rewardTiers());
+it('hides the membership ladder for a top-tier customer but keeps the contact footer', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockMemberships(rewardMemberships());
+  mockTierProgress(
+    buildTierProgressWith({
+      targetKind: 'AtTop',
+      currentTierName: 'Signature',
+      targetTierName: '',
+    }),
+  );
 
-  renderWithProviders(<Loyalty />);
+  renderWithProviders(<Loyalty />, customerPreloadedState);
 
   expect(await screen.findByText('Questions? Contact us at 1-833-397-2619')).toBeInTheDocument();
   expect(screen.queryByText("What's Available as Your Orders Grow?")).not.toBeInTheDocument();
@@ -1969,14 +1991,12 @@ it('hides the tier ladder for a top-tier customer but keeps the contact footer',
     screen.queryByText('When you reach the next level, your tier upgrades automatically.'),
   ).not.toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Place your next order' })).toBeInTheDocument();
-  // Influence ordering alone never earns the top-tier message; only SSW's AtTop does.
-  expect(screen.queryByText(/our top tier/)).not.toBeInTheDocument();
 });
 
 // Same iframe escape as the hero CTA above.
 it('points the order CTA at the top-level window, not the portal frame', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
-  mockTiers(rewardTiers());
+  mockMemberships(rewardMemberships());
 
   renderWithProviders(<Loyalty />);
 
@@ -1986,9 +2006,9 @@ it('points the order CTA at the top-level window, not the portal frame', async (
   expect(cta).toHaveAttribute('target', '_top');
 });
 
-it('hides the tier ladder when the customer tier is unknown', async () => {
-  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 'not-in-list' }));
-  mockTiers(rewardTiers());
+it('hides the membership ladder when tier progress is unavailable', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockMemberships(rewardMemberships());
 
   renderWithProviders(<Loyalty />);
 
@@ -1996,11 +2016,22 @@ it('hides the tier ladder when the customer tier is unknown', async () => {
   expect(screen.queryByText("What's Available as Your Orders Grow?")).not.toBeInTheDocument();
 });
 
-it('replaces the tier ladder with the top-tier message when SSW reports AtTop', async () => {
-  // Influence still has this customer on the lowest tier (t1) while SSW says they are
-  // topped out — the exact divergence that used to leave a SIGNATURE card in the ladder.
-  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't1' }));
-  mockTiers(rewardTiers());
+it('hides the membership ladder when SSW reports a membership name matching none of the three', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockMemberships(rewardMemberships());
+  mockTierProgress(
+    buildTierProgressWith({ targetKind: 'NextTier', currentTierName: 'Renamed In SSW Only' }),
+  );
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  expect(await screen.findByText('Questions? Contact us at 1-833-397-2619')).toBeInTheDocument();
+  expect(screen.queryByText("What's Available as Your Orders Grow?")).not.toBeInTheDocument();
+});
+
+it('replaces the membership ladder with the top-tier message when SSW reports AtTop', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockMemberships(rewardMemberships());
   mockTierProgress(
     buildTierProgressWith({
       targetKind: 'AtTop',
@@ -2018,9 +2049,6 @@ it('replaces the tier ladder with the top-tier message when SSW reports AtTop', 
   ).toBeInTheDocument();
   expect(screen.queryByText("What's Available as Your Orders Grow?")).not.toBeInTheDocument();
   expect(screen.queryByText('Signature Tier')).not.toBeInTheDocument();
-  expect(
-    screen.queryByText('When you reach the next level, your tier upgrades automatically.'),
-  ).not.toBeInTheDocument();
   // A non-null AtTop progress object must not wake the progress card or the hero CTA.
   expect(screen.queryByText(/Progress to/)).not.toBeInTheDocument();
   expect(
@@ -2028,9 +2056,9 @@ it('replaces the tier ladder with the top-tier message when SSW reports AtTop', 
   ).not.toBeInTheDocument();
 });
 
-it('falls back to the generic top-tier message when SSW sends no tier name', async () => {
-  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't1' }));
-  mockTiers(rewardTiers());
+it('falls back to the generic top-tier message when SSW sends no membership name', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockMemberships(rewardMemberships());
   mockTierProgress(
     buildTierProgressWith({ targetKind: 'AtTop', currentTierName: '', targetTierName: '' }),
   );
@@ -2045,11 +2073,9 @@ it('falls back to the generic top-tier message when SSW sends no tier name', asy
   expect(screen.queryByText("What's Available as Your Orders Grow?")).not.toBeInTheDocument();
 });
 
-it('anchors the tier ladder on the SSW tier name when the Influence id disagrees', async () => {
-  // SSW and Influence keep separate tier id spaces, so the id resolves to nothing here;
-  // the case-insensitive name match ('SELECT' vs 'Select') is what positions the ladder.
-  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 'influence-only-id' }));
-  mockTiers(rewardTiers());
+it('matches the SSW membership name case-insensitively', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockMemberships(rewardMemberships());
   mockTierProgress(
     buildTierProgressWith({
       targetKind: 'NextTier',
@@ -2060,25 +2086,6 @@ it('anchors the tier ladder on the SSW tier name when the Influence id disagrees
 
   renderWithProviders(<Loyalty />, customerPreloadedState);
 
-  expect(await screen.findByText('Signature Tier')).toBeInTheDocument();
-  expect(screen.queryByText('Select Tier')).not.toBeInTheDocument();
-  expect(screen.queryByText('Essential Tier')).not.toBeInTheDocument();
-});
-
-it('falls back to the Influence tier id when the SSW tier name matches no tier', async () => {
-  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't2' }));
-  mockTiers(rewardTiers());
-  mockTierProgress(
-    buildTierProgressWith({
-      targetKind: 'NextTier',
-      currentTierName: 'Renamed In SSW Only',
-      targetTierName: 'Signature',
-    }),
-  );
-
-  renderWithProviders(<Loyalty />, customerPreloadedState);
-
-  // The name matches no tier title, so the Influence id (t2 = Select) positions the ladder.
   expect(await screen.findByText('Signature Tier')).toBeInTheDocument();
   expect(screen.queryByText('Select Tier')).not.toBeInTheDocument();
   expect(screen.queryByText('Essential Tier')).not.toBeInTheDocument();

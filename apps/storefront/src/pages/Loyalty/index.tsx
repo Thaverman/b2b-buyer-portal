@@ -240,6 +240,7 @@ function Loyalty() {
           <BenefitsTab
             customer={customer}
             tiers={tiers}
+            memberships={memberships}
             tierProgress={tierProgress}
             tierDisplayName={displayTierTitle}
           />

@@ -4,15 +4,22 @@ import { Box, Button, Typography } from '@mui/material';
 
 import { useB3Lang } from '@/lib/lang';
 
-import { getBenefitsBannerUrl, LoyaltyCustomer, LoyaltyTier, LoyaltyTierProgress } from '../api';
+import {
+  getBenefitsBannerUrl,
+  LoyaltyCustomer,
+  LoyaltyMembership,
+  LoyaltyTier,
+  LoyaltyTierProgress,
+} from '../api';
 
 import BenefitsInfoCards from './BenefitsInfoCards';
-import NextTiersSection from './NextTiersSection';
+import NextMembershipsSection from './NextMembershipsSection';
 import TierProgressCard from './TierProgressCard';
 
 interface BenefitsTabProps {
   customer: LoyaltyCustomer | undefined;
   tiers: LoyaltyTier[];
+  memberships: LoyaltyMembership[];
   tierProgress: LoyaltyTierProgress | null;
   tierDisplayName: string | null;
 }
@@ -55,7 +62,13 @@ function BenefitsBox({ title, perks }: BenefitsBoxProps) {
   );
 }
 
-function BenefitsTab({ customer, tiers, tierProgress, tierDisplayName }: BenefitsTabProps) {
+function BenefitsTab({
+  customer,
+  tiers,
+  memberships,
+  tierProgress,
+  tierDisplayName,
+}: BenefitsTabProps) {
   const b3Lang = useB3Lang();
   // background-image cannot report load failures, so the banner is a real <img> we can hide.
   const [bannerFailed, setBannerFailed] = useState(false);
@@ -136,9 +149,8 @@ function BenefitsTab({ customer, tiers, tierProgress, tierDisplayName }: Benefit
         </Box>
       </Box>
       <BenefitsInfoCards tierDisplayName={tierDisplayName} />
-      <NextTiersSection
-        tiers={tiers}
-        currentTierId={customer.currentLoyaltyTierId ?? null}
+      <NextMembershipsSection
+        memberships={memberships}
         currentTierName={tierProgress?.currentTierName || null}
         atTop={tierProgress?.targetKind === 'AtTop'}
       />
