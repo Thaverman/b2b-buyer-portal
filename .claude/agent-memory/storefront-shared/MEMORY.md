@@ -70,6 +70,34 @@ in-file-builder precedent for this same type (used there as `Partial<GlobalState
 `renderWithProviders`'s `initialGlobalContext`, which is a different, weaker need than a
 direct function call requiring the full type).
 
+### A required-boolean Redux field is not protected against `undefined` at runtime — check `=== false`/`!== false`, not truthiness
+
+`Customer.isLoyaltyEntitled: boolean` is a required TS field, but `company` persists to
+sessionStorage via `redux-persist` with no `version`/`migrate`, and `autoMergeLevel1` hard-sets
+the whole persisted `customer` object over `initialState.customer` on rehydrate. A session
+rehydrated from a bundle that predates the field yields `customer.isLoyaltyEntitled === undefined`
+at runtime — TS's "required" guarantee only holds for code written *after* the field existed, not
+for JSON that was serialized before it. Every consumer of a newly-added required boolean on a
+persisted slice must compare against the specific "false" value it's guarding
+(`x === false` / `x !== false`), never a bare truthy/falsy test, or `undefined` silently reads as
+the fail-hidden branch for every existing session the moment the field ships. To test this,
+don't use the object-builder's merge-with-overrides form (`buildXWith({ field: {...} })`) — it
+deep-merges onto defaults and will silently restore a field you tried to omit. Build the full
+default object once, destructure the target key out of it, and substitute the resulting object
+directly (bypassing the builder's second merge) — for a Redux slice read via `store.getState()`,
+dispatch the omission-shaped object directly; for `preloadedState`, spread the already-built
+state and replace the nested key directly rather than re-invoking the builder with an override.
+
+### `@typescript-eslint/naming-convention` (via airbnb-typescript) rejects leading-underscore variable names, even for intentionally-unused rest-destructure siblings
+
+`no-unused-vars`'s `ignoreRestSiblings: true` (set in this repo's base config) makes an unused
+destructured sibling of a rest spread legal without needing a `_`-prefixed name — but
+`naming-convention`'s `variable` selector only allows `camelCase`/`PascalCase`/`UPPER_CASE`, so
+`const { foo: _foo, ...rest } = x` fails lint even though it's fine at the `no-unused-vars` level.
+Name the discarded binding something descriptive in camelCase instead (e.g.
+`discardedIsLoyaltyEntitled`), not `_foo` — `ignoreRestSiblings` already covers the "unused"
+concern; the naming rule is independent and has no underscore exception here.
+
 ### `vi.mock('@/store')` (global, in `tests/setup-test-environment.ts`) resets the singleton store before every test
 
 `src/store/__mocks__/index.ts` calls `setupStore()` fresh in a `beforeEach` and points the mocked
