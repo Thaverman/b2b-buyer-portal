@@ -239,7 +239,6 @@ function Loyalty() {
         {activeTab === 'benefits' && (
           <BenefitsTab
             customer={customer}
-            tiers={tiers}
             memberships={memberships}
             tierProgress={tierProgress}
             tierDisplayName={displayTierTitle}

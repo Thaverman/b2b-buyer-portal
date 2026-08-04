@@ -8,7 +8,6 @@ import {
   getBenefitsBannerUrl,
   LoyaltyCustomer,
   LoyaltyMembership,
-  LoyaltyTier,
   LoyaltyTierProgress,
 } from '../api';
 
@@ -18,7 +17,6 @@ import TierProgressCard from './TierProgressCard';
 
 interface BenefitsTabProps {
   customer: LoyaltyCustomer | undefined;
-  tiers: LoyaltyTier[];
   memberships: LoyaltyMembership[];
   tierProgress: LoyaltyTierProgress | null;
   tierDisplayName: string | null;
@@ -62,13 +60,7 @@ function BenefitsBox({ title, perks }: BenefitsBoxProps) {
   );
 }
 
-function BenefitsTab({
-  customer,
-  tiers,
-  memberships,
-  tierProgress,
-  tierDisplayName,
-}: BenefitsTabProps) {
+function BenefitsTab({ customer, memberships, tierProgress, tierDisplayName }: BenefitsTabProps) {
   const b3Lang = useB3Lang();
   // background-image cannot report load failures, so the banner is a real <img> we can hide.
   const [bannerFailed, setBannerFailed] = useState(false);
@@ -77,7 +69,6 @@ function BenefitsTab({
     return null;
   }
 
-  const currentTier = tiers.find((tier) => tier.id === customer.currentLoyaltyTierId);
   const membership = customer.currentMembership;
 
   return (
@@ -92,12 +83,6 @@ function BenefitsTab({
             : b3Lang('loyalty.benefits.introGuideGeneric')}
         </Typography>
       </Box>
-      {currentTier && (
-        <BenefitsBox
-          title={b3Lang('loyalty.overview.benefitsTitle', { tier: currentTier.title })}
-          perks={currentTier.perks}
-        />
-      )}
       {membership && membership.perks.length > 0 && (
         <BenefitsBox
           title={b3Lang('loyalty.overview.membershipBenefitsTitle', {

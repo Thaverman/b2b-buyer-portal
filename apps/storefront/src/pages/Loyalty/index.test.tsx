@@ -454,7 +454,9 @@ it('falls back to the Influence tier title in the hero when tier progress is abs
   expect(await screen.findByText('Select')).toBeInTheDocument();
 });
 
-it('shows the current tier benefits and points summary on My benefits', async () => {
+it('never shows the Influence tier perk box, even when the tier id matches', async () => {
+  // Influence's tier placement diverges from SSW's (the authoritative source), so the
+  // "Your {tier} benefits" box was removed outright — only the membership box remains.
   const select = buildTierWith({
     id: 't1',
     title: 'Select',
@@ -466,19 +468,16 @@ it('shows the current tier benefits and points summary on My benefits', async ()
     buildLoyaltyCustomerWith({
       pointBalance: 2465,
       currentLoyaltyTierId: 't1',
-      currentLoyaltyTierProgress: 240,
+      currentMembership: null,
     }),
   );
   mockTiers([select, buildTierWith({ id: 't2', title: 'Elite', threshold: '300' })]);
 
   renderWithProviders(<Loyalty />);
 
-  // Scoped to the highlighted benefits box — the same tier's perks also appear in the tier list below.
-  const benefitsBox = (await screen.findByText('Your Select benefits')).closest(
-    '.MuiBox-root',
-  ) as HTMLElement;
-  expect(within(benefitsBox).getByText('5% credit on every order')).toBeInTheDocument();
-  expect(within(benefitsBox).getByText('Free ground shipping over $300')).toBeInTheDocument();
+  expect(await screen.findByText('You have 2,465 points available.')).toBeInTheDocument();
+  expect(screen.queryByText('Your Select benefits')).not.toBeInTheDocument();
+  expect(screen.queryByText('5% credit on every order')).not.toBeInTheDocument();
 });
 
 it('shows the current membership benefits on My benefits', async () => {
@@ -507,7 +506,7 @@ it('omits the membership benefits block when the customer has no membership', as
   renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('You have 100 points available.')).toBeInTheDocument();
-  // No membership and no tiers mocked here, so neither highlighted benefits box renders
+  // No membership here, so no highlighted benefits box renders
   // (the "My benefits" tab/section heading itself is unconditional, so this can't be /benefits/i).
   expect(screen.queryByText(/Your .+ benefits/)).not.toBeInTheDocument();
 });
@@ -1628,12 +1627,9 @@ it('renders the four Smart Rewards tabs and defaults to My benefits', async () =
   expect(screen.queryByRole('tab', { name: 'History' })).not.toBeInTheDocument();
 });
 
-it('shows membership status and tier benefits on My benefits', async () => {
-  const select = buildTierWith({ id: 't1', title: 'Select', perks: ['5% credit'] });
-
+it('shows membership status on My benefits', async () => {
   mockLoyaltyApis(
     buildLoyaltyCustomerWith({
-      currentLoyaltyTierId: 't1',
       currentMembership: {
         id: 'm1',
         title: 'Signature Membership',
@@ -1641,13 +1637,11 @@ it('shows membership status and tier benefits on My benefits', async () => {
       },
     }),
   );
-  mockTiers([select]);
 
   renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('Your Signature Membership benefits')).toBeInTheDocument();
   expect(screen.getByText('Dedicated account representative')).toBeInTheDocument();
-  expect(await screen.findByText('Your Select benefits')).toBeInTheDocument();
 });
 
 it.each([
