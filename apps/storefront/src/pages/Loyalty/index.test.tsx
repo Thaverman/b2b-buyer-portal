@@ -1739,7 +1739,7 @@ it('points shoppers at portal tabs instead of an absolute storefront URL', async
   await user.click(await screen.findByRole('tab', { name: 'FAQs' }));
 
   expect(
-    await screen.findByText('Your tier, benefits, and progress are on the My benefits tab.'),
+    await screen.findByText('Your tier and benefits are on the My benefits tab.'),
   ).toBeInTheDocument();
   expect(
     screen.getByText(

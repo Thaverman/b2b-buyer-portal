@@ -130,8 +130,8 @@ into a bundle that also runs on sandbox.
 
 | Question | Was | Becomes |
 |---|---|---|
-| Where can I see my current tier? | Log in at `https://www.storesupply.com/login.php#/login` to see your tier, benefits, and progress. | Your tier, benefits, and progress are on the My benefits tab. |
-| How do I find early access products? | We'll email you when early access items are available. You can also log in at `…` to see what's open to you. | We'll email you when early access items are available. You can also check the My benefits tab to see what's open to you. |
+| Where can I see my current tier? | Log in at `https://www.storesupply.com/login.php#/login` to see your tier, benefits, and progress. | Your tier and benefits are on the My benefits tab. |
+| How do I find early access products? | We'll email you when early access items are available. You can also log in at `…` to see what's open to you. | We'll email you when early access items are available. |
 | Where can I see my benefits, credit balance, and tier status? | Log in at `…` to find your tier, benefits, points, and any store credits. | Your tier and benefits are on the My benefits tab, your points balance is at the top of this page, and any store credit certificates are under My rewards. |
 
 No link replaces the removed URLs, so this also drops 3 of the 8 link sites.

@@ -5,6 +5,13 @@ import { Link } from '@mui/material';
 // channels, never storefront URLs. mailto:/tel: invoke a protocol handler and
 // never navigate, which is why neither needs target="_top" the way the
 // storefront CTAs in BenefitsTab/LoyaltyHero do.
+//
+// This copy lives here rather than in src/lib/lang/locales/en.json like the
+// rest of the loyalty page: several answers carry a link mid-sentence, which
+// an ICU message string cannot express without react-intl rich-text tags.
+// Adding those would mean widening useB3Lang's `=> string` signature
+// (src/lib/lang/useB3Lang.ts:4-7) across its 864 call sites for one page's
+// benefit. Do not "fix" this by moving the copy to en.json.
 const REP_EMAIL = 'contactsmartrewards@storesupply.com';
 const REP_PHONE = '1-833-397-2619';
 
@@ -106,8 +113,10 @@ export const FAQ_SECTIONS: FaqSection[] = [
       {
         question: 'Where can I see my current tier?',
         // Reworded: was "Log in at https://www.storesupply.com/login.php#/login to
-        // see your tier, benefits, and progress."
-        answer: 'Your tier, benefits, and progress are on the My benefits tab.',
+        // see your tier, benefits, and progress." Dropped "progress": TierProgressCard
+        // renders null unless progress.targetKind is 'NextTier', and the PrePointsGate
+        // progress summary is rendered by the hero above the tabs, not by this tab.
+        answer: 'Your tier and benefits are on the My benefits tab.',
       },
     ],
   },
@@ -213,8 +222,9 @@ export const FAQ_SECTIONS: FaqSection[] = [
         question: 'How do I find early access products?',
         // Reworded: the second sentence was "You can also log in at
         // https://www.storesupply.com/login.php#/login to see what's open to you."
-        answer:
-          "We'll email you when early access items are available. You can also check the My benefits tab to see what's open to you.",
+        // Dropped rather than repointed at My benefits: that tab describes the
+        // early-access perk, it does not list early-access items.
+        answer: "We'll email you when early access items are available.",
       },
       {
         question: 'Can my rep help me find early access products?',
