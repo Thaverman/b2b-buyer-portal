@@ -11,7 +11,7 @@ interface LoyaltyConfig {
   siteName?: string;
   bannerUrl?: string;
   benefitsBannerUrl?: string;
-  tierAttributeId?: number;
+  tierAttributeId?: number | string;
 }
 
 const LAUNCHER_API_BASE = 'https://launcher.api.influence.io/launcher/v1';
@@ -44,14 +44,30 @@ const TIER_ATTRIBUTE_NAME = 'Loyalty Tier';
 // document safe — the value comes from a host-set global and is not to be trusted.
 // The range guard rejects ids too large to serialize as a valid GraphQL Int literal
 // (e.g. 1e21 renders as "1e+21", not digits) or plainly bogus (<= 0).
+// Digit-strings coerce because theme settings are stringly-typed (Handlebars): the
+// live snippet delivered '2', which must arm the gate exactly like the number would.
+// The digits-only regex keeps everything else out of the coercion path.
 export const getTierAttributeId = (): number | undefined => {
   const configured = getLoyaltyConfig()?.tierAttributeId;
+  const candidate =
+    typeof configured === 'string' && /^\d+$/.test(configured.trim())
+      ? Number(configured.trim())
+      : configured;
   const isPlausibleId =
-    typeof configured === 'number' &&
-    Number.isInteger(configured) &&
-    configured > 0 &&
-    configured < 2 ** 31;
-  return isPlausibleId ? configured : undefined;
+    typeof candidate === 'number' &&
+    Number.isInteger(candidate) &&
+    candidate > 0 &&
+    candidate < 2 ** 31;
+  // An explicitly-set key that gets rejected is a misconfiguration, not an un-opted
+  // store — leave a trail instead of silently disarming the gate.
+  if (!isPlausibleId && configured !== undefined) {
+    b2bLogger.error(
+      `Loyalty: BC_CONTEXT.loyalty.tierAttributeId ${JSON.stringify(
+        configured,
+      )} is not a usable attribute id — leaving Loyalty visible`,
+    );
+  }
+  return isPlausibleId ? candidate : undefined;
 };
 
 // TRUE keeps Loyalty visible. It closes ONLY on a successfully-read, blank attribute:
@@ -70,9 +86,13 @@ export const resolveLoyaltyEntitlement = (
     );
     return true;
   }
-  if (rawAttribute.name !== TIER_ATTRIBUTE_NAME) {
+  // BigCommerce echoes the attribute NAME only when the customer has a value record
+  // (measured live 2026-08-04): a never-set attribute arrives as { entityId,
+  // name: '', value: null }. An empty name is the normal unenrolled shape — only a
+  // non-empty, DIFFERENT name is evidence of id drift.
+  if (rawAttribute.name && rawAttribute.name !== TIER_ATTRIBUTE_NAME) {
     b2bLogger.error(
-      `Loyalty: attribute ${tierAttributeId} is named "${rawAttribute.name ?? ''}", not "${TIER_ATTRIBUTE_NAME}" — check BC_CONTEXT.loyalty.tierAttributeId; leaving Loyalty visible`,
+      `Loyalty: attribute ${tierAttributeId} is named "${rawAttribute.name}", not "${TIER_ATTRIBUTE_NAME}" — check BC_CONTEXT.loyalty.tierAttributeId; leaving Loyalty visible`,
     );
     return true;
   }
@@ -445,6 +465,19 @@ const identityBody = (config: LoyaltyConfig, identity: LoyaltyIdentity) => ({
   digest: identity.digest,
 });
 
+// Influence.io names its rules and rewards "$5 off coupon"; the store's vocabulary for
+// the redeemed thing is "certificate". Relabelled on read rather than upstream because an
+// issued reward keeps the title it was created with — renaming the rules in Influence.io
+// would leave every existing My rewards row saying "coupon".
+const toCertificateWording = (title: string) =>
+  title.replace(/coupons?/gi, (match) => {
+    const word = match.toLowerCase() === 'coupons' ? 'certificates' : 'certificate';
+    if (match === match.toUpperCase()) {
+      return word.toUpperCase();
+    }
+    return match[0] === match[0].toUpperCase() ? `${word[0].toUpperCase()}${word.slice(1)}` : word;
+  });
+
 export interface RedeemRule {
   id: string;
   title: string;
@@ -474,7 +507,7 @@ export const fetchRedeemRules = async (): Promise<RedeemRule[]> => {
 
   return (raw.rules ?? []).map((rule) => ({
     id: String(rule.id ?? ''),
-    title: rule.customTitle ?? rule.title ?? '',
+    title: toCertificateWording(rule.customTitle ?? rule.title ?? ''),
     pointCost: rule.pointCost ?? null,
     redeemType: rule.redeemType ?? '',
     status: rule.status ?? '',
@@ -561,7 +594,7 @@ export const fetchEarnedRewards = async (
     items: (raw.items ?? []).map((item) => ({
       id: String(item.id ?? ''),
       couponCode: item.couponCode ?? '',
-      title: item.title ?? '',
+      title: toCertificateWording(item.title ?? ''),
       createdAt: item.createdAt ?? '',
     })),
     nextToken: raw.nextToken ?? null,
@@ -639,36 +672,3 @@ const DEFAULT_BENEFITS_BANNER_URL = '/content/images/loyalty/loyalty-benefits-ba
 
 export const getBenefitsBannerUrl = (): string =>
   getLoyaltyConfig()?.benefitsBannerUrl?.trim() || DEFAULT_BENEFITS_BANNER_URL;
-
-// Module-internal: knip fails the build on unused exports, so this file only
-// exports what other files actually import.
-interface LoyaltyFaqItem {
-  question: string;
-  answer: string;
-  bullets: string[];
-}
-
-export interface LoyaltyFaqSection {
-  title: string;
-  items: LoyaltyFaqItem[];
-}
-
-export const getFaqSections = (): LoyaltyFaqSection[] =>
-  (window.loyaltyFaqConfig?.sections ?? [])
-    .map((section) => ({
-      title: section.title?.trim() ?? '',
-      items: (section.items ?? [])
-        .map((item) => ({
-          question: item.question?.trim() ?? '',
-          answer: item.answer?.trim() ?? '',
-          bullets: (item.bullets ?? [])
-            .map((bullet) => bullet.trim())
-            .filter((bullet) => bullet !== ''),
-        }))
-        // A half-filled entry would render an empty accordion row; drop it.
-        .filter((item) => item.question !== '' && (item.answer !== '' || item.bullets.length > 0)),
-    }))
-    // A titleless or item-less section would render an empty heading; drop it.
-    .filter((section) => section.title !== '' && section.items.length > 0);
-
-export const getFaqIntro = (): string => window.loyaltyFaqConfig?.intro?.trim() ?? '';

@@ -76,9 +76,10 @@ declare global {
         /**
          * entityId of the BigCommerce "Loyalty Tier" customer attribute. Absent =
          * the visibility gate is OFF and Loyalty shows for everyone, as before.
+         * A digit-string (e.g. '2') is accepted — theme settings are stringly-typed.
          * Find it with GET /v3/customers/attributes?name=Loyalty Tier (server-side).
          */
-        tierAttributeId?: number;
+        tierAttributeId?: number | string;
         /** SSW site key for GetDetailWithProgress (e.g. "StoreSupply"); absent = tier progress off. */
         siteName?: string;
         /** Theme override for the hero banner image; absent = the relative default. */
@@ -106,14 +107,6 @@ declare global {
     /** Theme-set rollout gate; absent (older theme deploys) = empty allowlist = everyone. */
     loyaltyRolloutConfig?: {
       allowedTiers?: string;
-    };
-    /** Theme-set FAQ content; absent or empty = the FAQ tab is hidden. */
-    loyaltyFaqConfig?: {
-      intro?: string;
-      sections?: {
-        title?: string;
-        items?: { question?: string; answer?: string; bullets?: string[] }[];
-      }[];
     };
     B3: {
       setting: {

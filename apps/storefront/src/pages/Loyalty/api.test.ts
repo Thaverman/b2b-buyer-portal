@@ -19,8 +19,6 @@ import {
   getAllowedTiers,
   getBannerUrl,
   getBenefitsBannerUrl,
-  getFaqIntro,
-  getFaqSections,
   getLoyaltyDigest,
   getShippingCalculation,
   getTierAttributeId,
@@ -63,7 +61,6 @@ afterEach(() => {
   delete window.loyaltyShippingConfig;
   delete window.getLoyaltyShippingCalculation;
   delete window.loyaltyRolloutConfig;
-  delete window.loyaltyFaqConfig;
 });
 
 const mockJwt = (jwt = 'fresh-jwt') =>
@@ -346,6 +343,32 @@ describe('fetchRedeemRules and isRedeemableCatalogRule', () => {
     ]);
   });
 
+  it('relabels "coupon" in rule titles as "certificate", keeping the original case', async () => {
+    server.use(
+      http.get('https://launcher.api.influence.io/launcher/v1/shop/rules/redeem', () =>
+        HttpResponse.json({
+          rules: [
+            { id: 'rr1', title: '$5 off coupon', pointCost: 500 },
+            { id: 'rr2', customTitle: 'Coupon for $10', pointCost: 1000 },
+            { id: 'rr3', title: '$20 OFF COUPON', pointCost: 2000 },
+            { id: 'rr4', title: 'Stackable coupons', pointCost: 3000 },
+            { id: 'rr5', title: 'Free shipping', pointCost: 4000 },
+          ],
+        }),
+      ),
+    );
+
+    const result = await fetchRedeemRules();
+
+    expect(result.map((rule) => rule.title)).toEqual([
+      '$5 off certificate',
+      'Certificate for $10',
+      '$20 OFF CERTIFICATE',
+      'Stackable certificates',
+      'Free shipping',
+    ]);
+  });
+
   it.each([
     [{ pointCost: 500, minRedeemablePoints: null, maxRedeemablePoints: null, status: '' }, true],
     [
@@ -428,6 +451,23 @@ describe('fetchEarnedRewards', () => {
       items: [{ id: 'w1', couponCode: 'SAVE-123', title: '$5 discount', createdAt: '2026-06-01' }],
       nextToken: null,
     });
+  });
+
+  it('relabels "coupon" in earned reward titles as "certificate"', async () => {
+    server.use(
+      http.get('https://launcher.api.influence.io/launcher/v1/customer/all-rewards', () =>
+        HttpResponse.json({
+          items: [
+            { id: 'w1', couponCode: 'SAVE-30', title: '$30 off coupon', createdAt: '2026-06-01' },
+          ],
+          nextToken: null,
+        }),
+      ),
+    );
+
+    const result = await fetchEarnedRewards(identity);
+
+    expect(result.items.map((item) => item.title)).toEqual(['$30 off certificate']);
   });
 });
 
@@ -824,92 +864,6 @@ describe('getBenefitsBannerUrl', () => {
   });
 });
 
-describe('getFaqSections and getFaqIntro', () => {
-  it('returns an empty list and intro when the theme global is absent', () => {
-    expect(getFaqSections()).toEqual([]);
-    expect(getFaqIntro()).toBe('');
-  });
-
-  it('drops items missing a question, or missing both an answer and bullets, keeping valid ones', () => {
-    window.loyaltyFaqConfig = {
-      intro: 'Ask away.',
-      sections: [
-        {
-          title: 'Getting started',
-          items: [
-            { question: 'How do I earn?', answer: 'Place orders.' },
-            { question: 'No answer or bullets' },
-            { answer: 'No question' },
-            { question: '  ', answer: 'blank question' },
-          ],
-        },
-      ],
-    };
-
-    expect(getFaqSections()).toEqual([
-      {
-        title: 'Getting started',
-        items: [{ question: 'How do I earn?', answer: 'Place orders.', bullets: [] }],
-      },
-    ]);
-    expect(getFaqIntro()).toBe('Ask away.');
-  });
-
-  it('keeps an item with bullets and no answer, filtering blank/whitespace-only bullets', () => {
-    window.loyaltyFaqConfig = {
-      sections: [
-        {
-          title: 'Program Tiers',
-          items: [
-            {
-              question: 'What are the tiers?',
-              bullets: ['Essential: 1%', '  ', 'Select: 2%', ''],
-            },
-          ],
-        },
-      ],
-    };
-
-    expect(getFaqSections()).toEqual([
-      {
-        title: 'Program Tiers',
-        items: [
-          {
-            question: 'What are the tiers?',
-            answer: '',
-            bullets: ['Essential: 1%', 'Select: 2%'],
-          },
-        ],
-      },
-    ]);
-  });
-
-  it('drops a section with a blank or missing title even if its items are valid', () => {
-    window.loyaltyFaqConfig = {
-      sections: [
-        { title: '  ', items: [{ question: 'Q?', answer: 'A.' }] },
-        { items: [{ question: 'Q2?', answer: 'A2.' }] },
-      ],
-    };
-
-    expect(getFaqSections()).toEqual([]);
-  });
-
-  it('drops a section whose items are all invalid', () => {
-    window.loyaltyFaqConfig = {
-      sections: [{ title: 'Empty section', items: [{ question: 'No answer or bullets' }] }],
-    };
-
-    expect(getFaqSections()).toEqual([]);
-  });
-
-  it('degrades a sections-less config to an empty list', () => {
-    window.loyaltyFaqConfig = {};
-
-    expect(getFaqSections()).toEqual([]);
-  });
-});
-
 describe('resolveLoyaltyEntitlement', () => {
   const withTierAttributeId = (tierAttributeId?: number) => {
     window.BC_CONTEXT = {
@@ -958,6 +912,24 @@ describe('resolveLoyaltyEntitlement', () => {
     expect(resolveLoyaltyEntitlement(null)).toBe(true);
   });
 
+  // Measured live 2026-08-04 (customer 40978, sandbox): a never-set attribute comes
+  // back as { entityId: 2, name: '', value: null } — BigCommerce echoes the attribute
+  // NAME only when the customer has a value record. An empty name is the normal
+  // unenrolled shape, not id drift, and must close the gate without logging.
+  it('is NOT entitled when the attribute has never been set (empty name, null value)', () => {
+    withTierAttributeId(2);
+
+    expect(resolveLoyaltyEntitlement({ entityId: 2, name: '', value: null })).toBe(false);
+    expect(resolveLoyaltyEntitlement({ entityId: 2, value: null })).toBe(false);
+    expect(b2bLogger.error).not.toHaveBeenCalled();
+  });
+
+  it('is entitled when the value is non-blank even if the name is missing', () => {
+    withTierAttributeId(2);
+
+    expect(resolveLoyaltyEntitlement({ entityId: 2, name: '', value: 'Signature' })).toBe(true);
+  });
+
   // Guards against the configured id drifting onto a different attribute, which would
   // otherwise hide Loyalty from everyone.
   it('stays entitled and logs when the id points at a differently-named attribute', () => {
@@ -975,12 +947,86 @@ describe('resolveLoyaltyEntitlement', () => {
         shopKey: 'shop-key',
         apiBase: 'https://ssw.example.com/customers',
         appClientId: 'app-client-id',
-        tierAttributeId: '2 } malformed' as unknown as number,
+        tierAttributeId: '2 } malformed',
       },
     };
 
     expect(getTierAttributeId()).toBeUndefined();
     expect(resolveLoyaltyEntitlement({ entityId: 2, name: 'Loyalty Tier', value: '' })).toBe(true);
+  });
+
+  // Theme settings are stringly-typed (Handlebars): the live snippet delivered
+  // tierAttributeId as '2', which silently disarmed the gate. A clean digit-string
+  // must arm it exactly like the number would.
+  it('accepts a digit-string configured id and closes the gate on a blank value', () => {
+    window.BC_CONTEXT = {
+      loyalty: {
+        shopKey: 'shop-key',
+        apiBase: 'https://ssw.example.com/customers',
+        appClientId: 'app-client-id',
+        tierAttributeId: '2',
+      },
+    };
+
+    expect(getTierAttributeId()).toBe(2);
+    expect(resolveLoyaltyEntitlement({ entityId: 2, name: 'Loyalty Tier', value: '' })).toBe(false);
+    expect(
+      resolveLoyaltyEntitlement({ entityId: 2, name: 'Loyalty Tier', value: 'Signature' }),
+    ).toBe(true);
+  });
+
+  it('accepts a whitespace-padded digit-string id', () => {
+    window.BC_CONTEXT = {
+      loyalty: {
+        shopKey: 'shop-key',
+        apiBase: 'https://ssw.example.com/customers',
+        appClientId: 'app-client-id',
+        tierAttributeId: ' 2 ',
+      },
+    };
+
+    expect(getTierAttributeId()).toBe(2);
+  });
+
+  // Only whole digit-strings coerce; anything else must degrade to gate-off, never
+  // reach the GraphQL document.
+  it('ignores string ids that are not clean whole numbers in range', () => {
+    const rejects = ['2.5', '-3', '', '   ', '1e21', '0', '1000000000000000000000'];
+
+    rejects.forEach((tierAttributeId) => {
+      window.BC_CONTEXT = {
+        loyalty: {
+          shopKey: 'shop-key',
+          apiBase: 'https://ssw.example.com/customers',
+          appClientId: 'app-client-id',
+          tierAttributeId,
+        },
+      };
+
+      expect(getTierAttributeId(), `expected '${tierAttributeId}' to be ignored`).toBeUndefined();
+    });
+  });
+
+  // An explicitly-set key that gets rejected is a misconfiguration, not an un-opted
+  // store — it must leave a diagnosable trail, unlike the silent absent-key case.
+  it('logs when a configured id is unusable, but not when the key is absent', () => {
+    window.BC_CONTEXT = {
+      loyalty: {
+        shopKey: 'shop-key',
+        apiBase: 'https://ssw.example.com/customers',
+        appClientId: 'app-client-id',
+        tierAttributeId: '2.5',
+      },
+    };
+
+    expect(getTierAttributeId()).toBeUndefined();
+    expect(b2bLogger.error).toHaveBeenCalled();
+
+    vi.mocked(b2bLogger.error).mockClear();
+    withTierAttributeId(undefined);
+
+    expect(getTierAttributeId()).toBeUndefined();
+    expect(b2bLogger.error).not.toHaveBeenCalled();
   });
 
   // The value is cast from an untyped GraphQL response; a numeric tier must read as
