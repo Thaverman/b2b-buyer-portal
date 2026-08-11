@@ -108,12 +108,23 @@ it('renders bullets for an FAQ item that has no answer', async () => {
   ).toBeInTheDocument();
 });
 
-it('links the rep email and phone, without a target since neither navigates', async () => {
+it('links the rep email and phone, with no target since neither navigates', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
 
   const { user } = renderWithProviders(<Loyalty />);
 
   await user.click(await screen.findByRole('tab', { name: 'FAQs' }));
+
+  // MUI keeps collapsed Accordion content mounted but visibility:hidden, and role
+  // queries exclude inaccessible nodes, so every answer carrying a link is expanded
+  // first. (getByText matches hidden text, which is why the copy assertions below
+  // and in the other tests need no expansion.)
+  await user.click(screen.getByText('How do I reach my account rep?'));
+  await user.click(screen.getByText('I think my tier is wrong. What do I do?'));
+  await user.click(screen.getByText('Can I combine Smart Rewards with other promotions?'));
+  await user.click(
+    screen.getByText("I have a question that's not covered here. Who do I contact?"),
+  );
 
   const emailLinks = await screen.findAllByRole('link', {
     name: 'contactsmartrewards@storesupply.com',
@@ -127,6 +138,10 @@ it('links the rep email and phone, without a target since neither navigates', as
   const phoneLink = screen.getByRole('link', { name: '1-833-397-2619' });
   expect(phoneLink).toHaveAttribute('href', 'tel:+18333972619');
   expect(phoneLink).not.toHaveAttribute('target');
+
+  // Pinning the total against the five exact hrefs above leaves no room for a
+  // storefront URL to hide among the FAQ's links.
+  expect(screen.getAllByRole('link')).toHaveLength(5);
 });
 
 it('points shoppers at portal tabs instead of an absolute storefront URL', async () => {
@@ -139,14 +154,12 @@ it('points shoppers at portal tabs instead of an absolute storefront URL', async
   expect(
     await screen.findByText('Your tier, benefits, and progress are on the My benefits tab.'),
   ).toBeInTheDocument();
-
-  // Asserting the count first keeps the href sweep below from passing vacuously
-  // if the content ever fails to render.
-  const links = screen.getAllByRole('link');
-  expect(links).toHaveLength(5);
-  links.forEach((link) => {
-    expect(link.getAttribute('href')).not.toMatch(/storesupply\.com|login\.php/);
-  });
+  expect(
+    screen.getByText(
+      'Your tier and benefits are on the My benefits tab, your points balance is at the top of this page, and any store credit certificates are under My rewards.',
+    ),
+  ).toBeInTheDocument();
+  expect(screen.queryByText(/login\.php/)).not.toBeInTheDocument();
 });
 
 it('selects the FAQ tab for ?tab=faq', async () => {
@@ -158,7 +171,9 @@ it('selects the FAQ tab for ?tab=faq', async () => {
 });
 ```
 
-If the link count of 5 trips because `LoyaltyHero` renders an anchor with this fixture, scope the sweep with `within` on the FAQ panel rather than raising the number — the point of the count is that all five expected links exist.
+If the link count of 5 trips because `LoyaltyHero` renders an anchor with this fixture, scope the sweep with `within` on the FAQ content rather than raising the number — the point of the count is that the FAQ's link set is exactly the five known contact links.
+
+Do not reach for `.closest('a')` to get around the collapsed-content problem: `testing-library/no-node-access` is enabled via `plugin:testing-library/react` and would reject it at Task 2's lint gate.
 
 - [ ] **Step 2: Run the tests and confirm they fail for the right reason**
 
@@ -537,10 +552,13 @@ Four edits to `src/pages/Loyalty/index.tsx`:
 Run: `CIRCLECI=true yarn test src/pages/Loyalty/index.test.tsx --run`
 Expected: PASS, including all six tests from Step 1.
 
-- [ ] **Step 7: Type-check**
+- [ ] **Step 7: Type-check, and lint the touched files only**
 
 Run: `yarn tsc --noEmit`
 Expected: no errors. `getFaqSections`/`getFaqIntro` still exist in `api.ts` — merely unused, which is not a type error. (`yarn lint:knip` *will* flag them; that is Task 2.)
+
+Run: `npx eslint src/pages/Loyalty/faqContent.tsx src/pages/Loyalty/components/FaqTab.tsx src/pages/Loyalty/index.tsx src/pages/Loyalty/index.test.tsx`
+Expected: clean. This catches `react/function-component-definition`, `react/no-unescaped-entities`, `testing-library/no-node-access`, and import order now, rather than at Task 2's full `yarn lint` gate. It runs no knip, so the deliberately-orphaned exports do not trip it.
 
 - [ ] **Step 8: Confirm the link assertions are not vacuous**
 
