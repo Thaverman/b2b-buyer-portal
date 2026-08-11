@@ -250,6 +250,10 @@ tests on this feature have passed against unwired code three times.
   `<Link component="button">`, because `jsx-a11y/anchor-is-valid` cannot see
   through MUI's `component` prop and reads that as an anchor with no `href`.
   The linked tab names are capitalized ("My Benefits", "My Rewards") at the
-  user's request, which deliberately differs from the lowercase tab labels in
-  `en.json`.
+  user's request, and the tab labels themselves were capitalized to match —
+  `loyalty.tabs.benefits`, `loyalty.tabs.myRewards` and `loyalty.tabs.getRewards`
+  in `en.json`, plus the `loyalty.myRewards.empty` prose that names the Get
+  Rewards tab. That also settled a pre-existing mismatch: `en.json`'s
+  `loyalty.redeem.findInMyRewards` already read "My **R**ewards tab" while two
+  tests asserted lowercase, and those two tests were red for that reason alone.
 - **Theme-side removal of the `loyalty_faq` settings** — stencil repo.

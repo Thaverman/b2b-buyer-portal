@@ -121,7 +121,7 @@ it('shows the unavailable state when the customer is not loyalty-entitled', () =
   });
 
   expect(screen.getByText('Rewards are not available.')).toBeInTheDocument();
-  expect(screen.queryByRole('tab', { name: 'My rewards' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: 'My Rewards' })).not.toBeInTheDocument();
 });
 
 // A session rehydrated from a bundle that predates this field has no
@@ -144,7 +144,7 @@ it('renders the page when the persisted customer predates isLoyaltyEntitled', as
     },
   });
 
-  expect(await screen.findByRole('tab', { name: 'My benefits' })).toBeInTheDocument();
+  expect(await screen.findByRole('tab', { name: 'My Benefits' })).toBeInTheDocument();
   expect(screen.queryByText('Rewards are not available.')).not.toBeInTheDocument();
 });
 
@@ -403,10 +403,10 @@ it('renders the tabs with mockup labels and defaults to My benefits', async () =
   renderWithProviders(<Loyalty />);
 
   expect(
-    await screen.findByRole('tab', { name: 'My benefits', selected: true }),
+    await screen.findByRole('tab', { name: 'My Benefits', selected: true }),
   ).toBeInTheDocument();
-  expect(screen.getByRole('tab', { name: 'Get rewards' })).toBeInTheDocument();
-  expect(screen.getByRole('tab', { name: 'My rewards' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'Get Rewards' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'My Rewards' })).toBeInTheDocument();
 });
 
 it('selects the tab named by the URL search param', async () => {
@@ -416,7 +416,7 @@ it('selects the tab named by the URL search param', async () => {
   renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=my-rewards' }] });
 
   expect(
-    await screen.findByRole('tab', { name: 'My rewards', selected: true }),
+    await screen.findByRole('tab', { name: 'My Rewards', selected: true }),
   ).toBeInTheDocument();
 });
 
@@ -426,7 +426,7 @@ it('falls back to My benefits for an unknown tab param', async () => {
   renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=bogus' }] });
 
   expect(
-    await screen.findByRole('tab', { name: 'My benefits', selected: true }),
+    await screen.findByRole('tab', { name: 'My Benefits', selected: true }),
   ).toBeInTheDocument();
 });
 
@@ -435,9 +435,9 @@ it('switches tabs on click', async () => {
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'Get rewards' }));
+  await user.click(await screen.findByRole('tab', { name: 'Get Rewards' }));
 
-  expect(screen.getByRole('tab', { name: 'Get rewards', selected: true })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'Get Rewards', selected: true })).toBeInTheDocument();
 });
 
 it('falls back to the Influence tier title in the hero when tier progress is absent', async () => {
@@ -516,7 +516,7 @@ it('lists redeemable rewards and disables ones costing more than the balance', a
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'Get rewards' }));
+  await user.click(await screen.findByRole('tab', { name: 'Get Rewards' }));
 
   const cheap = (await screen.findByText('$5 discount')).closest('.MuiCard-root') as HTMLElement;
   const dear = screen.getByText('Free shipping').closest('.MuiCard-root') as HTMLElement;
@@ -534,7 +534,7 @@ it('orders the reward catalog by point cost, lowest first', async () => {
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'Get rewards' }));
+  await user.click(await screen.findByRole('tab', { name: 'Get Rewards' }));
   await screen.findByText('Free shipping');
 
   const cards = document.querySelectorAll('.MuiCard-root');
@@ -554,7 +554,7 @@ it('hides increment-type and unknown-status rules from the catalog', async () =>
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'Get rewards' }));
+  await user.click(await screen.findByRole('tab', { name: 'Get Rewards' }));
 
   expect(await screen.findByText('$5 discount')).toBeInTheDocument();
   expect(screen.queryByText('Point donation')).not.toBeInTheDocument();
@@ -572,7 +572,7 @@ it('redeems a reward after confirmation and sends the shopper to My rewards', as
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'Get rewards' }));
+  await user.click(await screen.findByRole('tab', { name: 'Get Rewards' }));
   await user.click(await screen.findByRole('button', { name: 'Get reward' }));
 
   expect(await screen.findByText('Redeem $5 discount for 500 points?')).toBeInTheDocument();
@@ -580,7 +580,7 @@ it('redeems a reward after confirmation and sends the shopper to My rewards', as
   await user.click(screen.getByRole('button', { name: 'Redeem' }));
 
   expect(
-    await screen.findByText("Your certificate is ready — you'll find it in the My rewards tab."),
+    await screen.findByText("Your certificate is ready — you'll find it in the My Rewards tab."),
   ).toBeInTheDocument();
 });
 
@@ -595,11 +595,11 @@ it('never reveals the redeemed coupon code', async () => {
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'Get rewards' }));
+  await user.click(await screen.findByRole('tab', { name: 'Get Rewards' }));
   await user.click(await screen.findByRole('button', { name: 'Get reward' }));
   await user.click(await screen.findByRole('button', { name: 'Redeem' }));
 
-  await screen.findByText("Your certificate is ready — you'll find it in the My rewards tab.");
+  await screen.findByText("Your certificate is ready — you'll find it in the My Rewards tab.");
 
   expect(screen.queryByText('SAVE-123')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Copy code' })).not.toBeInTheDocument();
@@ -620,7 +620,7 @@ it('does not redeem when the confirmation is cancelled', async () => {
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'Get rewards' }));
+  await user.click(await screen.findByRole('tab', { name: 'Get Rewards' }));
   await user.click(await screen.findByRole('button', { name: 'Get reward' }));
   await user.click(await screen.findByRole('button', { name: 'Cancel' }));
 
@@ -636,7 +636,7 @@ it('shows an error snackbar when the redemption fails', async () => {
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'Get rewards' }));
+  await user.click(await screen.findByRole('tab', { name: 'Get Rewards' }));
   await user.click(await screen.findByRole('button', { name: 'Get reward' }));
   await user.click(await screen.findByRole('button', { name: 'Redeem' }));
 
@@ -654,7 +654,7 @@ it('shows an error snackbar when redemption succeeds without a coupon code', asy
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'Get rewards' }));
+  await user.click(await screen.findByRole('tab', { name: 'Get Rewards' }));
   await user.click(await screen.findByRole('button', { name: 'Get reward' }));
   await user.click(await screen.findByRole('button', { name: 'Redeem' }));
 
@@ -662,7 +662,7 @@ it('shows an error snackbar when redemption succeeds without a coupon code', asy
     expect(snackbar.error).toHaveBeenCalledWith('Something went wrong. Please try again.');
   });
   expect(
-    screen.queryByText("Your certificate is ready — you'll find it in the My rewards tab."),
+    screen.queryByText("Your certificate is ready — you'll find it in the My Rewards tab."),
   ).not.toBeInTheDocument();
 });
 
@@ -685,7 +685,7 @@ it('lists previously earned rewards and loads more pages', async () => {
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'My rewards' }));
+  await user.click(await screen.findByRole('tab', { name: 'My Rewards' }));
 
   expect(await screen.findByText('$5 credit')).toBeInTheDocument();
   expect(screen.queryByText('FIRST-CODE')).not.toBeInTheDocument();
@@ -840,7 +840,7 @@ it('renders the page when the customer tier is on the rollout allowlist', async 
   renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('You have 2,465 points available.')).toBeInTheDocument();
-  expect(screen.getByRole('tab', { name: 'My benefits' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'My Benefits' })).toBeInTheDocument();
 });
 
 it('shows the unavailable state when the customer tier is not on the allowlist', async () => {
@@ -851,7 +851,7 @@ it('shows the unavailable state when the customer tier is not on the allowlist',
   renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('Rewards are not available.')).toBeInTheDocument();
-  expect(screen.queryByRole('tab', { name: 'My benefits' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: 'My Benefits' })).not.toBeInTheDocument();
 });
 
 it('fails closed to unavailable on a digest failure while the allowlist is set', async () => {
@@ -888,7 +888,7 @@ it('fails closed to unavailable when the tiers lookup fails while the allowlist 
   renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('Rewards are not available.')).toBeInTheDocument();
-  expect(screen.queryByRole('tab', { name: 'My benefits' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: 'My Benefits' })).not.toBeInTheDocument();
 });
 
 it('treats an empty allowedTiers string as lever-off (current behavior)', async () => {
@@ -1002,7 +1002,7 @@ it('hides the tier progress card when the endpoint reports no progress', async (
   renderWithProviders(<Loyalty />, customerPreloadedState);
 
   expect(
-    await screen.findByRole('tab', { name: 'My benefits', selected: true }),
+    await screen.findByRole('tab', { name: 'My Benefits', selected: true }),
   ).toBeInTheDocument();
   expect(screen.queryByText(/Progress to/)).not.toBeInTheDocument();
 });
@@ -1131,11 +1131,11 @@ it('keeps earned rewards away from the catalog', async () => {
   const { user } = renderWithProviders(<Loyalty />);
 
   // Catalog tab shows the redeemable rule but no longer the earned codes.
-  await user.click(await screen.findByRole('tab', { name: 'Get rewards' }));
+  await user.click(await screen.findByRole('tab', { name: 'Get Rewards' }));
   expect(await screen.findByText('Free shipping')).toBeInTheDocument();
   expect(screen.queryByText('SAVE-123')).not.toBeInTheDocument();
 
-  await user.click(screen.getByRole('tab', { name: 'My rewards' }));
+  await user.click(screen.getByRole('tab', { name: 'My Rewards' }));
   expect(await screen.findByText('$5 discount')).toBeInTheDocument();
   expect(screen.queryByText('SAVE-123')).not.toBeInTheDocument();
 });
@@ -1254,7 +1254,7 @@ it('shows the intro copy and the empty nudge when nothing has been redeemed', as
   ).toBeInTheDocument();
   expect(
     await screen.findByText(
-      "You haven't redeemed any rewards yet. Visit Get rewards to turn your points into store credit.",
+      "You haven't redeemed any rewards yet. Visit Get Rewards to turn your points into store credit.",
     ),
   ).toBeInTheDocument();
 });
@@ -1277,7 +1277,7 @@ it('keeps the empty nudge off when the rewards fetch fails', async () => {
   // failed query settles — rather than merely being absent at first paint.
   await expect(
     screen.findByText(
-      "You haven't redeemed any rewards yet. Visit Get rewards to turn your points into store credit.",
+      "You haven't redeemed any rewards yet. Visit Get Rewards to turn your points into store credit.",
       {},
       { timeout: 1500 },
     ),
@@ -1613,10 +1613,10 @@ it('renders the four Smart Rewards tabs and defaults to My benefits', async () =
   renderWithProviders(<Loyalty />);
 
   expect(
-    await screen.findByRole('tab', { name: 'My benefits', selected: true }),
+    await screen.findByRole('tab', { name: 'My Benefits', selected: true }),
   ).toBeInTheDocument();
-  expect(screen.getByRole('tab', { name: 'Get rewards' })).toBeInTheDocument();
-  expect(screen.getByRole('tab', { name: 'My rewards' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'Get Rewards' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'My Rewards' })).toBeInTheDocument();
   expect(screen.queryByRole('tab', { name: 'Earn points' })).not.toBeInTheDocument();
   expect(screen.queryByRole('tab', { name: 'Tiers' })).not.toBeInTheDocument();
   expect(screen.queryByRole('tab', { name: 'History' })).not.toBeInTheDocument();
@@ -1640,13 +1640,13 @@ it('shows membership status on My benefits', async () => {
 });
 
 it.each([
-  ['overview', 'My benefits'],
-  ['earn', 'My benefits'],
-  ['tiers', 'My benefits'],
-  ['memberships', 'My benefits'],
-  ['redeem', 'Get rewards'],
-  ['history', 'My rewards'],
-  ['bogus', 'My benefits'],
+  ['overview', 'My Benefits'],
+  ['earn', 'My Benefits'],
+  ['tiers', 'My Benefits'],
+  ['memberships', 'My Benefits'],
+  ['redeem', 'Get Rewards'],
+  ['history', 'My Rewards'],
+  ['bogus', 'My Benefits'],
 ])('maps the legacy ?tab=%s deep link to %s', async (legacy, expected) => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
 
@@ -1756,7 +1756,7 @@ it('switches to My benefits when the FAQ names that tab', async () => {
   await user.click(await screen.findByRole('button', { name: 'My Benefits' }));
 
   expect(
-    await screen.findByRole('tab', { name: 'My benefits', selected: true }),
+    await screen.findByRole('tab', { name: 'My Benefits', selected: true }),
   ).toBeInTheDocument();
 });
 
@@ -1772,7 +1772,7 @@ it('switches to My rewards when the FAQ names that tab', async () => {
   await user.click(await screen.findByRole('button', { name: 'My Rewards' }));
 
   expect(
-    await screen.findByRole('tab', { name: 'My rewards', selected: true }),
+    await screen.findByRole('tab', { name: 'My Rewards', selected: true }),
   ).toBeInTheDocument();
 });
 
