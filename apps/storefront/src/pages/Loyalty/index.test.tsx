@@ -1738,15 +1738,54 @@ it('points shoppers at portal tabs instead of an absolute storefront URL', async
 
   await user.click(await screen.findByRole('tab', { name: 'FAQs' }));
 
-  expect(
-    await screen.findByText('Your tier and benefits are on the My benefits tab.'),
-  ).toBeInTheDocument();
-  expect(
-    screen.getByText(
-      'Your tier and benefits are on the My benefits tab, your points balance is at the top of this page, and any store credit certificates are under My rewards.',
-    ),
-  ).toBeInTheDocument();
+  // The tab names are links, so each answer's copy is split across text nodes —
+  // match a fragment rather than the whole sentence. Both reworded answers open the
+  // same way, which is what the count asserts.
+  expect(await screen.findAllByText(/Your tier and benefits are on the/)).toHaveLength(2);
+  expect(screen.getByText(/your points balance is at the top of this page/)).toBeInTheDocument();
   expect(screen.queryByText(/login\.php/)).not.toBeInTheDocument();
+});
+
+it('switches to My benefits when the FAQ names that tab', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'FAQs' }));
+  await user.click(screen.getByText('Where can I see my current tier?'));
+  await user.click(await screen.findByRole('button', { name: 'My Benefits' }));
+
+  expect(
+    await screen.findByRole('tab', { name: 'My benefits', selected: true }),
+  ).toBeInTheDocument();
+});
+
+it('switches to My rewards when the FAQ names that tab', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'FAQs' }));
+  await user.click(
+    screen.getByText('Where can I see my benefits, credit balance, and tier status?'),
+  );
+  await user.click(await screen.findByRole('button', { name: 'My Rewards' }));
+
+  expect(
+    await screen.findByRole('tab', { name: 'My rewards', selected: true }),
+  ).toBeInTheDocument();
+});
+
+it('keeps the FAQ tab-name links out of the anchor set, since they navigate no document', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'FAQs' }));
+  await user.click(screen.getByText('Where can I see my current tier?'));
+
+  const tabLink = await screen.findByRole('button', { name: 'My Benefits' });
+  expect(tabLink).not.toHaveAttribute('href');
 });
 
 it('selects the FAQ tab for ?tab=faq', async () => {

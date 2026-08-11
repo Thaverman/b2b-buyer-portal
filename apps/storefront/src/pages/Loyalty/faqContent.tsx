@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
-import { Link } from '@mui/material';
+import { useSearchParams } from 'react-router-dom';
+import { Box, Link } from '@mui/material';
 
 // The FAQ renders only inside the signed-in portal, so its links are contact
 // channels, never storefront URLs. mailto:/tel: invoke a protocol handler and
@@ -20,6 +21,39 @@ function RepEmail() {
     <Link href={`mailto:${REP_EMAIL}`} underline="always">
       {REP_EMAIL}
     </Link>
+  );
+}
+
+// Switching tabs is a same-page state change, so this is a real <button>, not an
+// anchor: the portal renders inside the ThemeFrame iframe, where an href's fragment
+// resolves against about:srcdoc instead of the storefront page. setSearchParams is
+// the same mechanism the tab bar itself uses (index.tsx), so deep links keep working.
+//
+// Styled by hand to match the MUI Links above rather than using <Link
+// component="button">, because jsx-a11y/anchor-is-valid cannot see through MUI's
+// `component` prop and reads that as an anchor with no href.
+function TabLink({ tab, children }: { tab: 'benefits' | 'my-rewards'; children: string }) {
+  const [, setSearchParams] = useSearchParams();
+
+  return (
+    <Box
+      component="button"
+      type="button"
+      onClick={() => setSearchParams({ tab }, { replace: true })}
+      sx={{
+        p: 0,
+        border: 0,
+        background: 'none',
+        font: 'inherit',
+        color: 'primary.main',
+        textDecoration: 'underline',
+        cursor: 'pointer',
+        // Keeps the button sitting on the sentence's text line.
+        verticalAlign: 'baseline',
+      }}
+    >
+      {children}
+    </Box>
   );
 }
 
@@ -116,7 +150,11 @@ export const FAQ_SECTIONS: FaqSection[] = [
         // see your tier, benefits, and progress." Dropped "progress": TierProgressCard
         // renders null unless progress.targetKind is 'NextTier', and the PrePointsGate
         // progress summary is rendered by the hero above the tabs, not by this tab.
-        answer: 'Your tier and benefits are on the My benefits tab.',
+        answer: (
+          <>
+            Your tier and benefits are on the <TabLink tab="benefits">My Benefits</TabLink> tab.
+          </>
+        ),
       },
     ],
   },
@@ -241,8 +279,13 @@ export const FAQ_SECTIONS: FaqSection[] = [
         // Reworded: was "Log in at https://www.storesupply.com/login.php#/login to
         // find your tier, benefits, points, and any store credits." Split by where
         // each thing actually lives in the portal.
-        answer:
-          'Your tier and benefits are on the My benefits tab, your points balance is at the top of this page, and any store credit certificates are under My rewards.',
+        answer: (
+          <>
+            Your tier and benefits are on the <TabLink tab="benefits">My Benefits</TabLink> tab,
+            your points balance is at the top of this page, and any store credit certificates are
+            under <TabLink tab="my-rewards">My Rewards</TabLink>.
+          </>
+        ),
       },
       {
         question: 'I think my tier is wrong. What do I do?',

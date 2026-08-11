@@ -130,9 +130,9 @@ into a bundle that also runs on sandbox.
 
 | Question | Was | Becomes |
 |---|---|---|
-| Where can I see my current tier? | Log in at `https://www.storesupply.com/login.php#/login` to see your tier, benefits, and progress. | Your tier and benefits are on the My benefits tab. |
+| Where can I see my current tier? | Log in at `https://www.storesupply.com/login.php#/login` to see your tier, benefits, and progress. | Your tier and benefits are on the **My Benefits** tab. (tab name linked) |
 | How do I find early access products? | We'll email you when early access items are available. You can also log in at `…` to see what's open to you. | We'll email you when early access items are available. |
-| Where can I see my benefits, credit balance, and tier status? | Log in at `…` to find your tier, benefits, points, and any store credits. | Your tier and benefits are on the My benefits tab, your points balance is at the top of this page, and any store credit certificates are under My rewards. |
+| Where can I see my benefits, credit balance, and tier status? | Log in at `…` to find your tier, benefits, points, and any store credits. | Your tier and benefits are on the **My Benefits** tab, your points balance is at the top of this page, and any store credit certificates are under **My Rewards**. (both tab names linked) |
 
 No link replaces the removed URLs, so this also drops 3 of the 8 link sites.
 
@@ -240,10 +240,16 @@ tests on this feature have passed against unwired code three times.
 - **`loyalty.benefits.accountRep.point1`** (`en.json:814`) carries the same
   email and phone and renders plain in the benefits cards. Same fix would
   apply; not part of this change.
-- **Internal portal routes as links** (e.g. linking "My benefits tab" to
-  `?tab=benefits`). The reworded answers name the tab in prose instead. An
-  anchor inside the iframe resolves its fragment against the iframe's
-  `about:srcdoc` document rather than the parent, so an in-portal link needs
-  react-router navigation, not an `href` — worth doing deliberately, later, if
-  at all.
+- ~~**Internal portal routes as links**~~ — **added 2026-08-11, after the rest
+  shipped.** The two answers naming a tab now link it: `faqContent.tsx`'s
+  `TabLink` renders a real `<button>` whose `onClick` calls
+  `setSearchParams({ tab }, { replace: true })`, the same mechanism the tab bar
+  uses. A button, not an anchor, precisely for the reason this was deferred — an
+  `href`'s fragment resolves against the iframe's `about:srcdoc` document rather
+  than the parent. It is styled by hand to match the MUI links rather than using
+  `<Link component="button">`, because `jsx-a11y/anchor-is-valid` cannot see
+  through MUI's `component` prop and reads that as an anchor with no `href`.
+  The linked tab names are capitalized ("My Benefits", "My Rewards") at the
+  user's request, which deliberately differs from the lowercase tab labels in
+  `en.json`.
 - **Theme-side removal of the `loyalty_faq` settings** — stencil repo.
