@@ -55,28 +55,31 @@ Captured 2026-08-11 by curling both storefronts and extracting
 sections: [...] }`, 7 sections, 32 items, 3 bullet lists, real email/phone.
 This is the copy to transcribe.
 
-**Production** (`www.storesupply.com`) — two independent problems:
+**Production** (`www.storesupply.com`) — running the **pre-promotion theme**
+(confirmed 2026-08-11): both the copy rework and the `sections`-shaped config
+landed on sandbox and have not been promoted yet. Two effects of that lag, both
+expected rather than defects:
 
-1. **The FAQ tab is invisible on production today.** Its config is the flat
-   shape `{ intro, items: [...] }` with **no `sections` key**. `getFaqSections()`
-   reads `config.sections`, gets `undefined`, returns `[]` — so the tab is
-   hidden and `?tab=faq` falls back to My benefits. A silent as-built contract
-   mismatch, the same failure mode as `storeSuffix`, `siteName` and
-   `tierAttributeId` before it.
-2. **Its copy is an unfinished draft.** Four answers carry literal unfilled
-   placeholders — `[PORTAL URL]`, `[REP PHONE]`, `[REP EMAIL]`,
-   `[SUPPORT CONTACT]` — no bullet lists (bullet content is flattened into
-   run-on answers), and "SSW Smart Rewards" branding that sandbox dropped. Had
-   the shape matched, those placeholders would have rendered verbatim to
-   customers.
+1. Its config is the older flat shape `{ intro, items: [...] }` with no
+   `sections` key. `getFaqSections()` reads `config.sections`, gets `undefined`,
+   returns `[]` — so the FAQ tab is hidden on production today and `?tab=faq`
+   falls back to My benefits.
+2. That older copy is an unfinished draft: four answers carry literal unfilled
+   placeholders (`[PORTAL URL]`, `[REP PHONE]`, `[REP EMAIL]`,
+   `[SUPPORT CONTACT]`), no bullet lists, and "SSW Smart Rewards" branding that
+   sandbox dropped.
+
+Retiring the config makes both moot — neither needs a theme fix. What matters
+for this spec is only that **sandbox, not production, is the copy of record.**
 
 `loyaltyFaqConfig` is assigned once per page and read by nothing in the theme;
 `/smart-rewards/`, `/loyalty/` and `/rewards/` are all 404. The portal is the
 only consumer, so retiring the contract breaks nothing else.
 
-**Consequence to accept deliberately:** because the tab is currently hidden on
-production, this change is also the FAQ's first appearance for production
-customers. It is a content launch, not only a link fix.
+**Consequence to accept deliberately:** because the tab is hidden on production
+today, this change is also the FAQ's first appearance for production customers —
+a content launch, not only a link fix. It arrives with the portal deploy and no
+longer waits on a theme promotion, which is the intended outcome.
 
 ## Design
 
