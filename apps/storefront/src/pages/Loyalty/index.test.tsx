@@ -48,7 +48,6 @@ afterEach(() => {
   delete window.loyaltyShippingConfig;
   delete window.getLoyaltyShippingCalculation;
   delete window.loyaltyRolloutConfig;
-  delete window.loyaltyFaqConfig;
 });
 
 it('shows the unavailable state when BC_CONTEXT is not configured', () => {
@@ -333,7 +332,7 @@ it('renders the hero banner photo full-width as a background behind the greeting
   const style = window.getComputedStyle(image);
   expect(style.width).toBe('100%');
   expect(style.objectFit).toBe('cover');
-  expect(style.objectPosition).toBe('right center');
+  expect(style.objectPosition).toBe('right top');
 });
 
 it('shows the session-expired state when the jwt fetch fails', async () => {
@@ -367,9 +366,6 @@ it('renders no benefits sections while the customer record is unavailable', asyn
   renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText("We couldn't load your rewards.")).toBeInTheDocument();
-  expect(
-    screen.queryByText('We want to make sure every order works harder for you.', { exact: false }),
-  ).not.toBeInTheDocument();
   expect(screen.queryByText(/Progress to/)).not.toBeInTheDocument();
 });
 
@@ -565,7 +561,7 @@ it('hides increment-type and unknown-status rules from the catalog', async () =>
   expect(screen.queryByText('Paused reward')).not.toBeInTheDocument();
 });
 
-it('redeems a reward after confirmation and shows the coupon code', async () => {
+it('redeems a reward after confirmation and sends the shopper to My rewards', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 600 }));
   mockRedeemRules([buildRedeemRuleWith({ id: 'rr1', title: '$5 discount', pointCost: 500 })]);
   server.use(
@@ -583,11 +579,12 @@ it('redeems a reward after confirmation and shows the coupon code', async () => 
 
   await user.click(screen.getByRole('button', { name: 'Redeem' }));
 
-  expect(await screen.findByText('SAVE-123')).toBeInTheDocument();
-  expect(screen.getByText('Apply this code at checkout.')).toBeInTheDocument();
+  expect(
+    await screen.findByText("Your certificate is ready — you'll find it in the My rewards tab."),
+  ).toBeInTheDocument();
 });
 
-it('copies the coupon code to the clipboard', async () => {
+it('never reveals the redeemed coupon code', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith({ pointBalance: 600 }));
   mockRedeemRules([buildRedeemRuleWith({ title: '$5 discount', pointCost: 500 })]);
   server.use(
@@ -602,14 +599,10 @@ it('copies the coupon code to the clipboard', async () => {
   await user.click(await screen.findByRole('button', { name: 'Get reward' }));
   await user.click(await screen.findByRole('button', { name: 'Redeem' }));
 
-  expect(await screen.findByText('SAVE-123')).toBeInTheDocument();
+  await screen.findByText("Your certificate is ready — you'll find it in the My rewards tab.");
 
-  await user.click(screen.getByRole('button', { name: 'Copy code' }));
-
-  await waitFor(() => {
-    expect(snackbar.success).toHaveBeenCalledWith('Code copied');
-  });
-  expect(await window.navigator.clipboard.readText()).toBe('SAVE-123');
+  expect(screen.queryByText('SAVE-123')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Copy code' })).not.toBeInTheDocument();
 });
 
 it('does not redeem when the confirmation is cancelled', async () => {
@@ -668,7 +661,9 @@ it('shows an error snackbar when redemption succeeds without a coupon code', asy
   await waitFor(() => {
     expect(snackbar.error).toHaveBeenCalledWith('Something went wrong. Please try again.');
   });
-  expect(screen.queryByText('Apply this code at checkout.')).not.toBeInTheDocument();
+  expect(
+    screen.queryByText("Your certificate is ready — you'll find it in the My rewards tab."),
+  ).not.toBeInTheDocument();
 });
 
 it('lists previously earned rewards and loads more pages', async () => {
@@ -1660,87 +1655,106 @@ it.each([
   expect(await screen.findByRole('tab', { name: expected, selected: true })).toBeInTheDocument();
 });
 
-it('hides the FAQ tab when the theme ships no FAQ content', async () => {
-  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
-
-  renderWithProviders(<Loyalty />);
-
-  expect(await screen.findByRole('tab', { name: 'My benefits' })).toBeInTheDocument();
-  expect(screen.queryByRole('tab', { name: 'FAQ' })).not.toBeInTheDocument();
-});
-
-it('renders theme-provided FAQ sections, questions and answers', async () => {
-  window.loyaltyFaqConfig = {
-    intro: 'Ask away.',
-    sections: [
-      {
-        title: 'Getting started',
-        items: [{ question: 'How do I earn points?', answer: 'Place an order.' }],
-      },
-    ],
-  };
+it('renders the hardcoded FAQ content with no theme config present', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'FAQ' }));
+  await user.click(await screen.findByRole('tab', { name: 'FAQs' }));
 
-  expect(await screen.findByText('Ask away.')).toBeInTheDocument();
-  expect(screen.getByText('Getting started')).toBeInTheDocument();
-  expect(screen.getByText('How do I earn points?')).toBeInTheDocument();
-  expect(screen.getByText('Place an order.')).toBeInTheDocument();
-});
-
-it('uses the default FAQ intro when the theme supplies none', async () => {
-  window.loyaltyFaqConfig = {
-    sections: [{ title: 'Getting started', items: [{ question: 'Q?', answer: 'A.' }] }],
-  };
-  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
-
-  const { user } = renderWithProviders(<Loyalty />);
-
-  await user.click(await screen.findByRole('tab', { name: 'FAQ' }));
-
+  expect(await screen.findByText('Program Tiers')).toBeInTheDocument();
+  expect(screen.getByText('What are the different program tiers?')).toBeInTheDocument();
   expect(
-    await screen.findByText(
-      "Got questions? Here's what our customers ask most about Smart Rewards.",
-    ),
+    screen.getByText('Monthly. We look at your orders from the past 12 months.'),
   ).toBeInTheDocument();
 });
 
-it('renders an FAQ item bullet list even when the item has no answer', async () => {
-  window.loyaltyFaqConfig = {
-    sections: [
-      {
-        title: 'Program Tiers',
-        items: [
-          {
-            question: 'What do I need to qualify for each tier?',
-            bullets: ['Essential: first order.', 'Select: 8+ orders per year.'],
-          },
-        ],
-      },
-    ],
-  };
+it('renders the FAQ intro without a theme-supplied one', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
 
   const { user } = renderWithProviders(<Loyalty />);
 
-  await user.click(await screen.findByRole('tab', { name: 'FAQ' }));
+  await user.click(await screen.findByRole('tab', { name: 'FAQs' }));
 
-  expect(await screen.findByText('What do I need to qualify for each tier?')).toBeInTheDocument();
-  expect(screen.getByText('Essential: first order.')).toBeInTheDocument();
-  expect(screen.getByText('Select: 8+ orders per year.')).toBeInTheDocument();
+  expect(await screen.findByText(/Smart Rewards is our free loyalty program/)).toBeInTheDocument();
 });
 
-it('falls back to My benefits for ?tab=faq with no FAQ content', async () => {
+it('renders bullets for an FAQ item that has no answer', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'FAQs' }));
+
+  expect(await screen.findByText('What do I need to qualify for each tier?')).toBeInTheDocument();
+  expect(
+    screen.getByText('Select: 8+ orders per year, or $2,000+ in annual purchases.'),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText('Signature: 16+ orders per year, or $5,000+ in annual purchases.'),
+  ).toBeInTheDocument();
+});
+
+it('links the rep email and phone, with no target since neither navigates', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'FAQs' }));
+
+  // MUI keeps collapsed Accordion content mounted but visibility:hidden, and role
+  // queries exclude inaccessible nodes, so every answer carrying a link is expanded
+  // first. (getByText matches hidden text, which is why the copy assertions below
+  // and in the other tests need no expansion.)
+  await user.click(screen.getByText('How do I reach my account rep?'));
+  await user.click(screen.getByText('I think my tier is wrong. What do I do?'));
+  await user.click(screen.getByText('Can I combine Smart Rewards with other promotions?'));
+  await user.click(
+    screen.getByText("I have a question that's not covered here. Who do I contact?"),
+  );
+
+  const emailLinks = await screen.findAllByRole('link', {
+    name: 'contactsmartrewards@storesupply.com',
+  });
+  expect(emailLinks).toHaveLength(4);
+  emailLinks.forEach((link) => {
+    expect(link).toHaveAttribute('href', 'mailto:contactsmartrewards@storesupply.com');
+    expect(link).not.toHaveAttribute('target');
+  });
+
+  const phoneLink = screen.getByRole('link', { name: '1-833-397-2619' });
+  expect(phoneLink).toHaveAttribute('href', 'tel:+18333972619');
+  expect(phoneLink).not.toHaveAttribute('target');
+
+  // Pinning the total against the five exact hrefs above leaves no room for a
+  // storefront URL to hide among the FAQ's links.
+  expect(screen.getAllByRole('link')).toHaveLength(5);
+});
+
+it('points shoppers at portal tabs instead of an absolute storefront URL', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+
+  const { user } = renderWithProviders(<Loyalty />);
+
+  await user.click(await screen.findByRole('tab', { name: 'FAQs' }));
+
+  expect(
+    await screen.findByText('Your tier, benefits, and progress are on the My benefits tab.'),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      'Your tier and benefits are on the My benefits tab, your points balance is at the top of this page, and any store credit certificates are under My rewards.',
+    ),
+  ).toBeInTheDocument();
+  expect(screen.queryByText(/login\.php/)).not.toBeInTheDocument();
+});
+
+it('selects the FAQ tab for ?tab=faq', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
 
   renderWithProviders(<Loyalty />, { initialEntries: [{ search: '?tab=faq' }] });
 
-  expect(
-    await screen.findByRole('tab', { name: 'My benefits', selected: true }),
-  ).toBeInTheDocument();
+  expect(await screen.findByRole('tab', { name: 'FAQs', selected: true })).toBeInTheDocument();
 });
 
 it('introduces My benefits with the customer tier name', async () => {
@@ -1749,9 +1763,6 @@ it('introduces My benefits with the customer tier name', async () => {
 
   renderWithProviders(<Loyalty />);
 
-  expect(
-    await screen.findByText('We want to make sure every order works harder for you.'),
-  ).toBeInTheDocument();
   expect(
     await screen.findByText(
       "Here's a quick guide to your Essential benefits and how to get the most from them.",
@@ -1778,7 +1789,6 @@ it('shows the benefits banner and explainer cards with the tier name', async () 
   renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText("Here's how your Essential rewards work")).toBeInTheDocument();
-  expect(screen.getByText('Each purchase earns you points.')).toBeInTheDocument();
   expect(
     document.querySelector('img[src="/content/images/loyalty/loyalty-benefits-banner.jpg"]'),
   ).toBeInTheDocument();
@@ -1789,7 +1799,7 @@ it('shows the benefits banner and explainer cards with the tier name', async () 
     ),
   ).toBeInTheDocument();
   expect(
-    screen.getByText('Redeem your points for a certificate on the Get Rewards page.'),
+    screen.getByText("Redeem your points for a certificate on the 'Get Rewards' page."),
   ).toBeInTheDocument();
   expect(
     screen.getByText('Certificates can be used alongside product discounts.'),
@@ -1816,8 +1826,6 @@ it('styles the benefits explainer card bullet points at 18px in #282828', async 
 
   renderWithProviders(<Loyalty />);
 
-  // The banner subtitle above these cards is "Each purchase earns you points." verbatim —
-  // query the full bullet sentence so this never collides with that shorter subtitle.
   const bullet = await screen.findByText(
     'Every purchase earns you points, based on your tier rate.',
   );
@@ -1869,6 +1877,149 @@ it('matches the tier rate case-insensitively and trims whitespace', async () => 
   renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('Your rate is 2% of your total order.')).toBeInTheDocument();
+});
+
+const accountRepPoint =
+  'You have an account rep for orders, product sourcing and stock questions. Reach our rep at 833-397-2619 or contactsmartrewards@storesupply.com.';
+const earlyAccessSignaturePoint =
+  "You'll see new products and closeout deals a full week early, with first pick on limited stock and new arrivals.";
+const earlyAccessSelectPoint =
+  "You'll see closeout deals 48 hours early, with first pick on limited stock.";
+const earlyAccessEmailPoint = "When early access items are available, we'll email you.";
+const tierStatusPoint1 =
+  'We look at your orders over the past 12 months, updated monthly, to determine your tier.';
+const maintainSelectPoint =
+  'To maintain Select: place 8+ orders per year, and/or $2,000+ in annual purchases.';
+const maintainSignaturePoint =
+  'To maintain your Signature tier: place 16+ orders per year, and/or $5,000+ in annual purchases.';
+const tierStatusPoint2 =
+  "If your tier is ever going to change, we'll let you know 30 days in advance.";
+
+it('shows the account rep and one-week early access cards when SSW says Signature', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  // Signature is the top rung, so AtTop is the realistic progress shape for these customers.
+  mockTierProgress(
+    buildTierProgressWith({
+      targetKind: 'AtTop',
+      currentTierName: 'Signature',
+      targetTierName: '',
+    }),
+  );
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  expect(await screen.findByText('Account Rep')).toBeInTheDocument();
+  expect(screen.getByText(accountRepPoint)).toBeInTheDocument();
+  expect(screen.getByText('One-Week Early Access')).toBeInTheDocument();
+  expect(screen.getByText(earlyAccessSignaturePoint)).toBeInTheDocument();
+  expect(screen.getByText(earlyAccessEmailPoint)).toBeInTheDocument();
+  expect(screen.queryByText('48-Hour Early Access')).not.toBeInTheDocument();
+  expect(screen.queryByText(earlyAccessSelectPoint)).not.toBeInTheDocument();
+});
+
+it('matches the Signature gate case-insensitively and trims whitespace', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockTierProgress(buildTierProgressWith({ currentTierName: ' SIGNATURE ' }));
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  expect(await screen.findByText('Account Rep')).toBeInTheDocument();
+  expect(screen.getByText('One-Week Early Access')).toBeInTheDocument();
+});
+
+it('gives Select the account rep and the 48-hour early access card', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockTierProgress(buildTierProgressWith({ currentTierName: 'Select' }));
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  expect(await screen.findByText('Account Rep')).toBeInTheDocument();
+  expect(screen.getByText(accountRepPoint)).toBeInTheDocument();
+  expect(screen.getByText('48-Hour Early Access')).toBeInTheDocument();
+  expect(screen.getByText(earlyAccessSelectPoint)).toBeInTheDocument();
+  expect(screen.getByText(earlyAccessEmailPoint)).toBeInTheDocument();
+  expect(screen.queryByText('One-Week Early Access')).not.toBeInTheDocument();
+  expect(screen.queryByText(earlyAccessSignaturePoint)).not.toBeInTheDocument();
+});
+
+it('adds the maintain-Select bullet between the two standing tier-status lines', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockTierProgress(buildTierProgressWith({ currentTierName: 'Select' }));
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  const tierStatusCard = (await screen.findByText('Your Tier Status')).closest(
+    'div',
+  )?.parentElement;
+  // Asserting the full ordered list, not just presence: the bullet has to land in the
+  // middle, and a presence-only check would pass with it appended to the end.
+  expect(
+    within(tierStatusCard as HTMLElement)
+      .getAllByRole('listitem')
+      .map((bullet) => bullet.textContent),
+  ).toEqual([tierStatusPoint1, maintainSelectPoint, tierStatusPoint2]);
+});
+
+it('uses the Signature maintenance threshold, not the Select one', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockTierProgress(
+    buildTierProgressWith({
+      targetKind: 'AtTop',
+      currentTierName: 'Signature',
+      targetTierName: '',
+    }),
+  );
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  const tierStatusCard = (await screen.findByText('Your Tier Status')).closest(
+    'div',
+  )?.parentElement;
+  expect(
+    within(tierStatusCard as HTMLElement)
+      .getAllByRole('listitem')
+      .map((bullet) => bullet.textContent),
+  ).toEqual([tierStatusPoint1, maintainSignaturePoint, tierStatusPoint2]);
+});
+
+it('matches the Select gate case-insensitively and trims whitespace', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockTierProgress(buildTierProgressWith({ currentTierName: ' SELECT ' }));
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  expect(await screen.findByText('48-Hour Early Access')).toBeInTheDocument();
+});
+
+it('gives Essential neither the account rep nor any early access card', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockTierProgress(buildTierProgressWith({ currentTierName: 'Essential' }));
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  // Anchor on the footer, which renders after the info cards: without it these
+  // absence checks would pass on the still-empty pre-fetch DOM.
+  expect(await screen.findByText('Questions? Contact us at 1-833-397-2619')).toBeInTheDocument();
+  expect(screen.queryByText('Account Rep')).not.toBeInTheDocument();
+  expect(screen.queryByText('One-Week Early Access')).not.toBeInTheDocument();
+  expect(screen.queryByText('48-Hour Early Access')).not.toBeInTheDocument();
+  expect(screen.queryByText(maintainSelectPoint)).not.toBeInTheDocument();
+  expect(screen.queryByText(maintainSignaturePoint)).not.toBeInTheDocument();
+});
+
+it('hides the tier-restricted cards when only the Influence tier says Signature', async () => {
+  // No mockTierProgress: SSW is unavailable, so the gate must fail closed rather than
+  // fall through to the Influence tier that tierDisplayName would supply.
+  mockLoyaltyApis(buildLoyaltyCustomerWith({ currentLoyaltyTierId: 't1' }));
+  mockTiers([buildTierWith({ id: 't1', title: 'Signature' })]);
+
+  renderWithProviders(<Loyalty />);
+
+  // The Influence name still drives the credit copy, proving the page did reach Signature.
+  expect(await screen.findByText('Your rate is 3% of your total order.')).toBeInTheDocument();
+  expect(screen.queryByText('Account Rep')).not.toBeInTheDocument();
+  expect(screen.queryByText('One-Week Early Access')).not.toBeInTheDocument();
+  expect(screen.queryByText('48-Hour Early Access')).not.toBeInTheDocument();
 });
 
 it('frames the benefits banner photo on the subject rather than centring the crop', async () => {
@@ -1947,6 +2098,42 @@ it('shows the memberships above the customer with their quota and perks', async 
   ).toBeInTheDocument();
 });
 
+const selectQuotaLine = '(8+ orders/year and/or $2,000+ annual spend)';
+const signatureQuotaLine = '(16+ orders/year and/or $5,000+ annual spend)';
+
+it('puts each membership quota line above that card’s Influence description', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockMemberships(rewardMemberships());
+  mockTierProgress(buildTierProgressWith({ targetKind: 'NextTier', currentTierName: 'Essential' }));
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  const selectCard = (await screen.findByText('Select Tier')).closest('div')?.parentElement;
+  // Whole-card textContent, so this locks order: the quota line has to precede the
+  // Influence description, which a presence-only assertion would not catch.
+  expect(selectCard?.textContent).toBe(
+    `Select Tier${selectQuotaLine}(8+ orders/year or $2,000+ annual spend) :2% monthly credit, an account rep`,
+  );
+
+  const signatureCard = screen.getByText('Signature Tier').closest('div')?.parentElement;
+  expect(signatureCard?.textContent).toBe(
+    `Signature Tier${signatureQuotaLine}(16+ orders/year or $5,000+ annual spend) :3% monthly credit`,
+  );
+});
+
+it('quotes each card’s own tier, not the tier the customer is currently in', async () => {
+  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
+  mockMemberships(rewardMemberships());
+  // A Select customer sees only the Signature card, so only Signature's quota may appear.
+  mockTierProgress(buildTierProgressWith({ targetKind: 'NextTier', currentTierName: 'Select' }));
+
+  renderWithProviders(<Loyalty />, customerPreloadedState);
+
+  expect(await screen.findByText('Signature Tier')).toBeInTheDocument();
+  expect(screen.getByText(signatureQuotaLine)).toBeInTheDocument();
+  expect(screen.queryByText(selectQuotaLine)).not.toBeInTheDocument();
+});
+
 it('shows only the memberships above the customer, not current or lower ones', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
   mockMemberships(rewardMemberships());
@@ -1975,8 +2162,6 @@ it('hides the membership ladder for a top-tier customer but keeps the contact fo
     screen.queryByText('When you reach the next level, your tier upgrades automatically.'),
   ).not.toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Place your next order' })).toBeInTheDocument();
-  // Only SSW's AtTop earns the top-tier message; NextTier at the last rung must not.
-  expect(screen.queryByText(/our top tier/)).not.toBeInTheDocument();
 });
 
 it('drops a membership missing from the catalog but still renders the rest of the ladder', async () => {
@@ -2029,7 +2214,7 @@ it('hides the membership ladder when SSW reports a membership name matching none
   expect(screen.queryByText("What's Available as Your Orders Grow?")).not.toBeInTheDocument();
 });
 
-it('replaces the membership ladder with the top-tier message when SSW reports AtTop', async () => {
+it('hides the membership ladder when SSW reports AtTop', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
   mockMemberships(rewardMemberships());
   mockTierProgress(
@@ -2042,11 +2227,7 @@ it('replaces the membership ladder with the top-tier message when SSW reports At
 
   renderWithProviders(<Loyalty />, customerPreloadedState);
 
-  expect(
-    await screen.findByText(
-      "You're at Signature, our top tier — you're already earning at the highest rate we offer.",
-    ),
-  ).toBeInTheDocument();
+  expect(await screen.findByText('Questions? Contact us at 1-833-397-2619')).toBeInTheDocument();
   expect(screen.queryByText("What's Available as Your Orders Grow?")).not.toBeInTheDocument();
   expect(screen.queryByText('Signature Tier')).not.toBeInTheDocument();
   // A non-null AtTop progress object must not wake the progress card or the hero CTA.
@@ -2054,23 +2235,6 @@ it('replaces the membership ladder with the top-tier message when SSW reports At
   expect(
     screen.queryByRole('link', { name: 'Start shopping to earn points' }),
   ).not.toBeInTheDocument();
-});
-
-it('falls back to the generic top-tier message when SSW sends no membership name', async () => {
-  mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
-  mockMemberships(rewardMemberships());
-  mockTierProgress(
-    buildTierProgressWith({ targetKind: 'AtTop', currentTierName: '', targetTierName: '' }),
-  );
-
-  renderWithProviders(<Loyalty />, customerPreloadedState);
-
-  expect(
-    await screen.findByText(
-      "You're at our top tier — you're already earning at the highest rate we offer.",
-    ),
-  ).toBeInTheDocument();
-  expect(screen.queryByText("What's Available as Your Orders Grow?")).not.toBeInTheDocument();
 });
 
 it('matches the SSW membership name case-insensitively', async () => {

@@ -18,8 +18,6 @@ import {
   fetchTiers,
   getAllowedTiers,
   getBannerUrl,
-  getFaqIntro,
-  getFaqSections,
   getLoyaltyDigest,
   isLoyaltyAvailable,
   isTierAllowed,
@@ -169,10 +167,6 @@ function Loyalty() {
   const isSessionExpired = errorKind === 'sessionExpired';
   const isLoadError = Boolean(errorKind) && !isNotEnrolled && !isSessionExpired;
 
-  const faqSections = getFaqSections();
-  const hasFaq = faqSections.length > 0;
-  const activeTab = tab === 'faq' && !hasFaq ? 'benefits' : tab;
-
   return (
     <B3Spin isSpinning={digestQuery.isFetching || customerQuery.isFetching}>
       {/* pb clears host-page overlays (company-hierarchy bar, loyalty launcher) that float
@@ -218,7 +212,7 @@ function Loyalty() {
           </Alert>
         )}
         <Tabs
-          value={activeTab}
+          value={tab}
           onChange={(_, newTab: LoyaltyTab) => setSearchParams({ tab: newTab }, { replace: true })}
           variant="scrollable"
           allowScrollButtonsMobile
@@ -234,9 +228,9 @@ function Loyalty() {
           <Tab value="benefits" label={b3Lang('loyalty.tabs.benefits')} />
           <Tab value="get-rewards" label={b3Lang('loyalty.tabs.getRewards')} />
           <Tab value="my-rewards" label={b3Lang('loyalty.tabs.myRewards')} />
-          {hasFaq && <Tab value="faq" label={b3Lang('loyalty.tabs.faq')} />}
+          <Tab value="faq" label={b3Lang('loyalty.tabs.faq')} />
         </Tabs>
-        {activeTab === 'benefits' && (
+        {tab === 'benefits' && (
           <BenefitsTab
             customer={customer}
             memberships={memberships}
@@ -244,15 +238,15 @@ function Loyalty() {
             tierDisplayName={displayTierTitle}
           />
         )}
-        {activeTab === 'get-rewards' && (
+        {tab === 'get-rewards' && (
           <RewardsTab
             identity={identity}
             pointBalance={customer?.pointBalance ?? 0}
             customerQueryKey={['loyaltyCustomer', customerId]}
           />
         )}
-        {activeTab === 'my-rewards' && <MyRewardsTab identity={identity} />}
-        {activeTab === 'faq' && <FaqTab sections={faqSections} intro={getFaqIntro()} />}
+        {tab === 'my-rewards' && <MyRewardsTab identity={identity} />}
+        {tab === 'faq' && <FaqTab />}
       </Box>
     </B3Spin>
   );
