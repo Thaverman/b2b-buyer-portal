@@ -539,6 +539,51 @@ customer.
   worsens it. Do not add new PII to what the page reads from it.
 - Deleting the portal page (§7 — separate change).
 
+## 12. Build order
+
+Dependency-ordered phases. Each one ends somewhere shippable, because the page
+is unlinked until you link it and the portal keeps serving `/loyalty` until
+`themePageUrl` is set. Turn this into a repo-local plan on your side — the
+paths, partial names and test commands are yours, not ours.
+
+**Phase 0 — Config, before any markup.** Emit `tierAttributeId` and a real
+`siteName` (§3.1). Verify by curling the storefront and grepping the rendered
+HTML for each key on both environments. Do this first: with `siteName` empty,
+Phases 3's gated content renders nothing and you will spend the day debugging
+markup that is behaving exactly as designed.
+
+**Phase 1 — Shell, no data.** Web Page, custom template, account side-nav,
+login gate, four tab panels, client-side tab routing including every legacy
+`?tab=` value (§1.1). Fully verifiable with no API calls at all: every tab
+switches, every deep link lands, an anonymous visit redirects.
+
+**Phase 2 — Identity and hero.** The three-hop chain (§4), then greeting,
+points line, tier chip, banner with its error fallback and ratio floor (§2.1).
+Wire the free-shipping bar to the eligibility module the theme already owns
+rather than through a window global (§2.1.1). Error banners land here too
+(§4.1) — they are page-level, so they belong with the first thing that can fail.
+
+**Phase 3 — My Benefits.** Universal info cards and the benefits banner first;
+then SSW progress, and only then the progress card, the two tier-restricted
+cards, the maintenance bullet and the ladder (§2.3). **Run the view-source leak
+test at the end of this phase** (acceptance check 5), not at the end of the
+build — it is the one defect that looks perfect in a browser.
+
+**Phase 4 — Get Rewards.** Catalog fetch, the three filtering rules, icon
+keyword mapping, redeem with both dialogs and the no-coupon-code-is-a-failure
+rule (§2.4).
+
+**Phase 5 — My Rewards.** Earned list with paging, cart read, apply and remove
+with the CSRF header, and the hint-precedence table including its
+list-has-resolved guard (§2.5). Test this against a real cart — the CSRF and
+empty-cart behaviors have no meaningful offline equivalent.
+
+**Phase 6 — Cutover.** The portal side already exists: set
+`themePageUrl` on sandbox, confirm `/loyalty` hands off and that the storefront
+page replaces the portal rather than loading inside the account panel, then
+unset it and confirm the portal returns. Promote to production, then schedule
+the portal page's deletion as its own change.
+
 ---
 
 # Appendix A — API contract
@@ -767,7 +812,7 @@ format.
   "loyalty.benefits.autoUpgrade": "When you reach the next level, your tier upgrades automatically.",
   "loyalty.benefits.contact": "Questions? Contact us at 1-833-397-2619",
   "loyalty.benefits.orderCta": "Place your next order",
-  "loyalty.redeem.intro": "Redeem your available points for certificates",
+  "loyalty.redeem.intro": "Redeem your available points for store certificates",
   "loyalty.redeem.pointCost": "{points} points",
   "loyalty.redeem.getReward": "Get reward",
   "loyalty.redeem.confirmTitle": "Redeem reward?",
@@ -779,7 +824,7 @@ format.
   "loyalty.redeem.findInMyRewards": "Your certificate is ready — you'll find it in the My Rewards tab.",
   "loyalty.myRewards.introRedeemed": "Here's what you've redeemed and have ready to use.",
   "loyalty.myRewards.introApply": "Apply one to your cart below — only one reward can be used per order.",
-  "loyalty.myRewards.empty": "You haven't redeemed any rewards yet. Visit Get Rewards to turn your points into store certificates.",
+  "loyalty.myRewards.empty": "You haven't redeemed any points. Visit the “Get Rewards” tab to turn your points into store certificates.",
   "loyalty.myRewards.apply": "Apply to cart",
   "loyalty.myRewards.remove": "Remove",
   "loyalty.myRewards.removeSuccess": "Reward removed from your cart.",
