@@ -76,9 +76,6 @@ interface FaqSection {
   items: FaqItem[];
 }
 
-export const FAQ_INTRO =
-  'Smart Rewards is our free loyalty program for Store Supply Warehouse customers. Every qualifying purchase earns points that convert into store credit, every tier gets free ground shipping on orders over $300, and higher tiers add an account rep and early access to closeouts and new products.';
-
 export const FAQ_SECTIONS: FaqSection[] = [
   {
     title: 'About Smart Rewards',
@@ -86,7 +83,7 @@ export const FAQ_SECTIONS: FaqSection[] = [
       {
         question: 'What is Smart Rewards?',
         answer:
-          'A free rewards program for Store Supply Warehouse customers. Every qualifying purchase earns you points that convert into store credit you can use on future orders. You also get free ground shipping on orders over $300, and at higher tiers, early access to new products and an account rep.',
+          'A free rewards program for Store Supply Warehouse customers. Every qualifying purchase earns you points that convert into store certificates you can use on future orders. You also get free ground shipping on orders of $300 or more, and at higher tiers, early access to new products and an account rep.',
       },
       {
         question: 'Does it cost anything to be in the program?',
@@ -110,11 +107,11 @@ export const FAQ_SECTIONS: FaqSection[] = [
       {
         question: 'What are the different program tiers?',
         answer:
-          "Smart Rewards has three tiers. Every purchase earns you points based on your tier's rate, calculated on your order total after discounts, excluding tax and shipping. Your points can be redeemed for store credit certificates.",
+          "Smart Rewards has three tiers. Every purchase earns you points based on your tier's rate, calculated on your order total after discounts, excluding tax and shipping. Your points can be redeemed for store certificates.",
         bullets: [
-          'Essential: 1% rate (after $500 in annual purchases), free ground shipping on orders over $300.',
-          'Select: 2% rate, free ground shipping on orders over $300, an account rep, and 48-hour early access to closeouts and new products.',
-          'Signature: 3% rate (the highest), free ground shipping on orders over $300, a dedicated account rep, and 1-week early access to closeouts and new products.',
+          'Essential: 1% rate (after $500 in annual purchases), free ground shipping on orders of $300 or more.',
+          'Select: 2% rate, Free ground shipping on orders of $300 or more, an account rep, and 48-hour early access to closeouts and new products.',
+          'Signature: 3% rate (the highest), free ground shipping on orders of $300 or more, an account rep, and 1-week early access to closeouts and new products.',
         ],
       },
       {
@@ -159,31 +156,30 @@ export const FAQ_SECTIONS: FaqSection[] = [
     ],
   },
   {
-    title: 'Earning and Redeeming Credit',
+    title: 'Earning and Redeeming Store Certificates',
     items: [
       {
-        question: 'How do I earn credit?',
+        question: 'How do I earn store certificates?',
         answer:
-          "Each purchase earns you points based on your tier's credit rate (1% for Essential, 2% for Select, 3% for Signature). Points are calculated on your order total after any discounts, excluding tax and shipping charges.",
+          "Each purchase earns you points based on your tier's rate (1% for Essential, 2% for Select, 3% for Signature). Points are calculated on your order total after any discounts, excluding tax and shipping charges.",
       },
       {
         question: 'How do I redeem my points?',
         answer:
-          "You'll receive an email when points are in your account. You redeem points for store credit certificates. You can then apply the certificates to any future order.",
+          "You'll receive an email when points are in your account. You redeem points for store certificates. You can then apply the certificates to any future order.",
       },
       {
-        question: 'How long are my store credit certificates valid?',
+        question: 'How long are my store certificates valid?',
         answer: "12 months from the date they're issued.",
       },
       {
-        question: 'Can I use store credit with other discounts?',
-        answer:
-          'Yes. Store credit certificates work alongside product discounts on the same order.',
+        question: 'Can I use store certificates with other discounts?',
+        answer: 'Yes. Store certificates work alongside product discounts on the same order.',
       },
       {
-        question: 'Is there a limit on how much credit I can use per order?',
+        question: 'Is there a limit on how many store certificates I can use per order?',
         answer:
-          'One store credit certificate per order. Certificates cannot be transferred to other accounts.',
+          'One store certificate per order. Certificates cannot be transferred to other accounts.',
       },
       {
         question: 'What counts toward my points calculation?',
@@ -202,7 +198,7 @@ export const FAQ_SECTIONS: FaqSection[] = [
     items: [
       {
         question: 'How does free shipping work?',
-        answer: 'Every tier gets free ground shipping on all qualifying orders over $300.',
+        answer: 'Every tier gets free ground shipping on all qualifying orders of $300 or more.',
       },
       {
         question: 'How do I know if my order qualifies for free shipping?',
@@ -231,7 +227,7 @@ export const FAQ_SECTIONS: FaqSection[] = [
       {
         question: 'What is an account rep?',
         answer:
-          'At the Select tier, you have access to an account rep who can help with orders, product questions, stock availability, and recommendations. At Signature, you have a dedicated rep assigned specifically to your account.',
+          'At the Select tier, you have access to an account rep who can help with orders, product questions, stock availability, and recommendations. At Signature, you have an account rep assigned specifically to your account.',
       },
       {
         question: 'How do I reach my account rep?',
@@ -267,7 +263,7 @@ export const FAQ_SECTIONS: FaqSection[] = [
       {
         question: 'Can my rep help me find early access products?',
         answer:
-          'Yes. Your dedicated rep can flag items or categories that might be relevant based on your ordering patterns.',
+          'Yes. Your rep can flag items or categories that might be relevant based on your ordering patterns.',
       },
     ],
   },
@@ -275,15 +271,15 @@ export const FAQ_SECTIONS: FaqSection[] = [
     title: 'Questions and Troubleshooting',
     items: [
       {
-        question: 'Where can I see my benefits, credit balance, and tier status?',
+        question: 'Where can I see my benefits, points balance, and tier status?',
         // Reworded: was "Log in at https://www.storesupply.com/login.php#/login to
-        // find your tier, benefits, points, and any store credits." Split by where
+        // find your tier, benefits, points, and any store certificates." Split by where
         // each thing actually lives in the portal.
         answer: (
           <>
             Your tier and benefits are on the <TabLink tab="benefits">My Benefits</TabLink> tab,
-            your points balance is at the top of this page, and any store credit certificates are
-            under <TabLink tab="my-rewards">My Rewards</TabLink>.
+            your points balance is at the top of this page, and any store certificates are under{' '}
+            <TabLink tab="my-rewards">My Rewards</TabLink>.
           </>
         ),
       },
@@ -300,7 +296,7 @@ export const FAQ_SECTIONS: FaqSection[] = [
         question: 'Can I combine Smart Rewards with other promotions?',
         answer: (
           <>
-            Store credit certificates work alongside product discounts. For questions about specific
+            Store certificates work alongside product discounts. For questions about specific
             promotions, contact us at <RepEmail />.
           </>
         ),

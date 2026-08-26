@@ -2,8 +2,8 @@
 title: Loyalty tier progress comes from SSW GetDetailWithProgress (dual orders/spend quotas), not Influence thresholds — SSW tier names are display-only, the allowlist gate stays Influence-keyed; endpoint is unauthenticated by accepted decision
 type: decision
 created: 2026-07-20
-updated: 2026-08-03
-lastVerified: 2026-08-03
+updated: 2026-08-07
+lastVerified: 2026-08-07
 repo: b2b-buyer-portal
 storeHash: 24erkpw9h6
 website: SSW
@@ -60,6 +60,13 @@ Plus"). Decision (user, 2026-07-20):
   (`NextMembershipsSection.tsx`), anchored on the SSW `currentTierName` against a
   hardcoded Essential→Select→Signature order — Influence tier ids/thresholds are
   no longer consulted for the ladder itself (2026-08-03).
+- **Tier-restricted CONTENT VISIBILITY uses SSW `currentTierName` and fails
+  CLOSED** — a third category, added 2026-08-07. Do NOT reuse `displayTierTitle`
+  for it: that value's `|| influenceTierTitle` fallback is the source
+  `b23b6eb3` removed from this tab for wrong placement, so a gate keyed on it
+  leaks Signature/Select-only content whenever SSW is down. Copy *selection*
+  (credit rate) tolerating that fallback is not precedent for a *gate*. Details:
+  [[b2b-buyer-portal--loyalty-tier-restricted-benefit-cards]].
 
 ## Gating & failure posture
 

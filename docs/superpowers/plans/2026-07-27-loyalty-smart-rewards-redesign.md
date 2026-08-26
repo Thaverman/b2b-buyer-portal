@@ -1008,7 +1008,7 @@ it('shows membership status, tier benefits, earn rules and comparisons on My ben
       currentMembership: {
         id: 'm1',
         title: 'Signature Membership',
-        perks: ['Dedicated account representative'],
+        perks: ['Account representative'],
       },
     }),
   );

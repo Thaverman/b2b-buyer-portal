@@ -25,7 +25,7 @@ function TierProgressCard({ progress }: TierProgressCardProps) {
         p: 3,
       }}
     >
-      <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+      <Typography variant="h6" sx={{ fontWeight: 700 }}>
         {b3Lang('loyalty.tiers.progressTo', { tier: progress.targetTierName })}
       </Typography>
       {progress.targetAmountRequired > 0 && (

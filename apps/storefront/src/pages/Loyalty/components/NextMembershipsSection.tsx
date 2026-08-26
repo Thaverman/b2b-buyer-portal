@@ -25,13 +25,7 @@ function NextMembershipsSection({
   // SSW is the only source consulted for placement (per the 2026-08-03 decision):
   // Influence is no longer trusted for "which membership is this customer in."
   if (atTop) {
-    return (
-      <Typography sx={{ textAlign: 'center' }}>
-        {sswName
-          ? b3Lang('loyalty.benefits.atTopTier', { tier: sswName })
-          : b3Lang('loyalty.benefits.atTopTierGeneric')}
-      </Typography>
-    );
+    return null;
   }
 
   const anchorIndex = MEMBERSHIP_LADDER_ORDER.indexOf(sswName.toLowerCase());
@@ -48,51 +42,71 @@ function NextMembershipsSection({
     return null;
   }
 
+  // Keyed on the card's own membership, not the customer's tier: each card states the
+  // quota for the level it advertises. Literal keys, not a computed lookup.
+  const quotaLineFor = (title: string) => {
+    const name = title.trim().toLowerCase();
+    if (name === 'select') return b3Lang('loyalty.benefits.nextTierQuotaSelect');
+    if (name === 'signature') return b3Lang('loyalty.benefits.nextTierQuotaSignature');
+    return null;
+  };
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
       <Typography variant="h4" sx={{ fontWeight: 800, textAlign: 'center' }}>
         {b3Lang('loyalty.benefits.nextTiersTitle')}
       </Typography>
-      <Typography sx={{ textAlign: 'center' }}>
+      <Typography sx={{ textAlign: 'center', fontSize: '18px' }}>
         {nextMemberships.length === 1
           ? b3Lang('loyalty.benefits.nextTiersIntroOne')
           : b3Lang('loyalty.benefits.nextTiersIntroMany', { count: nextMemberships.length })}
       </Typography>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-        {nextMemberships.map((membership) => (
-          <Box
-            key={membership.id}
-            sx={{
-              bgcolor: 'primary.main',
-              color: 'primary.contrastText',
-              borderRadius: 2,
-              p: 3,
-              flex: '1 1 40%',
-              minWidth: 240,
-            }}
-          >
+        {nextMemberships.map((membership) => {
+          const quotaLine = quotaLineFor(membership.title);
+
+          return (
             <Box
-              sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}
+              key={membership.id}
+              sx={{
+                bgcolor: 'primary.main',
+                color: 'primary.contrastText',
+                borderRadius: 2,
+                p: 3,
+                flex: '1 1 40%',
+                minWidth: 240,
+              }}
             >
-              <Typography variant="h5" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
-                {b3Lang('loyalty.benefits.nextTierName', { title: membership.title })}
-              </Typography>
-              <ArrowOutward sx={{ fontSize: 32 }} />
+              <Box
+                sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}
+              >
+                <Typography variant="h5" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                  {b3Lang('loyalty.benefits.nextTierName', { title: membership.title })}
+                </Typography>
+                <ArrowOutward sx={{ fontSize: 32 }} />
+              </Box>
+              {quotaLine && (
+                <Typography variant="body2" sx={{ fontWeight: 700, mt: 1, fontSize: '18px' }}>
+                  {quotaLine}
+                </Typography>
+              )}
+              {membership.description.trim() !== '' && (
+                <Typography variant="body2" sx={{ fontWeight: 700, mt: 1, fontSize: '18px' }}>
+                  {`(${membership.description}) :`}
+                </Typography>
+              )}
+              {membership.perks.length > 0 && (
+                <Typography variant="body2" sx={{ mt: 1, fontSize: '18px' }}>
+                  {membership.perks.join(', ')}
+                </Typography>
+              )}
             </Box>
-            {membership.description.trim() !== '' && (
-              <Typography variant="body2" sx={{ fontWeight: 700, mt: 1 }}>
-                {`(${membership.description}) :`}
-              </Typography>
-            )}
-            {membership.perks.length > 0 && (
-              <Typography variant="body2" sx={{ mt: 1 }}>
-                {membership.perks.join(', ')}
-              </Typography>
-            )}
-          </Box>
-        ))}
+          );
+        })}
       </Box>
-      <Typography sx={{ textAlign: 'center' }}>{b3Lang('loyalty.benefits.autoUpgrade')}</Typography>
+      <Typography sx={{ textAlign: 'center', fontSize: '18px' }}>
+        {b3Lang('loyalty.benefits.autoUpgrade')}
+      </Typography>
     </Box>
   );
 }

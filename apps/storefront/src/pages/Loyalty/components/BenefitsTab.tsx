@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { WorkspacePremiumOutlined } from '@mui/icons-material';
 import { Box, Button, Typography } from '@mui/material';
 
 import { useB3Lang } from '@/lib/lang';
@@ -12,6 +11,7 @@ import {
 } from '../api';
 
 import BenefitsInfoCards from './BenefitsInfoCards';
+import LoyaltyBadgeIcon from './LoyaltyBadgeIcon';
 import NextMembershipsSection from './NextMembershipsSection';
 import TierProgressCard from './TierProgressCard';
 
@@ -41,16 +41,19 @@ interface BenefitsBoxProps {
 function BenefitsBox({ title, perks }: BenefitsBoxProps) {
   return (
     <Box sx={benefitsBoxSx}>
-      <WorkspacePremiumOutlined
-        sx={{ fontSize: 64, flex: '0 0 auto', mx: { xs: 'auto', sm: 3 } }}
-      />
+      <LoyaltyBadgeIcon sx={{ fontSize: 64, flex: '0 0 auto', mx: { xs: 'auto', sm: 3 } }} />
       <Box sx={{ flex: '1 1 60%' }}>
         <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
           {title}
         </Typography>
         <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
           {perks.map((perk) => (
-            <Typography key={perk} component="li" variant="body2" sx={{ mb: 0.5 }}>
+            <Typography
+              key={perk}
+              component="li"
+              variant="body2"
+              sx={{ mb: 0.5, fontSize: '18px' }}
+            >
               {perk}
             </Typography>
           ))}
@@ -74,10 +77,7 @@ function BenefitsTab({ customer, memberships, tierProgress, tierDisplayName }: B
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
       <Box sx={{ textAlign: 'center' }}>
-        <Typography variant="body2" color="text.secondary">
-          {b3Lang('loyalty.benefits.introLead')}
-        </Typography>
-        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+        <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '18px' }}>
           {tierDisplayName
             ? b3Lang('loyalty.benefits.introGuide', { tier: tierDisplayName })
             : b3Lang('loyalty.benefits.introGuideGeneric')}
@@ -91,7 +91,6 @@ function BenefitsTab({ customer, memberships, tierProgress, tierDisplayName }: B
           perks={membership.perks}
         />
       )}
-      <TierProgressCard progress={tierProgress} />
       <Box
         sx={{
           position: 'relative',
@@ -128,18 +127,19 @@ function BenefitsTab({ customer, memberships, tierProgress, tierDisplayName }: B
               ? b3Lang('loyalty.benefits.bannerTitle', { tier: tierDisplayName })
               : b3Lang('loyalty.benefits.bannerTitleGeneric')}
           </Typography>
-          <Typography variant="body2" sx={{ mt: 2, opacity: 0.9 }}>
-            {b3Lang('loyalty.benefits.bannerSubtitle')}
-          </Typography>
         </Box>
       </Box>
-      <BenefitsInfoCards tierDisplayName={tierDisplayName} />
+      <BenefitsInfoCards
+        tierDisplayName={tierDisplayName}
+        currentTierName={tierProgress?.currentTierName || null}
+      />
       <NextMembershipsSection
         memberships={memberships}
         currentTierName={tierProgress?.currentTierName || null}
         atTop={tierProgress?.targetKind === 'AtTop'}
       />
-      <Typography sx={{ textAlign: 'center', fontWeight: 700 }}>
+      <TierProgressCard progress={tierProgress} />
+      <Typography sx={{ textAlign: 'center', fontWeight: 700, fontSize: '18px' }}>
         {b3Lang('loyalty.benefits.contact')}
       </Typography>
       <Button
@@ -148,9 +148,12 @@ function BenefitsTab({ customer, memberships, tierProgress, tierDisplayName }: B
         // page loads inside the account panel instead of closing the portal.
         target="_top"
         variant="contained"
-        color="error"
         size="large"
         fullWidth
+        // Not a palette colour: primary.main is merchant-configured via portalStyle,
+        // so this CTA's green has to be literal. The hover shade is MUI's contained
+        // darken-20%; without it MUI's own :hover rule repaints this primary.dark.
+        sx={{ bgcolor: '#0e7d3b', '&:hover': { bgcolor: '#0b642f' } }}
       >
         {b3Lang('loyalty.benefits.orderCta')}
       </Button>

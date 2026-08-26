@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { WorkspacePremium } from '@mui/icons-material';
-import { alpha, Box, Button, Chip, Typography } from '@mui/material';
+import { Box, Button, Chip, Typography } from '@mui/material';
 
 import { useB3Lang } from '@/lib/lang';
 
@@ -49,7 +49,7 @@ function LoyaltyHero({
           // growing. Percentage padding resolves against the content-box width, which is why
           // the padding moved to the inner Box below.
           [theme.breakpoints.up('md')]: {
-            '&::before': { content: '""', float: 'left', width: 0, paddingBottom: '31.25%' },
+            '&::before': { content: '""', float: 'left', width: 0, paddingBottom: '11.25%' },
             '&::after': { content: '""', display: 'table', clear: 'both' },
           },
         })}
@@ -70,21 +70,10 @@ function LoyaltyHero({
               // loyalty-account-banner.jpg's subject sits in roughly the right third of the
               // frame; the default centered crop pushes her out of frame entirely on narrow
               // (mobile-width, tall) boxes, where object-fit:cover crops from the sides.
-              objectPosition: 'right center',
+              objectPosition: 'right top',
             }}
           />
         )}
-        {/* A flat neutral scrim, not this theme's own primary blue: the default banner asset
-            already bakes in its own solid-blue field on the left fading into the photo on the
-            right, so stacking another primary-colored layer on top double-tints that field and
-            makes the seam between "flat" and "photo" more visible instead of less. */}
-        <Box
-          sx={{
-            position: 'absolute',
-            inset: 0,
-            bgcolor: (theme) => alpha(theme.palette.common.black, 0.5),
-          }}
-        />
         <Box sx={{ position: 'relative', p: { xs: 3, sm: 4 } }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <WorkspacePremium />
@@ -139,7 +128,7 @@ function LoyaltyHero({
         </Box>
       </Box>
       {pointBalance !== null && (
-        <Typography sx={{ textAlign: 'center', mb: 2, color: 'text.secondary' }}>
+        <Typography sx={{ textAlign: 'center', mb: 2, fontWeight: 700 }}>
           {b3Lang('loyalty.hero.points', { points: pointBalance.toLocaleString() })}
         </Typography>
       )}

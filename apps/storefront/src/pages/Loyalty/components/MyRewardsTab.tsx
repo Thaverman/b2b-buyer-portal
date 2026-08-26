@@ -144,11 +144,15 @@ function MyRewardsTab({ identity }: MyRewardsTabProps) {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Box sx={{ textAlign: 'center' }}>
-        <Typography color="text.secondary">{b3Lang('loyalty.myRewards.introRedeemed')}</Typography>
-        <Typography color="text.secondary">{b3Lang('loyalty.myRewards.introApply')}</Typography>
+        <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '18px' }}>
+          {b3Lang('loyalty.myRewards.introRedeemed')}
+        </Typography>
+        <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '18px' }}>
+          {b3Lang('loyalty.myRewards.introApply')}
+        </Typography>
       </Box>
       {earnedQuery.isSuccess && earnedRewards.length === 0 && (
-        <Typography color="text.secondary" sx={{ textAlign: 'center' }}>
+        <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '18px', textAlign: 'center' }}>
           {b3Lang('loyalty.myRewards.empty')}
         </Typography>
       )}

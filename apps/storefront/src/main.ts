@@ -36,12 +36,22 @@ window.b2b = {
 };
 
 (async function bootstrap() {
+  const { hash, pathname } = window.location;
+
   // check if the accessed url contains a hashtag
-  if (window.location.hash.startsWith('#/')) {
+  if (hash.startsWith('#/')) {
+    initApp();
+  } else if (
+    // the storefront hides the native body on these pages and force-reveals it
+    // after 7s — load eagerly so the portal wins that race even on busy pages
+    pathname === '/login.php' ||
+    pathname === '/account.php' ||
+    pathname.startsWith('/checkout')
+  ) {
     initApp();
   } else {
-    // load the app when the browser is free
-    requestIdleCallbackFunction(initApp);
+    // load the app when the browser is free, or after 3s if it never goes idle
+    requestIdleCallbackFunction(initApp, { timeout: 3000 });
     // and bind links to load the app
     bindLinks();
     window.addEventListener('beforeunload', unbindLinks);

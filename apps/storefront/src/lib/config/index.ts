@@ -24,6 +24,10 @@ const themeOtherElementConfig = () => {
       '[href^="/account.php"] svg, [href^="/account.php"] svg path, [href="/login.php"] svg path',
     FinchUS: '[href^="/account.php"] img',
     Beautify: '[href^="/account.php"] .new-icon-account',
+    // StoreSupply renders absolute hrefs (https://.../account.php), which the
+    // relative-href selectors above never match; also cover the mobile hamburger
+    // account list, which carries no navUser-item--account class
+    StoreSupply: '[href*="/account.php"], [href*="/login.php"], .navPages-list--user a',
   };
 
   Object.values(themeElements).forEach((value) => {
@@ -57,6 +61,15 @@ const config: Record<string, string> = {
   checkout_super_clear_session: 'true',
   ...themeOtherElementConfig(),
 };
+
+// let the storefront's window.B3 snippet override selector defaults, so future
+// selector fixes ship via Script Manager without a portal rebuild; this runs at
+// module load, before any click listeners are bound
+Object.entries((window.B3 ?? {}) as unknown as Record<string, unknown>).forEach(([key, value]) => {
+  if (key in config && typeof value === 'string') {
+    config[key] = value;
+  }
+});
 
 export const setElementsListenersConfig = (key: string, value: string) => {
   if (key in config) {

@@ -1254,7 +1254,7 @@ it('shows the intro copy and the empty nudge when nothing has been redeemed', as
   ).toBeInTheDocument();
   expect(
     await screen.findByText(
-      "You haven't redeemed any rewards yet. Visit Get Rewards to turn your points into store credit.",
+      "You haven't redeemed any rewards yet. Visit Get Rewards to turn your points into store certificates.",
     ),
   ).toBeInTheDocument();
 });
@@ -1277,7 +1277,7 @@ it('keeps the empty nudge off when the rewards fetch fails', async () => {
   // failed query settles — rather than merely being absent at first paint.
   await expect(
     screen.findByText(
-      "You haven't redeemed any rewards yet. Visit Get Rewards to turn your points into store credit.",
+      "You haven't redeemed any rewards yet. Visit Get Rewards to turn your points into store certificates.",
       {},
       { timeout: 1500 },
     ),
@@ -1628,7 +1628,7 @@ it('shows membership status on My benefits', async () => {
       currentMembership: {
         id: 'm1',
         title: 'Signature Membership',
-        perks: ['Dedicated account representative'],
+        perks: ['account representative'],
       },
     }),
   );
@@ -1636,7 +1636,7 @@ it('shows membership status on My benefits', async () => {
   renderWithProviders(<Loyalty />);
 
   expect(await screen.findByText('Your Signature Membership benefits')).toBeInTheDocument();
-  expect(screen.getByText('Dedicated account representative')).toBeInTheDocument();
+  expect(screen.getByText('account representative')).toBeInTheDocument();
 });
 
 it.each([
@@ -1669,14 +1669,15 @@ it('renders the hardcoded FAQ content with no theme config present', async () =>
   ).toBeInTheDocument();
 });
 
-it('renders the FAQ intro without a theme-supplied one', async () => {
+it('renders no intro paragraph above the FAQ sections', async () => {
   mockLoyaltyApis(buildLoyaltyCustomerWith('WHATEVER_VALUES'));
 
   const { user } = renderWithProviders(<Loyalty />);
 
   await user.click(await screen.findByRole('tab', { name: 'FAQs' }));
 
-  expect(await screen.findByText(/Smart Rewards is our free loyalty program/)).toBeInTheDocument();
+  expect(await screen.findByText('About Smart Rewards')).toBeInTheDocument();
+  expect(screen.queryByText(/Smart Rewards is our free loyalty program/)).not.toBeInTheDocument();
 });
 
 it('renders bullets for an FAQ item that has no answer', async () => {
@@ -1767,7 +1768,7 @@ it('switches to My rewards when the FAQ names that tab', async () => {
 
   await user.click(await screen.findByRole('tab', { name: 'FAQs' }));
   await user.click(
-    screen.getByText('Where can I see my benefits, credit balance, and tier status?'),
+    screen.getByText('Where can I see my benefits, points balance, and tier status?'),
   );
   await user.click(await screen.findByRole('button', { name: 'My Rewards' }));
 
@@ -1831,7 +1832,7 @@ it('shows the benefits banner and explainer cards with the tier name', async () 
   expect(
     document.querySelector('img[src="/content/images/loyalty/loyalty-benefits-banner.jpg"]'),
   ).toBeInTheDocument();
-  expect(screen.getByText('Earning and Redeeming Credit')).toBeInTheDocument();
+  expect(screen.getByText('Earning and Redeeming Store Certificates')).toBeInTheDocument();
   expect(
     screen.getByText(
       'Once you reach $500 in annual purchases, your rate is 1% of your total order.',
@@ -1844,8 +1845,10 @@ it('shows the benefits banner and explainer cards with the tier name', async () 
     screen.getByText('Certificates can be used alongside product discounts.'),
   ).toBeInTheDocument();
 
-  const creditCard = screen.getByText('Earning and Redeeming Credit').closest('div')?.parentElement;
-  expect(within(creditCard as HTMLElement).getAllByRole('listitem')).toHaveLength(4);
+  const certificateCard = screen
+    .getByText('Earning and Redeeming Store Certificates')
+    .closest('div')?.parentElement;
+  expect(within(certificateCard as HTMLElement).getAllByRole('listitem')).toHaveLength(4);
 
   expect(screen.getByText('Free Shipping')).toBeInTheDocument();
   expect(

@@ -1,6 +1,8 @@
 import {
   LocalShippingOutlined,
+  LockClockOutlined,
   SavingsOutlined,
+  SupportAgentOutlined,
   SvgIconComponent,
   TrendingUp,
 } from '@mui/icons-material';
@@ -10,6 +12,11 @@ import { useB3Lang } from '@/lib/lang';
 
 interface BenefitsInfoCardsProps {
   tierDisplayName: string | null;
+  // SSW's placement, not tierDisplayName: the tier-restricted cards below are a visibility
+  // gate, and tierDisplayName falls back to the Influence tier that b23b6eb3 removed from
+  // this tab for placing customers on the wrong level. Per the 2026-08-03 decision, SSW
+  // alone answers "which membership is this?", so an absent name hides those cards.
+  currentTierName: string | null;
 }
 
 interface InfoCardProps {
@@ -20,7 +27,7 @@ interface InfoCardProps {
 
 function InfoCard({ title, Icon, points }: InfoCardProps) {
   return (
-    <Box sx={{ bgcolor: 'grey.100', borderRadius: 2, p: { xs: 3, sm: 4 } }}>
+    <Box sx={{ bgcolor: '#ededed', borderRadius: 2, p: { xs: 3, sm: 4 } }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <Typography variant="h6" color="primary" sx={{ fontWeight: 700, mb: 1 }}>
           {title}
@@ -54,15 +61,27 @@ function matchCreditRateTier(tierDisplayName: string | null): CreditRateTier | n
   return CREDIT_RATE_TIERS.find((tier) => tier === normalized) ?? null;
 }
 
-function BenefitsInfoCards({ tierDisplayName }: BenefitsInfoCardsProps) {
+function BenefitsInfoCards({ tierDisplayName, currentTierName }: BenefitsInfoCardsProps) {
   const b3Lang = useB3Lang();
   const creditRateTier = matchCreditRateTier(tierDisplayName);
+  const sswTier = currentTierName?.trim().toLowerCase();
+  const isSelect = sswTier === 'select';
+  const isSignature = sswTier === 'signature';
+  // Both perks start at Select; only their early-access window differs by tier.
+  const isSelectOrAbove = isSelect || isSignature;
 
   const point2 = (() => {
     if (creditRateTier === 'essential') return b3Lang('loyalty.benefits.credit.point2Essential');
     if (creditRateTier === 'select') return b3Lang('loyalty.benefits.credit.point2Select');
     if (creditRateTier === 'signature') return b3Lang('loyalty.benefits.credit.point2Signature');
     return b3Lang('loyalty.benefits.credit.point2Generic');
+  })();
+
+  // Only Select and Signature publish a maintenance threshold; other tiers omit the line.
+  const maintainLine = (() => {
+    if (isSelect) return b3Lang('loyalty.benefits.tierStatus.maintainSelect');
+    if (isSignature) return b3Lang('loyalty.benefits.tierStatus.maintainSignature');
+    return null;
   })();
 
   return (
@@ -90,9 +109,33 @@ function BenefitsInfoCards({ tierDisplayName }: BenefitsInfoCardsProps) {
         Icon={TrendingUp}
         points={[
           b3Lang('loyalty.benefits.tierStatus.point1'),
+          ...(maintainLine ? [maintainLine] : []),
           b3Lang('loyalty.benefits.tierStatus.point2'),
         ]}
       />
+      {isSelectOrAbove && (
+        <InfoCard
+          title={b3Lang('loyalty.benefits.accountRep.title')}
+          Icon={SupportAgentOutlined}
+          points={[b3Lang('loyalty.benefits.accountRep.point1')]}
+        />
+      )}
+      {isSelectOrAbove && (
+        <InfoCard
+          title={
+            isSignature
+              ? b3Lang('loyalty.benefits.earlyAccess.titleSignature')
+              : b3Lang('loyalty.benefits.earlyAccess.titleSelect')
+          }
+          Icon={LockClockOutlined}
+          points={[
+            isSignature
+              ? b3Lang('loyalty.benefits.earlyAccess.point1Signature')
+              : b3Lang('loyalty.benefits.earlyAccess.point1Select'),
+            b3Lang('loyalty.benefits.earlyAccess.point2'),
+          ]}
+        />
+      )}
     </Box>
   );
 }

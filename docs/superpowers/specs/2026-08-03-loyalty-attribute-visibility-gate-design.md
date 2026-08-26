@@ -228,6 +228,17 @@ This closes the question of whether the two branches could be confused at runtim
 they key off different levels of the response, and only one of them is reachable
 per-customer.
 
+> **Correction, measured 2026-08-04.** The probe above generalized from an
+> *enrolled* account. A customer who has **never** had the attribute set receives
+> `{ entityId: 2, name: "", value: null }` (verified live via same-origin
+> Storefront GraphQL, customer 40978): BigCommerce echoes the attribute **name
+> only when a value record exists**. As first built, the empty name tripped the
+> name-mismatch drift guard, so the unenrolled case fail-opened and the gate
+> could never close for exactly the customers it exists to hide. The resolver now
+> treats an **empty** name as the normal unenrolled shape (the value test applies
+> → hidden, no log) and only a non-empty, *different* name as id drift
+> (visible + log).
+
 This is a deliberate departure from the allowlist gate's blanket "fail-closed on
 the data surface". That gate is a *rollout* lever, where over-restricting is
 cheap; this one is an *entitlement* check, where over-restricting is a total

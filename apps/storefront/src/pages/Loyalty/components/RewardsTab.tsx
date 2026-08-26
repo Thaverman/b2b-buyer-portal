@@ -28,7 +28,7 @@ function RewardsTab({ identity, pointBalance, customerQueryKey }: RewardsTabProp
   const b3Lang = useB3Lang();
   const queryClient = useQueryClient();
   const [pendingRedeem, setPendingRedeem] = useState<RedeemRule | null>(null);
-  const [couponCode, setCouponCode] = useState<string | null>(null);
+  const [redeemed, setRedeemed] = useState(false);
 
   const rulesQuery = useQuery({
     queryKey: ['loyaltyRedeemRules'],
@@ -53,11 +53,12 @@ function RewardsTab({ identity, pointBalance, customerQueryKey }: RewardsTabProp
       queryClient.invalidateQueries({ queryKey: customerQueryKey });
       queryClient.invalidateQueries({ queryKey: ['loyaltyHistory'] });
       queryClient.invalidateQueries({ queryKey: ['loyaltyRewards'] });
+      // No coupon code means nothing redeemable was created, even on a 200.
       if (!result.couponCode) {
         snackbar.error(b3Lang('loyalty.errors.generic'));
         return;
       }
-      setCouponCode(result.couponCode);
+      setRedeemed(true);
     },
     onError: (err) => {
       setPendingRedeem(null);
@@ -69,21 +70,15 @@ function RewardsTab({ identity, pointBalance, customerQueryKey }: RewardsTabProp
     },
   });
 
-  const handleCopy = async () => {
-    if (!couponCode) {
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(couponCode);
-      snackbar.success(b3Lang('loyalty.redeem.copied'));
-    } catch {
-      snackbar.error(b3Lang('loyalty.errors.generic'));
-    }
-  };
-
   return (
     <Box>
       <SectionHeader>{b3Lang('loyalty.tabs.getRewards')}</SectionHeader>
+      <Typography
+        variant="body2"
+        sx={{ fontWeight: 700, textAlign: 'center', fontSize: '18px', pb: 2 }}
+      >
+        {b3Lang('loyalty.redeem.intro')}
+      </Typography>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
         {catalog.map((rule) => {
           const Icon = redeemRuleIcon(rule);
@@ -144,18 +139,16 @@ function RewardsTab({ identity, pointBalance, customerQueryKey }: RewardsTabProp
         </Box>
       </B3Dialog>
       <B3Dialog
-        isOpen={Boolean(couponCode)}
+        isOpen={redeemed}
         title={b3Lang('loyalty.redeem.couponTitle')}
-        leftSizeBtn={b3Lang('loyalty.redeem.copy')}
+        showLeftBtn={false}
         rightSizeBtn={b3Lang('loyalty.redeem.close')}
-        handleLeftClick={handleCopy}
-        handRightClick={() => setCouponCode(null)}
+        // Also the dismiss path for Escape, which B3Dialog routes to handleLeftClick.
+        handleLeftClick={() => setRedeemed(false)}
+        handRightClick={() => setRedeemed(false)}
       >
         <Box sx={{ textAlign: 'center' }}>
-          <Typography variant="h5" sx={{ mb: 1 }}>
-            {couponCode}
-          </Typography>
-          <Typography variant="body2">{b3Lang('loyalty.redeem.applyAtCheckout')}</Typography>
+          <Typography variant="body2">{b3Lang('loyalty.redeem.findInMyRewards')}</Typography>
         </Box>
       </B3Dialog>
     </Box>

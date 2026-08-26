@@ -3,7 +3,7 @@ import { Accordion, AccordionDetails, AccordionSummary, Box, Typography } from '
 
 import { useB3Lang } from '@/lib/lang';
 
-import { FAQ_INTRO, FAQ_SECTIONS } from '../faqContent';
+import { FAQ_SECTIONS } from '../faqContent';
 
 import SectionHeader from './SectionHeader';
 
@@ -13,9 +13,6 @@ function FaqTab() {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <SectionHeader>{b3Lang('loyalty.tabs.faq')}</SectionHeader>
-      <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '18px', textAlign: 'center' }}>
-        {FAQ_INTRO}
-      </Typography>
       {FAQ_SECTIONS.map((section) => (
         <Box key={section.title}>
           <Typography variant="subtitle1" component="h3" sx={{ fontWeight: 700, mb: 1 }}>
