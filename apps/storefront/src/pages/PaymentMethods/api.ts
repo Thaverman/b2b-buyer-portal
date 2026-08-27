@@ -64,7 +64,12 @@ const normalize = (raw: RawStoredInstrumentsResponse): StoredInstrumentsResponse
   instruments: (raw.instruments ?? raw.Instruments ?? []).map(normalizeInstrument),
 });
 
-type PaymentMethodsErrorKind = 'sessionExpired' | 'notFound' | 'rateLimited' | 'upstream' | 'declined';
+type PaymentMethodsErrorKind =
+  | 'sessionExpired'
+  | 'notFound'
+  | 'rateLimited'
+  | 'upstream'
+  | 'declined';
 
 export class PaymentMethodsError extends Error {
   kind: PaymentMethodsErrorKind;

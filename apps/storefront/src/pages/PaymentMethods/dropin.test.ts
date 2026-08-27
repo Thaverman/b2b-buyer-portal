@@ -18,7 +18,7 @@ const makeFrameDocument = () => {
 it('creates the drop-in through the iframe realm global when it is already present', async () => {
   const { window, document, container } = makeFrameDocument();
   const create = vi.fn().mockResolvedValue(fakeInstance);
-  (window as any).braintree = { dropin: { create } };
+  Object.assign(window, { braintree: { dropin: { create } } });
 
   const instance = await createDropin(document, container, 'bt-client-token');
 
@@ -42,7 +42,7 @@ it('injects the pinned script into the iframe head when the SDK is absent', asyn
   expect(script).toMatchObject({ src: DROPIN_SCRIPT_URL });
 
   // simulate the CDN script arriving and defining the global in the iframe realm
-  (window as any).braintree = { dropin: { create } };
+  Object.assign(window, { braintree: { dropin: { create } } });
   script?.dispatchEvent(new window.Event('load'));
 
   expect(await pending).toBe(fakeInstance);
@@ -57,7 +57,7 @@ it('reuses an in-flight script tag instead of injecting a second one', async () 
 
   expect(document.head.querySelectorAll('script')).toHaveLength(1);
 
-  (window as any).braintree = { dropin: { create } };
+  Object.assign(window, { braintree: { dropin: { create } } });
   document.head.querySelector('script')?.dispatchEvent(new window.Event('load'));
 
   await expect(first).resolves.toBe(fakeInstance);

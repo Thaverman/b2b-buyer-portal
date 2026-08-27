@@ -5,9 +5,10 @@
 // docs/superpowers/specs/2026-08-26-payment-methods-add-card-design.md §4.
 // That is also why this is a CDN script injection (Captcha-style) and not an npm
 // dependency: bundled code executes in the parent realm.
-export const DROPIN_SCRIPT_URL = 'https://js.braintreegateway.com/web/dropin/1.44.1/js/dropin.min.js';
+export const DROPIN_SCRIPT_URL =
+  'https://js.braintreegateway.com/web/dropin/1.44.1/js/dropin.min.js';
 
-export interface DropinPayload {
+interface DropinPayload {
   nonce: string;
   deviceData?: string;
 }
