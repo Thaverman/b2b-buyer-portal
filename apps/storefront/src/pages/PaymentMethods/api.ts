@@ -64,14 +64,17 @@ const normalize = (raw: RawStoredInstrumentsResponse): StoredInstrumentsResponse
   instruments: (raw.instruments ?? raw.Instruments ?? []).map(normalizeInstrument),
 });
 
-type PaymentMethodsErrorKind = 'sessionExpired' | 'notFound' | 'rateLimited' | 'upstream';
+type PaymentMethodsErrorKind = 'sessionExpired' | 'notFound' | 'rateLimited' | 'upstream' | 'declined';
 
 export class PaymentMethodsError extends Error {
   kind: PaymentMethodsErrorKind;
 
-  constructor(kind: PaymentMethodsErrorKind) {
+  declineReason?: string;
+
+  constructor(kind: PaymentMethodsErrorKind, declineReason?: string) {
     super(kind);
     this.kind = kind;
+    this.declineReason = declineReason;
   }
 }
 
@@ -82,10 +85,7 @@ const getPaymentMethodsConfig = () => window.BC_CONTEXT?.paymentMethods;
 export const isPaymentMethodsAvailable = () =>
   platform === 'bigcommerce' && Boolean(getPaymentMethodsConfig());
 
-const post = async (
-  action: string,
-  body: Record<string, string>,
-): Promise<StoredInstrumentsResponse> => {
+const fetchJson = async (action: string, body: Record<string, string>) => {
   const config = getPaymentMethodsConfig();
   if (!config) {
     throw new Error('Payment methods are not configured on this store');
@@ -114,7 +114,7 @@ const post = async (
   }
 
   if (response.ok) {
-    return normalize(await response.json());
+    return response.json();
   }
   if (response.status === 401) {
     b2bLogger.error(
@@ -125,11 +125,21 @@ const post = async (
   if (response.status === 404) {
     throw new PaymentMethodsError('notFound');
   }
+  if (response.status === 422) {
+    // The card itself was declined / failed verification — NOT a system error.
+    const { declineReason } = await response.json().catch(() => ({ declineReason: undefined }));
+    throw new PaymentMethodsError('declined', declineReason);
+  }
   if (response.status === 429) {
     throw new PaymentMethodsError('rateLimited');
   }
   throw new PaymentMethodsError('upstream');
 };
+
+const post = async (
+  action: string,
+  body: Record<string, string>,
+): Promise<StoredInstrumentsResponse> => normalize(await fetchJson(action, body));
 
 export const listStoredInstruments = () => post('StoredInstruments', {});
 
@@ -138,3 +148,23 @@ export const setDefaultStoredInstrument = (token: string) =>
 
 export const deleteStoredInstrument = (token: string) =>
   post('DeleteStoredInstrument', { Token: token });
+
+export const getVaultClientToken = async (): Promise<string> => {
+  const { clientToken } = await fetchJson('VaultClientToken', {});
+
+  return clientToken;
+};
+
+export const vaultInstrument = async ({
+  nonce,
+  deviceData,
+}: {
+  nonce: string;
+  deviceData?: string;
+}): Promise<StoredInstrument> =>
+  normalizeInstrument(
+    await fetchJson(
+      'VaultInstrument',
+      deviceData ? { Nonce: nonce, DeviceData: deviceData } : { Nonce: nonce },
+    ),
+  );
