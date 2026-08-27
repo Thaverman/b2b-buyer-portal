@@ -489,3 +489,142 @@ describe('add card form', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('saving a card', () => {
+  const openAddCard = async () => {
+    mockJwt();
+    mockClientToken();
+
+    const utils = renderWithProviders(<PaymentMethods />, {
+      preloadedState: { theme: { themeFrame: fakeThemeFrame } },
+    });
+
+    await utils.user.click(await screen.findByRole('button', { name: 'Add card' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Save card' })).toBeEnabled();
+    });
+
+    return utils;
+  };
+
+  it('vaults the tokenized nonce with device data and re-renders the refreshed list', async () => {
+    const newCard = buildStoredInstrumentWith({
+      brand: 'Visa',
+      last4: '1111',
+      isDefault: true,
+      source: 'braintree',
+    });
+    mockList([]);
+    const requestBody = vi.fn();
+    server.use(
+      http.post(`${apiBase}/customers/Customer/VaultInstrument`, async ({ request }) => {
+        requestBody(await request.json());
+        // subsequent list refetch returns the new card
+        mockList([newCard]);
+
+        return HttpResponse.json({
+          Token: newCard.token,
+          Last4: newCard.last4,
+          Brand: newCard.brand,
+          ExpiryMonth: newCard.expiryMonth,
+          ExpiryYear: newCard.expiryYear,
+          Type: newCard.type,
+          IsDefault: true,
+          Source: 'braintree',
+        });
+      }),
+    );
+
+    const { user } = await openAddCard();
+
+    await user.click(screen.getByRole('button', { name: 'Save card' }));
+
+    expect(await screen.findByText('Visa •••• 1111')).toBeInTheDocument();
+    expect(requestBody).toHaveBeenCalledWith({
+      Jwt: 'fresh-jwt',
+      Nonce: 'fake-nonce',
+      DeviceData: '{"d":1}',
+    });
+    // the form closed on success
+    expect(screen.queryByRole('button', { name: 'Save card' })).not.toBeInTheDocument();
+    expect(snackbar.success).toHaveBeenCalledWith('Card added');
+  });
+
+  it('shows the decline reason and keeps the form open on 422', async () => {
+    mockList([]);
+    server.use(
+      http.post(`${apiBase}/customers/Customer/VaultInstrument`, () =>
+        HttpResponse.json({ declineReason: 'CVV verification failed' }, { status: 422 }),
+      ),
+    );
+
+    const { user } = await openAddCard();
+
+    await user.click(screen.getByRole('button', { name: 'Save card' }));
+
+    expect(
+      await screen.findByText(
+        'Your card was declined: CVV verification failed. Please try a different card.',
+      ),
+    ).toBeInTheDocument();
+    // still open — the shopper can try a different card
+    expect(screen.getByRole('button', { name: 'Save card' })).toBeInTheDocument();
+  });
+
+  it('shows the slow-down message on 429 — not a decline', async () => {
+    mockList([]);
+    server.use(
+      http.post(`${apiBase}/customers/Customer/VaultInstrument`, () =>
+        HttpResponse.json({}, { status: 429 }),
+      ),
+    );
+
+    const { user } = await openAddCard();
+
+    await user.click(screen.getByRole('button', { name: 'Save card' }));
+
+    expect(
+      await screen.findByText('Too many attempts — please wait a minute and try again.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/declined/)).not.toBeInTheDocument();
+  });
+
+  it('shows the our-side error on 502 — never implies the card was bad', async () => {
+    mockList([]);
+    server.use(
+      http.post(`${apiBase}/customers/Customer/VaultInstrument`, () =>
+        HttpResponse.json({ error: 'upstream_unavailable' }, { status: 502 }),
+      ),
+    );
+
+    const { user } = await openAddCard();
+
+    await user.click(screen.getByRole('button', { name: 'Save card' }));
+
+    expect(
+      await screen.findByText(
+        'Something went wrong on our end — your card was not saved. Please try again.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/declined/)).not.toBeInTheDocument();
+  });
+
+  it('disables the save button while the vault call is in flight', async () => {
+    mockList([]);
+    server.use(
+      http.post(`${apiBase}/customers/Customer/VaultInstrument`, async () => {
+        await delay('infinite');
+
+        return HttpResponse.json({});
+      }),
+    );
+
+    const { user } = await openAddCard();
+
+    await user.click(screen.getByRole('button', { name: 'Save card' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Save card' })).toBeDisabled();
+    });
+  });
+});
