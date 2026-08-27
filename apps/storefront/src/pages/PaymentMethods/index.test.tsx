@@ -15,6 +15,7 @@ import {
 import { snackbar } from '@/utils/b3Tip';
 
 import { StoredInstrument } from './api';
+import { createDropin, DropinInstance } from './dropin';
 import PaymentMethods from '.';
 
 vi.mock('@/utils/b3Tip', () => ({
@@ -22,6 +23,10 @@ vi.mock('@/utils/b3Tip', () => ({
 }));
 
 vi.mock('@/utils/b3Logger');
+
+vi.mock('./dropin', () => ({
+  createDropin: vi.fn(),
+}));
 
 const { server } = startMockServer();
 
@@ -49,8 +54,35 @@ const mockList = (instruments: StoredInstrument[]) =>
     ),
   );
 
+const fakeDropinInstance = (): DropinInstance => ({
+  requestPaymentMethod: vi.fn().mockResolvedValue({ nonce: 'fake-nonce', deviceData: '{"d":1}' }),
+  teardown: vi.fn().mockResolvedValue(undefined),
+});
+
+const mockClientToken = () =>
+  server.use(
+    http.post(`${apiBase}/customers/Customer/VaultClientToken`, () =>
+      HttpResponse.json({ clientToken: 'bt-client-token' }),
+    ),
+  );
+
+// A real (jsdom) Document in preloadedState blows the stack in RTK's dev-mode
+// immutable-check traversal; the component only hands it to the mocked createDropin,
+// so a stub with just what the theme slice touches (updateOverflowStyle) is enough.
+const fakeThemeFrame = {
+  body: { style: {} },
+} as NonNullable<HTMLIFrameElement['contentDocument']>;
+
+const mockClientTokenUnavailable = () =>
+  server.use(
+    http.post(`${apiBase}/customers/Customer/VaultClientToken`, () =>
+      HttpResponse.json({ error: 'upstream_unavailable' }, { status: 502 }),
+    ),
+  );
+
 beforeEach(() => {
   window.BC_CONTEXT = { paymentMethods: { apiBase, appClientId } };
+  vi.mocked(createDropin).mockResolvedValue(fakeDropinInstance());
 });
 
 afterEach(() => {
@@ -367,4 +399,93 @@ it('closes the dialog and shows an error when the delete fails', async () => {
     expect(screen.queryByText('Delete card?')).not.toBeInTheDocument();
   });
   expect(screen.getByText('VISA •••• 4242')).toBeInTheDocument();
+});
+
+describe('add card gating', () => {
+  it('shows the add-card button when the store supports vaulting', async () => {
+    mockJwt();
+    mockList([]);
+    mockClientToken();
+
+    renderWithProviders(<PaymentMethods />);
+
+    expect(await screen.findByRole('button', { name: 'Add card' })).toBeInTheDocument();
+  });
+
+  it('hides the add-card button when the vault client token is unavailable (no Braintree on this brand)', async () => {
+    mockJwt();
+    mockList([buildStoredInstrumentWith({ brand: 'VISA', last4: '4242' })]);
+    mockClientTokenUnavailable();
+
+    renderWithProviders(<PaymentMethods />);
+
+    // the list still renders — managing existing cards works everywhere
+    expect(await screen.findByText('VISA •••• 4242')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add card' })).not.toBeInTheDocument();
+  });
+
+  it('invites adding a first card in the empty state when vaulting is available', async () => {
+    mockJwt();
+    mockList([]);
+    mockClientToken();
+
+    renderWithProviders(<PaymentMethods />);
+
+    expect(
+      await screen.findByText(
+        'You have no saved cards. Add your first card and it will become your default.',
+      ),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('add card form', () => {
+  it('opens the drop-in section with the fetched client token and closes on cancel with teardown', async () => {
+    const instance = fakeDropinInstance();
+    vi.mocked(createDropin).mockResolvedValue(instance);
+    mockJwt();
+    mockList([]);
+    mockClientToken();
+
+    const { user } = renderWithProviders(<PaymentMethods />, {
+      preloadedState: { theme: { themeFrame: fakeThemeFrame } },
+    });
+
+    await user.click(await screen.findByRole('button', { name: 'Add card' }));
+
+    await waitFor(() => {
+      expect(createDropin).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        'bt-client-token',
+      );
+    });
+    expect(screen.getByRole('button', { name: 'Save card' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByRole('button', { name: 'Save card' })).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(instance.teardown).toHaveBeenCalled();
+    });
+  });
+
+  it('shows the system-error message when drop-in initialization fails', async () => {
+    vi.mocked(createDropin).mockRejectedValue(new Error('script failed'));
+    mockJwt();
+    mockList([]);
+    mockClientToken();
+
+    const { user } = renderWithProviders(<PaymentMethods />, {
+      preloadedState: { theme: { themeFrame: fakeThemeFrame } },
+    });
+
+    await user.click(await screen.findByRole('button', { name: 'Add card' }));
+
+    expect(
+      await screen.findByText(
+        'Something went wrong on our end — your card was not saved. Please try again.',
+      ),
+    ).toBeInTheDocument();
+  });
 });
