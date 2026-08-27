@@ -85,7 +85,7 @@ it('listStoredInstruments posts the fresh jwt and returns the instrument list', 
 
   const result = await listStoredInstruments();
 
-  expect(requestBody).toHaveBeenCalledWith({ jwt: 'fresh-jwt' });
+  expect(requestBody).toHaveBeenCalledWith({ Jwt: 'fresh-jwt' });
   expect(result).toEqual(emptyList);
 });
 
@@ -103,7 +103,7 @@ it('setDefaultStoredInstrument posts the jwt and token', async () => {
 
   const result = await setDefaultStoredInstrument('tok-1');
 
-  expect(requestBody).toHaveBeenCalledWith({ jwt: 'fresh-jwt', token: 'tok-1' });
+  expect(requestBody).toHaveBeenCalledWith({ Jwt: 'fresh-jwt', Token: 'tok-1' });
   expect(result).toEqual(emptyList);
 });
 
@@ -121,7 +121,7 @@ it('deleteStoredInstrument posts the jwt and token', async () => {
 
   const result = await deleteStoredInstrument('tok-2');
 
-  expect(requestBody).toHaveBeenCalledWith({ jwt: 'fresh-jwt', token: 'tok-2' });
+  expect(requestBody).toHaveBeenCalledWith({ Jwt: 'fresh-jwt', Token: 'tok-2' });
   expect(result).toEqual(emptyList);
 });
 

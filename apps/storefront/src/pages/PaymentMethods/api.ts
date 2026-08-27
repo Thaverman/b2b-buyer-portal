@@ -100,7 +100,7 @@ const post = async (
     response = await fetch(`${config.apiBase}/customers/Customer/${action}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jwt, ...body }),
+      body: JSON.stringify({ Jwt: jwt, ...body }),
     });
   } catch {
     throw new PaymentMethodsError('upstream');
@@ -127,6 +127,7 @@ const post = async (
 export const listStoredInstruments = () => post('StoredInstruments', {});
 
 export const setDefaultStoredInstrument = (token: string) =>
-  post('SetDefaultStoredInstrument', { token });
+  post('SetDefaultStoredInstrument', { Token: token });
 
-export const deleteStoredInstrument = (token: string) => post('DeleteStoredInstrument', { token });
+export const deleteStoredInstrument = (token: string) =>
+  post('DeleteStoredInstrument', { Token: token });

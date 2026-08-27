@@ -201,7 +201,7 @@ it('sets a card as default and re-renders from the refreshed list', async () => 
   await waitFor(() => {
     expect(snackbar.success).toHaveBeenCalledWith('Default card updated');
   });
-  expect(requestBody).toHaveBeenCalledWith({ jwt: 'fresh-jwt', token: amex.token });
+  expect(requestBody).toHaveBeenCalledWith({ Jwt: 'fresh-jwt', Token: amex.token });
 
   // the refreshed list moved the default: the chip is now in the AMEX card and
   // the set-as-default action moved to the VISA card
@@ -314,7 +314,7 @@ it('deletes a card after confirmation and re-renders from the refreshed list', a
   await waitFor(() => {
     expect(snackbar.success).toHaveBeenCalledWith('Card deleted');
   });
-  expect(requestBody).toHaveBeenCalledWith({ jwt: 'fresh-jwt', token: amex.token });
+  expect(requestBody).toHaveBeenCalledWith({ Jwt: 'fresh-jwt', Token: amex.token });
   await waitFor(() => {
     expect(screen.queryByText('AMEX •••• 0005')).not.toBeInTheDocument();
   });
