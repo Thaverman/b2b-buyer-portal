@@ -37,6 +37,7 @@ const buildStoredInstrumentWith = builder<StoredInstrument>(() => ({
   expiryYear: faker.number.int({ min: 2030, max: 2035 }),
   type: 'card',
   isDefault: false,
+  source: faker.helpers.arrayElement(['bigcommerce', 'braintree']),
 }));
 
 const mockJwt = () => server.use(http.get(currentJwtUrl, () => HttpResponse.text('fresh-jwt')));

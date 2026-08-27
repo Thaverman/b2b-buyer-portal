@@ -43,6 +43,7 @@ it('normalizes a PascalCase backend response (.NET serialization) to camelCase',
             ExpiryYear: 2028,
             Type: 'stored_card',
             IsDefault: false,
+            Source: 'braintree',
           },
         ],
       }),
@@ -62,9 +63,36 @@ it('normalizes a PascalCase backend response (.NET serialization) to camelCase',
         expiryYear: 2028,
         type: 'stored_card',
         isDefault: false,
+        source: 'braintree',
       },
     ],
   });
+});
+
+it('defaults source to empty string when the backend omits it', async () => {
+  mockJwt();
+  server.use(
+    http.post(`${apiBase}/customers/Customer/StoredInstruments`, () =>
+      HttpResponse.json({
+        CustomerId: 999,
+        Instruments: [
+          {
+            Token: 'tok-1',
+            Last4: '1111',
+            Brand: 'VISA',
+            ExpiryMonth: 3,
+            ExpiryYear: 2028,
+            Type: 'card',
+            IsDefault: false,
+          },
+        ],
+      }),
+    ),
+  );
+
+  const result = await listStoredInstruments();
+
+  expect(result.instruments[0].source).toBe('');
 });
 
 it('listStoredInstruments posts the fresh jwt and returns the instrument list', async () => {

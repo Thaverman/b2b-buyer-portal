@@ -10,6 +10,8 @@ export interface StoredInstrument {
   expiryYear: number;
   type: string;
   isDefault: boolean;
+  /** Which vault the card lives in: 'bigcommerce' | 'braintree'. Not displayed in v1. */
+  source: string;
 }
 
 interface StoredInstrumentsResponse {
@@ -35,6 +37,8 @@ interface RawInstrument {
   Type?: string;
   isDefault?: boolean;
   IsDefault?: boolean;
+  source?: string;
+  Source?: string;
 }
 
 interface RawStoredInstrumentsResponse {
@@ -44,17 +48,20 @@ interface RawStoredInstrumentsResponse {
   Instruments?: RawInstrument[];
 }
 
+const normalizeInstrument = (i: RawInstrument): StoredInstrument => ({
+  token: i.token ?? i.Token ?? '',
+  last4: i.last4 ?? i.Last4 ?? '',
+  brand: i.brand ?? i.Brand ?? '',
+  expiryMonth: i.expiryMonth ?? i.ExpiryMonth ?? 0,
+  expiryYear: i.expiryYear ?? i.ExpiryYear ?? 0,
+  type: i.type ?? i.Type ?? '',
+  isDefault: i.isDefault ?? i.IsDefault ?? false,
+  source: i.source ?? i.Source ?? '',
+});
+
 const normalize = (raw: RawStoredInstrumentsResponse): StoredInstrumentsResponse => ({
   customerId: raw.customerId ?? raw.CustomerId ?? 0,
-  instruments: (raw.instruments ?? raw.Instruments ?? []).map((i) => ({
-    token: i.token ?? i.Token ?? '',
-    last4: i.last4 ?? i.Last4 ?? '',
-    brand: i.brand ?? i.Brand ?? '',
-    expiryMonth: i.expiryMonth ?? i.ExpiryMonth ?? 0,
-    expiryYear: i.expiryYear ?? i.ExpiryYear ?? 0,
-    type: i.type ?? i.Type ?? '',
-    isDefault: i.isDefault ?? i.IsDefault ?? false,
-  })),
+  instruments: (raw.instruments ?? raw.Instruments ?? []).map(normalizeInstrument),
 });
 
 type PaymentMethodsErrorKind = 'sessionExpired' | 'notFound' | 'rateLimited' | 'upstream';
