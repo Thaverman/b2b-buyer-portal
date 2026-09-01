@@ -56,14 +56,26 @@ const cardFieldSx = {
   px: 1,
 };
 
-// onAdded is wired by the save flow (next task); until then only the shell renders.
-function AddPaymentMethodDialog({ onClose, customerEmail }: AddPaymentMethodDialogProps) {
+// Everything the attach body sends unconditionally must be present (spec §5.4).
+const REQUIRED_FIELDS: (keyof BillingFormValues)[] = [
+  'firstName',
+  'lastName',
+  'address1',
+  'city',
+  'postalCode',
+  'countryCode',
+];
+
+function AddPaymentMethodDialog({ onClose, onAdded, customerEmail }: AddPaymentMethodDialogProps) {
   const b3Lang = useB3Lang();
   const [access, setAccess] = useState<Extract<VaultAccess, { state: 'available' }> | null>(null);
   const [isFormReady, setIsFormReady] = useState(false);
   const [hasInitError, setHasInitError] = useState(false);
   const [billing, setBilling] = useState<BillingFormValues>(emptyBillingValues);
   const [email, setEmail] = useState(customerEmail);
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasSubmitError, setHasSubmitError] = useState(false);
+  const [missingFields, setMissingFields] = useState<string[]>([]);
   const formRef = useRef<StoredCardForm | null>(null);
 
   useEffect(() => {
@@ -102,12 +114,68 @@ function AddPaymentMethodDialog({ onClose, customerEmail }: AddPaymentMethodDial
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const handleSave = async () => {
+    const form = formRef.current;
+    if (!form || !access || isSaving) {
+      return;
+    }
+
+    const missing: string[] = REQUIRED_FIELDS.filter((key) => !billing[key].trim());
+    if (!email.trim()) {
+      missing.push('email');
+    }
+    setMissingFields(missing);
+    if (missing.length > 0) {
+      return;
+    }
+
+    setHasSubmitError(false);
+    setIsSaving(true);
+    try {
+      await form.submit(
+        {
+          defaultInstrument: false,
+          email: email.trim(),
+          firstName: billing.firstName.trim(),
+          lastName: billing.lastName.trim(),
+          address1: billing.address1.trim(),
+          city: billing.city.trim(),
+          postalCode: billing.postalCode.trim(),
+          countryCode: billing.countryCode.trim(),
+          ...(billing.address2.trim() && { address2: billing.address2.trim() }),
+          ...(billing.company.trim() && { company: billing.company.trim() }),
+          ...(billing.phone.trim() && { phone: billing.phone.trim() }),
+          ...(billing.stateOrProvinceCode.trim() && {
+            stateOrProvinceCode: billing.stateOrProvinceCode.trim(),
+          }),
+        },
+        {
+          shopperId: access.shopperId,
+          storeHash: access.storeHash,
+          vaultToken: access.vaultToken,
+        },
+      );
+      // Resolves with no body (spec §2.5) — the parent refetches the list.
+      onAdded();
+    } catch {
+      // The SDK reports failure with no detail — decline and system error are
+      // indistinguishable (spec §2.6). One honest message; never blame the card.
+      setHasSubmitError(true);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const billingField = (key: keyof BillingFormValues, labelId: string) => (
     <TextField
       fullWidth
       size="small"
       label={b3Lang(labelId)}
       value={billing[key]}
+      error={missingFields.includes(key)}
+      helperText={
+        missingFields.includes(key) ? b3Lang('paymentMethods.addCard.requiredField') : undefined
+      }
       onChange={(e) => setBilling((prev) => ({ ...prev, [key]: e.target.value }))}
     />
   );
@@ -130,6 +198,11 @@ function AddPaymentMethodDialog({ onClose, customerEmail }: AddPaymentMethodDial
                 <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
                   <CircularProgress size={24} />
                 </Box>
+              )}
+              {hasSubmitError && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {b3Lang('paymentMethods.addCard.failed')}
+                </Alert>
               )}
               <Grid container spacing={2} sx={{ mt: 0 }}>
                 <Grid item xs={12}>
@@ -163,6 +236,12 @@ function AddPaymentMethodDialog({ onClose, customerEmail }: AddPaymentMethodDial
                     size="small"
                     label={b3Lang('paymentMethods.addCard.billing.email')}
                     value={email}
+                    error={missingFields.includes('email')}
+                    helperText={
+                      missingFields.includes('email')
+                        ? b3Lang('paymentMethods.addCard.requiredField')
+                        : undefined
+                    }
                     onChange={(e) => setEmail(e.target.value)}
                   />
                 </Grid>
@@ -201,8 +280,14 @@ function AddPaymentMethodDialog({ onClose, customerEmail }: AddPaymentMethodDial
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={onClose}>{b3Lang('paymentMethods.addCard.cancel')}</Button>
-          <Button variant="contained" disabled={!isFormReady || !access}>
+          <Button disabled={isSaving} onClick={onClose}>
+            {b3Lang('paymentMethods.addCard.cancel')}
+          </Button>
+          <Button
+            variant="contained"
+            disabled={!isFormReady || !access || isSaving}
+            onClick={handleSave}
+          >
             {b3Lang('paymentMethods.addCard.save')}
           </Button>
         </DialogActions>

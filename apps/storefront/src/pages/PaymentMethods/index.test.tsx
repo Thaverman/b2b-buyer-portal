@@ -16,7 +16,7 @@ import {
 import { snackbar } from '@/utils/b3Tip';
 
 import { StoredInstrument } from './api';
-import { getBillingPrefill } from './billingPrefill';
+import { emptyBillingValues, getBillingPrefill } from './billingPrefill';
 import { createStoredCardForm, StoredCardForm } from './hostedForm';
 import PaymentMethods from '.';
 
@@ -524,5 +524,106 @@ describe('add card dialog', () => {
         "The card form couldn't be loaded. Please try again, or add your card on the payment methods page.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it('submits flat billing fields with the scraped access data and refreshes the list', async () => {
+    const form = fakeStoredCardForm();
+    vi.mocked(createStoredCardForm).mockResolvedValue(form);
+    const newCard = buildStoredInstrumentWith({ brand: 'Visa', last4: '4242', isDefault: true });
+
+    const { user } = await openDialog();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save card' })).toBeEnabled());
+
+    mockList([newCard]); // the refetch after success returns the new card
+    await user.click(screen.getByRole('button', { name: 'Save card' }));
+
+    await waitFor(() => {
+      expect(form.submit).toHaveBeenCalledWith(
+        {
+          defaultInstrument: false,
+          email: 'cass@example.com',
+          firstName: 'Cass',
+          lastName: 'Doe',
+          address1: '1 Main St',
+          city: 'Bridgeton',
+          postalCode: '63044',
+          countryCode: 'US',
+          stateOrProvinceCode: 'MO',
+        },
+        { shopperId: '80591', storeHash: '24erkpw9h6', vaultToken: 'VAT test-token' },
+      );
+    });
+    expect(await screen.findByText('Visa •••• 4242')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(snackbar.success).toHaveBeenCalledWith('Card added');
+  });
+
+  it('omits empty optional billing fields from the submit payload', async () => {
+    const form = fakeStoredCardForm();
+    vi.mocked(createStoredCardForm).mockResolvedValue(form);
+
+    const { user } = await openDialog();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save card' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Save card' }));
+
+    await waitFor(() => expect(form.submit).toHaveBeenCalled());
+    const [fields] = vi.mocked(form.submit).mock.calls[0];
+    expect(fields).not.toHaveProperty('company');
+    expect(fields).not.toHaveProperty('address2');
+    expect(fields).not.toHaveProperty('phone');
+  });
+
+  it('shows one honest generic message on failure and keeps the dialog open', async () => {
+    const form = fakeStoredCardForm();
+    vi.mocked(form.submit).mockRejectedValue(new Error('STORED_CARD_FAILED'));
+    vi.mocked(createStoredCardForm).mockResolvedValue(form);
+
+    const { user } = await openDialog();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save card' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Save card' }));
+
+    expect(
+      await screen.findByText(
+        "We couldn't save this card. Check the card details and billing address, or try a different card.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save card' })).toBeEnabled();
+  });
+
+  it('blocks submit and marks the missing required billing fields', async () => {
+    const form = fakeStoredCardForm();
+    vi.mocked(createStoredCardForm).mockResolvedValue(form);
+    // the vi.mock spreads importOriginal, so emptyBillingValues is the real export
+    vi.mocked(getBillingPrefill).mockResolvedValue({ ...emptyBillingValues });
+
+    const { user } = await openDialog();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save card' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Save card' }));
+
+    expect(form.submit).not.toHaveBeenCalled();
+    expect(screen.getAllByText('Required').length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('disables save while the submit is in flight', async () => {
+    const form = fakeStoredCardForm();
+    let resolveSubmit: () => void = () => {};
+    vi.mocked(form.submit).mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSubmit = resolve;
+        }),
+    );
+    vi.mocked(createStoredCardForm).mockResolvedValue(form);
+
+    const { user } = await openDialog();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save card' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Save card' }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save card' })).toBeDisabled());
+
+    // settle the in-flight submit so its state updates land inside the test
+    resolveSubmit();
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 });
