@@ -23,6 +23,7 @@
     "start": "http-server ./dist --cors"
   },
   "dependencies": {
+    "@bigcommerce/checkout-sdk": "1.967.0",
     "@emotion/cache": "^11.9.3",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
