@@ -15,6 +15,7 @@ import { GlobalState } from '../global/context/config';
 import {
   BuyerPortalRoute,
   getAllowedRoutesWithoutComponent,
+  isNativePaymentMethodsPage,
   RouteItem,
   RouteItemBasic,
   routeList,
@@ -162,7 +163,22 @@ const gotoAllowedAppPage = async (
 
   let url = hash.substring(1);
 
-  if ((!url && role !== CustomerRole.GUEST && pathname.includes('account.php')) || isAccountEnter) {
+  if (isNativePaymentMethodsPage()) {
+    // The theme hides the native body on account.php expecting the portal to take over;
+    // we're deliberately NOT taking over here, so reveal it.
+    const hideBodyStyle = document.getElementById('b2b-account-page-hide-body');
+    if (hideBodyStyle) {
+      hideBodyStyle.innerHTML = '';
+    }
+  }
+
+  if (
+    (!url &&
+      role !== CustomerRole.GUEST &&
+      pathname.includes('account.php') &&
+      !isNativePaymentMethodsPage()) ||
+    isAccountEnter
+  ) {
     let isB2BUser = false;
     if (
       company.customer.userType === UserTypes.MULTIPLE_B2C &&

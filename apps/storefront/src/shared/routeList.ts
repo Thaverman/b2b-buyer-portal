@@ -266,6 +266,12 @@ export const routeList: (BuyerPortalRoute | RouteItem)[] = [
   },
 ];
 
+// The native BigCommerce payment-method pages must render un-hijacked: the portal's
+// own add-card fallback links to them, and the add page is where the storefront mints
+// the vault token. Everything else under account.php keeps redirecting into the portal.
+export const isNativePaymentMethodsPage = () =>
+  /[?&]action=(payment_methods|add_payment_method)(&|$)/.test(window.location.search);
+
 export const getAllowedRoutesWithoutComponent = (globalState: GlobalState): BuyerPortalRoute[] => {
   const { storefrontConfig, quoteConfig } = globalState;
   const { company, b2bFeatures } = store.getState();

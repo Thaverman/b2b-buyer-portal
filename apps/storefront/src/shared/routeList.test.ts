@@ -4,7 +4,7 @@ import { GlobalState, initState } from '@/shared/global/context/config';
 import { store } from '@/store';
 import { setCustomerInfo } from '@/store/slices/company';
 
-import { getAllowedRoutesWithoutComponent } from './routeList';
+import { getAllowedRoutesWithoutComponent, isNativePaymentMethodsPage } from './routeList';
 
 const loyaltyConfig = {
   shopKey: 'shop-key',
@@ -66,4 +66,27 @@ it('offers the loyalty route when the persisted customer predates isLoyaltyEntit
   store.dispatch(setCustomerInfo(withoutTheField as typeof customer));
 
   expect(hasLoyaltyRoute()).toBe(true);
+});
+
+describe('isNativePaymentMethodsPage', () => {
+  // vitest-location-mock ignores history.replaceState; drive the mocked location directly
+  const setUrl = (url: string) => window.location.assign(url);
+
+  afterEach(() => setUrl('/'));
+
+  it('matches the native payment-methods list and add pages', () => {
+    setUrl('/account.php?action=payment_methods');
+    expect(isNativePaymentMethodsPage()).toBe(true);
+
+    setUrl('/account.php?action=add_payment_method&provider=braintree&method_type=CARD');
+    expect(isNativePaymentMethodsPage()).toBe(true);
+  });
+
+  it('does not match other account pages', () => {
+    setUrl('/account.php?action=order_status');
+    expect(isNativePaymentMethodsPage()).toBe(false);
+
+    setUrl('/account.php');
+    expect(isNativePaymentMethodsPage()).toBe(false);
+  });
 });
