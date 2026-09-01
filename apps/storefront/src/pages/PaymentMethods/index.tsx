@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Box, Button, Typography } from '@mui/material';
+import { Alert, Box, Button, Link, Typography } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import B3Dialog from '@/components/B3Dialog';
@@ -8,6 +8,7 @@ import { useB3Lang } from '@/lib/lang';
 import { useAppSelector } from '@/store';
 import { snackbar } from '@/utils/b3Tip';
 
+import AddPaymentMethodDialog from './components/AddPaymentMethodDialog';
 import PaymentMethodRow from './components/PaymentMethodRow';
 import {
   deleteStoredInstrument,
@@ -17,6 +18,7 @@ import {
   setDefaultStoredInstrument,
   StoredInstrument,
 } from './api';
+import { getVaultAccess, NATIVE_ADD_PAYMENT_METHOD_PATH } from './vaultAccess';
 
 function PaymentMethods() {
   const b3Lang = useB3Lang();
@@ -32,6 +34,26 @@ function PaymentMethods() {
     queryFn: listStoredInstruments,
     enabled: isAvailable,
   });
+
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const customerEmail = useAppSelector(({ company }) => company.customer.emailAddress);
+
+  // Tri-state gate (spec §6): 'available' → in-portal dialog; 'unavailable' (theme page
+  // without a token = no gateway, i.e. Preferred) → no affordance at all; error (scrape
+  // broken / challenge / outage) → link out to the native page instead.
+  const vaultAccess = useQuery({
+    queryKey: ['vaultAccess', customerId],
+    queryFn: getVaultAccess,
+    enabled: isAvailable,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+
+  const handleAdded = () => {
+    setIsAddOpen(false);
+    queryClient.invalidateQueries({ queryKey: ['storedInstruments', customerId] });
+    snackbar.success(b3Lang('paymentMethods.addCard.success'));
+  };
 
   const handleMutationError = (err: unknown) => {
     if (err instanceof PaymentMethodsError) {
@@ -107,8 +129,34 @@ function PaymentMethods() {
             {b3Lang('paymentMethods.loadError')}
           </Alert>
         )}
+        {vaultAccess.data?.state === 'available' && (
+          <Box sx={{ mb: 2 }}>
+            <Button variant="outlined" onClick={() => setIsAddOpen(true)}>
+              {b3Lang('paymentMethods.addCard.button')}
+            </Button>
+          </Box>
+        )}
+        {vaultAccess.isError && (
+          <Box sx={{ mb: 2 }}>
+            {/* The portal renders inside the ThemeFrame; a plain anchor would navigate the frame. */}
+            <Link href={NATIVE_ADD_PAYMENT_METHOD_PATH} target="_top">
+              {b3Lang('paymentMethods.addCard.button')}
+            </Link>
+          </Box>
+        )}
+        {isAddOpen && (
+          <AddPaymentMethodDialog
+            onClose={() => setIsAddOpen(false)}
+            onAdded={handleAdded}
+            customerEmail={customerEmail}
+          />
+        )}
         {data && data.instruments.length === 0 && (
-          <Typography>{b3Lang('paymentMethods.empty')}</Typography>
+          <Typography>
+            {vaultAccess.data?.state === 'available'
+              ? b3Lang('paymentMethods.addCard.emptyList')
+              : b3Lang('paymentMethods.empty')}
+          </Typography>
         )}
         {data &&
           data.instruments.map((instrument) => (

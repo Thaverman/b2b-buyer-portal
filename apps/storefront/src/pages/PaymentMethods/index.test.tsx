@@ -1,5 +1,6 @@
 import {
   buildB2BFeaturesStateWith,
+  buildCompanyStateWith,
   builder,
   delay,
   faker,
@@ -15,6 +16,8 @@ import {
 import { snackbar } from '@/utils/b3Tip';
 
 import { StoredInstrument } from './api';
+import { getBillingPrefill } from './billingPrefill';
+import { createStoredCardForm, StoredCardForm } from './hostedForm';
 import PaymentMethods from '.';
 
 vi.mock('@/utils/b3Tip', () => ({
@@ -22,6 +25,15 @@ vi.mock('@/utils/b3Tip', () => ({
 }));
 
 vi.mock('@/utils/b3Logger');
+
+vi.mock('./hostedForm', () => ({
+  createStoredCardForm: vi.fn(),
+}));
+
+vi.mock('./billingPrefill', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./billingPrefill')>()),
+  getBillingPrefill: vi.fn(),
+}));
 
 const { server } = startMockServer();
 
@@ -49,8 +61,38 @@ const mockList = (instruments: StoredInstrument[]) =>
     ),
   );
 
+const fakeStoredCardForm = (): StoredCardForm => ({
+  submit: vi.fn().mockResolvedValue(undefined),
+  teardown: vi.fn(),
+});
+
+// Mirrors the live page: the context is a JSON string, so quotes arrive escaped.
+const availableNativePage = `<script>window.stencilBootstrap("account_addpaymentmethod", "{\\"storeHash\\":\\"24erkpw9h6\\",\\"vaultToken\\":\\"VAT test-token\\",\\"shopperId\\":\\"80591\\"}")</script>`;
+const noGatewayNativePage = `<script>window.stencilBootstrap("account_addpaymentmethod", "{}")</script>`;
+
+const mockNativePage = (body: string, status = 200) =>
+  server.use(
+    http.get(
+      '*/account.php',
+      () => new HttpResponse(body, { status, headers: { 'Content-Type': 'text/html' } }),
+    ),
+  );
+
 beforeEach(() => {
   window.BC_CONTEXT = { paymentMethods: { apiBase, appClientId } };
+  vi.mocked(createStoredCardForm).mockResolvedValue(fakeStoredCardForm());
+  vi.mocked(getBillingPrefill).mockResolvedValue({
+    firstName: 'Cass',
+    lastName: 'Doe',
+    company: '',
+    address1: '1 Main St',
+    address2: '',
+    city: 'Bridgeton',
+    stateOrProvinceCode: 'MO',
+    postalCode: '63044',
+    countryCode: 'US',
+    phone: '',
+  });
 });
 
 afterEach(() => {
@@ -367,4 +409,120 @@ it('closes the dialog and shows an error when the delete fails', async () => {
     expect(screen.queryByText('Delete card?')).not.toBeInTheDocument();
   });
   expect(screen.getByText('VISA •••• 4242')).toBeInTheDocument();
+});
+
+describe('add card gating', () => {
+  it('shows the add-card button when the native page carries a vault token', async () => {
+    mockJwt();
+    mockList([]);
+    mockNativePage(availableNativePage);
+
+    renderWithProviders(<PaymentMethods />);
+
+    expect(await screen.findByRole('button', { name: 'Add card' })).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        'You have no saved cards. Add your first card and it will become your default.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('hides the affordance entirely when the store has no gateway', async () => {
+    mockJwt();
+    mockList([buildStoredInstrumentWith({ brand: 'VISA', last4: '4242' })]);
+    mockNativePage(noGatewayNativePage);
+
+    renderWithProviders(<PaymentMethods />);
+
+    expect(await screen.findByText('VISA •••• 4242')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add card' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Add card' })).not.toBeInTheDocument();
+  });
+
+  it('falls back to a top-frame link to the native page when vault access cannot be read', async () => {
+    mockJwt();
+    mockList([]);
+    mockNativePage('<html>challenge</html>', 200);
+
+    renderWithProviders(<PaymentMethods />);
+
+    const link = await screen.findByRole('link', { name: 'Add card' });
+    expect(link).toHaveAttribute(
+      'href',
+      '/account.php?action=add_payment_method&provider=braintree&method_type=CARD',
+    );
+    // the portal renders inside an iframe — a plain anchor would navigate the frame
+    expect(link).toHaveAttribute('target', '_top');
+    // fallback keeps today's empty-state copy
+    expect(
+      await screen.findByText('You have no saved cards. Cards can be saved during checkout.'),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('add card dialog', () => {
+  const openDialog = async () => {
+    mockJwt();
+    mockList([]);
+    mockNativePage(availableNativePage);
+
+    const utils = renderWithProviders(<PaymentMethods />, {
+      // the dialog's email field prefills from Redux and is REQUIRED at submit time
+      preloadedState: {
+        company: buildCompanyStateWith({ customer: { emailAddress: 'cass@example.com' } }),
+      },
+    });
+
+    await utils.user.click(await screen.findByRole('button', { name: 'Add card' }));
+
+    return utils;
+  };
+
+  it('opens with hosted-field containers wired and billing prefilled and editable', async () => {
+    await openDialog();
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(createStoredCardForm).toHaveBeenCalledWith({
+        number: 'bpm-card-number',
+        expiry: 'bpm-card-expiry',
+        name: 'bpm-card-name',
+        cvv: 'bpm-card-cvv',
+      });
+    });
+    // containers exist in the document for the SDK to mount into
+    expect(document.getElementById('bpm-card-number')).toBeInTheDocument();
+
+    // prefilled and editable
+    const first = await screen.findByLabelText('First name');
+    expect(first).toHaveValue('Cass');
+    expect(screen.getByLabelText('State/Province code')).toHaveValue('MO');
+  });
+
+  it('tears the hosted form down on cancel', async () => {
+    const form = fakeStoredCardForm();
+    vi.mocked(createStoredCardForm).mockResolvedValue(form);
+
+    const { user } = await openDialog();
+
+    await screen.findByRole('dialog');
+    await waitFor(() => expect(createStoredCardForm).toHaveBeenCalled());
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => expect(form.teardown).toHaveBeenCalled());
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('shows the form error with a native-page link when the hosted form fails to initialize', async () => {
+    vi.mocked(createStoredCardForm).mockRejectedValue(new Error('sdk failed'));
+
+    await openDialog();
+
+    expect(
+      await screen.findByText(
+        "The card form couldn't be loaded. Please try again, or add your card on the payment methods page.",
+      ),
+    ).toBeInTheDocument();
+  });
 });
