@@ -499,6 +499,13 @@ describe('add card dialog', () => {
     expect(screen.getByLabelText('State/Province code')).toHaveValue('MO');
   });
 
+  it('stacks the dialog above the ThemeFrame overlay (iframe sits at z-index 12000)', async () => {
+    await openDialog();
+
+    await screen.findByRole('dialog');
+    expect(document.querySelector('.MuiDialog-root')).toHaveStyle({ zIndex: '12005' });
+  });
+
   it('tears the hosted form down on cancel', async () => {
     const form = fakeStoredCardForm();
     vi.mocked(createStoredCardForm).mockResolvedValue(form);

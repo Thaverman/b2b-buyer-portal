@@ -16,6 +16,7 @@ import {
   Typography,
 } from '@mui/material';
 
+import { Z_INDEX } from '@/constants';
 import { useB3Lang } from '@/lib/lang';
 
 import { BillingFormValues, emptyBillingValues, getBillingPrefill } from '../billingPrefill';
@@ -185,7 +186,9 @@ function AddPaymentMethodDialog({ onClose, onAdded, customerEmail }: AddPaymentM
 
   return (
     <CacheProvider value={parentDocumentCache}>
-      <Dialog open fullWidth maxWidth="sm" onClose={onClose}>
+      {/* The ThemeFrame overlay sits at Z_INDEX.IFRAME (12000); MUI's default modal
+          z-index (1300) would put this dialog underneath it. */}
+      <Dialog open fullWidth maxWidth="sm" onClose={onClose} sx={{ zIndex: Z_INDEX.MODAL }}>
         <DialogTitle>{b3Lang('paymentMethods.addCard.dialogTitle')}</DialogTitle>
         <DialogContent>
           {hasInitError ? (
