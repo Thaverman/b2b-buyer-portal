@@ -13,7 +13,8 @@ const noGatewayPage = `<html><body><script>
 window.stencilBootstrap("account_addpaymentmethod", "{\\"paymentsUrl\\":\\"https://payments.bigcommerce.com\\"}");
 </script></body></html>`;
 
-const challengePage = '<html><head><title>Just a moment...</title></head><body>Verifying</body></html>';
+const challengePage =
+  '<html><head><title>Just a moment...</title></head><body>Verifying</body></html>';
 
 const mockNativePage = (body: string, status = 200) =>
   server.use(

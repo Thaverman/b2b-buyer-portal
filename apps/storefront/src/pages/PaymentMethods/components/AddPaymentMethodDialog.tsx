@@ -41,7 +41,7 @@ const parentDocumentCache = createCache({
   prepend: true,
 });
 
-export const CARD_FIELD_CONTAINERS = {
+const CARD_FIELD_CONTAINERS = {
   number: 'bpm-card-number',
   expiry: 'bpm-card-expiry',
   name: 'bpm-card-name',
@@ -83,7 +83,11 @@ function AddPaymentMethodDialog({ onClose, onAdded, customerEmail }: AddPaymentM
 
     // Mint-fresh access on every open: the vault token lives ~30 minutes, so the page-load
     // gating result may be stale by the time the customer gets here.
-    Promise.all([getVaultAccess(), createStoredCardForm(CARD_FIELD_CONTAINERS), getBillingPrefill()])
+    Promise.all([
+      getVaultAccess(),
+      createStoredCardForm(CARD_FIELD_CONTAINERS),
+      getBillingPrefill(),
+    ])
       .then(([vaultAccess, form, prefill]) => {
         if (cancelled) {
           form.teardown();
@@ -111,7 +115,6 @@ function AddPaymentMethodDialog({ onClose, onAdded, customerEmail }: AddPaymentM
       formRef.current = null;
     };
     // mount-only by design: the dialog is unmounted on close
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSave = async () => {

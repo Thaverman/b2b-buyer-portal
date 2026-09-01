@@ -7,14 +7,14 @@ const PAYMENTS_URL = 'https://payments.bigcommerce.com';
 const PROVIDER_ID = 'braintree';
 const CURRENCY_CODE = 'USD';
 
-export interface StoredCardFormContainers {
+interface StoredCardFormContainers {
   number: string;
   expiry: string;
   name: string;
   cvv: string;
 }
 
-export interface StoredCardBillingFields {
+interface StoredCardBillingFields {
   defaultInstrument: boolean;
   email: string;
   firstName: string;
@@ -29,7 +29,7 @@ export interface StoredCardBillingFields {
   stateOrProvinceCode?: string;
 }
 
-export interface StoredCardSubmitData {
+interface StoredCardSubmitData {
   shopperId: string;
   storeHash: string;
   vaultToken: string;
