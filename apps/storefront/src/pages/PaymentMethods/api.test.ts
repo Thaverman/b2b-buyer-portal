@@ -2,11 +2,9 @@ import { assertQueryParams, http, HttpResponse, startMockServer } from 'tests/te
 
 import {
   deleteStoredInstrument,
-  getVaultClientToken,
   listStoredInstruments,
   PaymentMethodsError,
   setDefaultStoredInstrument,
-  vaultInstrument,
 } from './api';
 
 vi.mock('@/utils/b3Logger');
@@ -205,124 +203,4 @@ it('maps a network failure to upstream', async () => {
 
   expect(error).toBeInstanceOf(PaymentMethodsError);
   expect(error.kind).toBe('upstream');
-});
-
-describe('getVaultClientToken', () => {
-  it('POSTs the Jwt and returns the clientToken', async () => {
-    mockJwt();
-    const requestBody = vi.fn();
-    server.use(
-      http.post(`${apiBase}/customers/Customer/VaultClientToken`, async ({ request }) => {
-        requestBody(await request.json());
-
-        return HttpResponse.json({ clientToken: 'bt-client-token' });
-      }),
-    );
-
-    expect(await getVaultClientToken()).toBe('bt-client-token');
-    expect(requestBody).toHaveBeenCalledWith({ Jwt: 'fresh-jwt' });
-  });
-
-  it('maps 502 to an upstream error', async () => {
-    mockJwt();
-    server.use(
-      http.post(`${apiBase}/customers/Customer/VaultClientToken`, () =>
-        HttpResponse.json({ error: 'upstream_unavailable' }, { status: 502 }),
-      ),
-    );
-
-    await expect(getVaultClientToken()).rejects.toMatchObject({ kind: 'upstream' });
-  });
-});
-
-describe('vaultInstrument', () => {
-  it('POSTs Jwt, Nonce and DeviceData and normalizes the returned card', async () => {
-    mockJwt();
-    const requestBody = vi.fn();
-    server.use(
-      http.post(`${apiBase}/customers/Customer/VaultInstrument`, async ({ request }) => {
-        requestBody(await request.json());
-
-        return HttpResponse.json({
-          Token: 'tok-new',
-          Last4: '1111',
-          Brand: 'Visa',
-          ExpiryMonth: 12,
-          ExpiryYear: 2030,
-          Type: 'card',
-          IsDefault: true,
-          Source: 'braintree',
-        });
-      }),
-    );
-
-    const card = await vaultInstrument({ nonce: 'fake-nonce', deviceData: '{"d":1}' });
-
-    expect(requestBody).toHaveBeenCalledWith({
-      Jwt: 'fresh-jwt',
-      Nonce: 'fake-nonce',
-      DeviceData: '{"d":1}',
-    });
-    expect(card).toEqual({
-      token: 'tok-new',
-      last4: '1111',
-      brand: 'Visa',
-      expiryMonth: 12,
-      expiryYear: 2030,
-      type: 'card',
-      isDefault: true,
-      source: 'braintree',
-    });
-  });
-
-  it('omits DeviceData from the body when collection failed', async () => {
-    mockJwt();
-    const requestBody = vi.fn();
-    server.use(
-      http.post(`${apiBase}/customers/Customer/VaultInstrument`, async ({ request }) => {
-        requestBody(await request.json());
-
-        return HttpResponse.json({ Token: 'tok-new', IsDefault: true });
-      }),
-    );
-
-    await vaultInstrument({ nonce: 'fake-nonce' });
-
-    expect(requestBody).toHaveBeenCalledWith({ Jwt: 'fresh-jwt', Nonce: 'fake-nonce' });
-  });
-
-  it('maps 422 to a declined error carrying the declineReason', async () => {
-    mockJwt();
-    server.use(
-      http.post(`${apiBase}/customers/Customer/VaultInstrument`, () =>
-        HttpResponse.json({ declineReason: 'CVV verification failed' }, { status: 422 }),
-      ),
-    );
-
-    await expect(vaultInstrument({ nonce: 'fake-nonce' })).rejects.toMatchObject({
-      kind: 'declined',
-      declineReason: 'CVV verification failed',
-    });
-  });
-
-  it('maps 429 to rateLimited and 502 to upstream — a decline is neither', async () => {
-    mockJwt();
-    server.use(
-      http.post(`${apiBase}/customers/Customer/VaultInstrument`, () =>
-        HttpResponse.json({}, { status: 429 }),
-      ),
-    );
-    await expect(vaultInstrument({ nonce: 'fake-nonce' })).rejects.toMatchObject({
-      kind: 'rateLimited',
-    });
-
-    server.use(
-      http.post(`${apiBase}/customers/Customer/VaultInstrument`, () =>
-        HttpResponse.json({ error: 'upstream_unavailable' }, { status: 502 }),
-      ),
-    );
-    await expect(vaultInstrument({ nonce: 'fake-nonce' })).rejects.toMatchObject({
-      kind: 'upstream',
-    });
-  });
 });

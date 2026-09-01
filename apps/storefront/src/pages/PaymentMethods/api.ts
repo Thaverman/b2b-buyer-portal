@@ -64,22 +64,14 @@ const normalize = (raw: RawStoredInstrumentsResponse): StoredInstrumentsResponse
   instruments: (raw.instruments ?? raw.Instruments ?? []).map(normalizeInstrument),
 });
 
-type PaymentMethodsErrorKind =
-  | 'sessionExpired'
-  | 'notFound'
-  | 'rateLimited'
-  | 'upstream'
-  | 'declined';
+type PaymentMethodsErrorKind = 'sessionExpired' | 'notFound' | 'rateLimited' | 'upstream';
 
 export class PaymentMethodsError extends Error {
   kind: PaymentMethodsErrorKind;
 
-  declineReason?: string;
-
-  constructor(kind: PaymentMethodsErrorKind, declineReason?: string) {
+  constructor(kind: PaymentMethodsErrorKind) {
     super(kind);
     this.kind = kind;
-    this.declineReason = declineReason;
   }
 }
 
@@ -130,11 +122,6 @@ const fetchJson = async (action: string, body: Record<string, string>) => {
   if (response.status === 404) {
     throw new PaymentMethodsError('notFound');
   }
-  if (response.status === 422) {
-    // The card itself was declined / failed verification — NOT a system error.
-    const { declineReason } = await response.json().catch(() => ({ declineReason: undefined }));
-    throw new PaymentMethodsError('declined', declineReason);
-  }
   if (response.status === 429) {
     throw new PaymentMethodsError('rateLimited');
   }
@@ -153,23 +140,3 @@ export const setDefaultStoredInstrument = (token: string) =>
 
 export const deleteStoredInstrument = (token: string) =>
   post('DeleteStoredInstrument', { Token: token });
-
-export const getVaultClientToken = async (): Promise<string> => {
-  const { clientToken } = await fetchJson('VaultClientToken', {});
-
-  return clientToken;
-};
-
-export const vaultInstrument = async ({
-  nonce,
-  deviceData,
-}: {
-  nonce: string;
-  deviceData?: string;
-}): Promise<StoredInstrument> =>
-  normalizeInstrument(
-    await fetchJson(
-      'VaultInstrument',
-      deviceData ? { Nonce: nonce, DeviceData: deviceData } : { Nonce: nonce },
-    ),
-  );

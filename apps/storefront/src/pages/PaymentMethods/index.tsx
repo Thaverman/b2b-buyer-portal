@@ -8,11 +8,9 @@ import { useB3Lang } from '@/lib/lang';
 import { useAppSelector } from '@/store';
 import { snackbar } from '@/utils/b3Tip';
 
-import AddPaymentMethod from './components/AddPaymentMethod';
 import PaymentMethodRow from './components/PaymentMethodRow';
 import {
   deleteStoredInstrument,
-  getVaultClientToken,
   isPaymentMethodsAvailable,
   listStoredInstruments,
   PaymentMethodsError,
@@ -34,22 +32,6 @@ function PaymentMethods() {
     queryFn: listStoredInstruments,
     enabled: isAvailable,
   });
-
-  // Brand gate: only Braintree-enabled stores can add cards. On brands without a
-  // Braintree merchant account (Preferred) this probe 502s and the add-card
-  // affordance simply never renders. Deliberately a probe, not a theme flag —
-  // prod themes lag sandbox and a theme gate would silently fail open/closed.
-  const { data: vaultClientToken } = useQuery({
-    queryKey: ['vaultClientToken', customerId],
-    queryFn: getVaultClientToken,
-    enabled: isAvailable,
-    staleTime: Infinity,
-  });
-
-  const handleAdded = () => {
-    queryClient.invalidateQueries({ queryKey: ['storedInstruments', customerId] });
-    snackbar.success(b3Lang('paymentMethods.addCard.success'));
-  };
 
   const handleMutationError = (err: unknown) => {
     if (err instanceof PaymentMethodsError) {
@@ -125,15 +107,8 @@ function PaymentMethods() {
             {b3Lang('paymentMethods.loadError')}
           </Alert>
         )}
-        {vaultClientToken && (
-          <AddPaymentMethod clientToken={vaultClientToken} onAdded={handleAdded} />
-        )}
         {data && data.instruments.length === 0 && (
-          <Typography>
-            {vaultClientToken
-              ? b3Lang('paymentMethods.addCard.emptyList')
-              : b3Lang('paymentMethods.empty')}
-          </Typography>
+          <Typography>{b3Lang('paymentMethods.empty')}</Typography>
         )}
         {data &&
           data.instruments.map((instrument) => (
