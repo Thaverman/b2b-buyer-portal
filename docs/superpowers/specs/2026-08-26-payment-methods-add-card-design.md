@@ -1,7 +1,7 @@
 # Payment Methods: Add-a-saved-card (Braintree Drop-in) — Design
 
 - **Date:** 2026-08-26
-- **Status:** Approved (brainstormed + spiked with THaverman)
+- **Status:** ~~Approved~~ **SUPERSEDED 2026-09-01** by `2026-09-01-payment-methods-add-card-hosted-form-design.md` — the backend replaced the Braintree nonce contract; do not implement from this document.
 - **Page:** `apps/storefront/src/pages/PaymentMethods/`
 - **Backend:** already built, tested, merged (.NET microservices behind the YARP gateway). This work is frontend-only, against the fixed HTTP contract below. No mocked backends outside tests.
 
