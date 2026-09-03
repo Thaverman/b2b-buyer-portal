@@ -2,7 +2,7 @@
 title: checkout-sdk stored-card hosted form — top-realm only, VAT-only auth (no IAT code path), FLAT billing fields, detail-less failures; pinned 1.967.0
 type: concept
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-03
 lastVerified: 2026-09-01
 repo: b2b-buyer-portal
 storeHash: ssw
@@ -67,3 +67,4 @@ hosted-form bundles read); the in-portal add-card feature is built on these cons
 
 ## Related
 - [[board-payment-methods-page]]
+- [[b2b-buyer-portal--hosted-field-blank-200-session-pair-hang]] — the wrapper only 302s with BOTH `SHOP_SESSION_TOKEN` + `SHOP_SESSION_ROTATION_TOKEN`; a blank 200 hangs `initialize()` forever (2026-09-03).
