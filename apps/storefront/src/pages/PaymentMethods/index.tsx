@@ -18,6 +18,7 @@ import {
   setDefaultStoredInstrument,
   StoredInstrument,
 } from './api';
+import { hasActiveCart } from './cartPresence';
 import { getVaultAccess, NATIVE_ADD_PAYMENT_METHOD_PATH } from './vaultAccess';
 
 function PaymentMethods() {
@@ -48,6 +49,18 @@ function PaymentMethods() {
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
+
+  // The hosted card form is checkout infrastructure and only works with an active cart
+  // (spec §2.9); without one we say so instead of offering a dialog that cannot load.
+  const activeCart = useQuery({
+    queryKey: ['activeCart', customerId],
+    queryFn: hasActiveCart,
+    enabled: isAvailable,
+  });
+
+  const isVaultAvailable = vaultAccess.data?.state === 'available';
+  const canAddInPortal = isVaultAvailable && activeCart.data === true;
+  const needsCart = isVaultAvailable && activeCart.data === false;
 
   const handleAdded = () => {
     setIsAddOpen(false);
@@ -129,12 +142,15 @@ function PaymentMethods() {
             {b3Lang('paymentMethods.loadError')}
           </Alert>
         )}
-        {vaultAccess.data?.state === 'available' && (
+        {canAddInPortal && (
           <Box sx={{ mb: 2 }}>
             <Button variant="outlined" onClick={() => setIsAddOpen(true)}>
               {b3Lang('paymentMethods.addCard.button')}
             </Button>
           </Box>
+        )}
+        {needsCart && (
+          <Typography sx={{ mb: 2 }}>{b3Lang('paymentMethods.addCard.needsCart')}</Typography>
         )}
         {vaultAccess.isError && (
           <Box sx={{ mb: 2 }}>
@@ -153,7 +169,7 @@ function PaymentMethods() {
         )}
         {data && data.instruments.length === 0 && (
           <Typography>
-            {vaultAccess.data?.state === 'available'
+            {canAddInPortal
               ? b3Lang('paymentMethods.addCard.emptyList')
               : b3Lang('paymentMethods.empty')}
           </Typography>

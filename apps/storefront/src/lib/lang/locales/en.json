@@ -793,6 +793,7 @@
   "paymentMethods.addCard.billing.country": "Country",
   "paymentMethods.addCard.billing.phone": "Phone (optional)",
   "paymentMethods.addCard.requiredField": "Required",
+  "paymentMethods.addCard.needsCart": "To add a card here, add an item to your cart first — or save a card during checkout.",
   "loyalty.unavailable": "Rewards are not available.",
   "loyalty.sessionExpired": "Your session has expired — please sign in again.",
   "loyalty.notEnrolled": "Start earning points with your first order.",

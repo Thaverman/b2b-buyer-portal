@@ -18,6 +18,7 @@ import { snackbar } from '@/utils/b3Tip';
 
 import { StoredInstrument } from './api';
 import { emptyBillingValues, getBillingCountries, getBillingPrefill } from './billingPrefill';
+import { hasActiveCart } from './cartPresence';
 import { createStoredCardForm, StoredCardForm } from './hostedForm';
 import PaymentMethods from '.';
 
@@ -29,6 +30,10 @@ vi.mock('@/utils/b3Logger');
 
 vi.mock('./hostedForm', () => ({
   createStoredCardForm: vi.fn(),
+}));
+
+vi.mock('./cartPresence', () => ({
+  hasActiveCart: vi.fn(),
 }));
 
 vi.mock('./billingPrefill', async (importOriginal) => ({
@@ -80,8 +85,21 @@ const mockNativePage = (body: string, status = 200) =>
     ),
   );
 
+// The hosted-field wrapper only redirects when the session has a cart; a plain 200 means
+// "no checkout context". Healthy by default so the dialog tests keep working.
+const mockHostedFieldWrapper = (status: 302 | 200) =>
+  server.use(
+    http.get('*/checkout/payment/hosted-field', () =>
+      status === 302
+        ? HttpResponse.redirect('https://payments.bigcommerce.com/pay/hosted_forms/x/field', 302)
+        : new HttpResponse('', { status: 200 }),
+    ),
+  );
+
 beforeEach(() => {
   window.BC_CONTEXT = { paymentMethods: { apiBase, appClientId } };
+  vi.mocked(hasActiveCart).mockResolvedValue(true);
+  mockHostedFieldWrapper(302);
   vi.mocked(createStoredCardForm).mockResolvedValue(fakeStoredCardForm());
   vi.mocked(getBillingCountries).mockResolvedValue([
     {
@@ -468,6 +486,45 @@ describe('add card gating', () => {
       await screen.findByText('You have no saved cards. Cards can be saved during checkout.'),
     ).toBeInTheDocument();
   });
+
+  it('explains the cart requirement instead of offering the dialog when there is no active cart', async () => {
+    vi.mocked(hasActiveCart).mockResolvedValue(false);
+    mockJwt();
+    mockList([buildStoredInstrumentWith({ brand: 'VISA', last4: '4242' })]);
+    mockNativePage(availableNativePage);
+
+    renderWithProviders(<PaymentMethods />);
+
+    expect(
+      await screen.findByText(
+        'To add a card here, add an item to your cart first — or save a card during checkout.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add card' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Add card' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the neutral empty-list copy when the dialog is withheld for lack of a cart', async () => {
+    vi.mocked(hasActiveCart).mockResolvedValue(false);
+    mockJwt();
+    mockList([]);
+    mockNativePage(availableNativePage);
+
+    renderWithProviders(<PaymentMethods />);
+
+    // anchor on the settled gate before asserting what is absent
+    await screen.findByText(
+      'To add a card here, add an item to your cart first — or save a card during checkout.',
+    );
+    expect(
+      screen.getByText('You have no saved cards. Cards can be saved during checkout.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        'You have no saved cards. Add your first card and it will become your default.',
+      ),
+    ).not.toBeInTheDocument();
+  });
 });
 
 describe('add card dialog', () => {
@@ -585,6 +642,21 @@ describe('add card dialog', () => {
 
     await waitFor(() => expect(form.teardown).toHaveBeenCalled());
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('stops before creating the hosted form when the checkout has no cart context', async () => {
+    // cart present at page load, gone by the time the customer clicks: the wrapper answers 200
+    mockHostedFieldWrapper(200);
+
+    await openDialog();
+
+    expect(
+      await screen.findByText(
+        'To add a card here, add an item to your cart first — or save a card during checkout.',
+      ),
+    ).toBeInTheDocument();
+    expect(createStoredCardForm).not.toHaveBeenCalled();
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
   });
 
   it('gives up on a hosted form that never finishes initializing and offers the native page', async () => {

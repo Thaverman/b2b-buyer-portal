@@ -29,7 +29,12 @@ import {
   getBillingPrefill,
 } from '../billingPrefill';
 import { createStoredCardForm, StoredCardForm } from '../hostedForm';
-import { getVaultAccess, NATIVE_ADD_PAYMENT_METHOD_PATH, VaultAccess } from '../vaultAccess';
+import {
+  getVaultAccess,
+  hasCheckoutContext,
+  NATIVE_ADD_PAYMENT_METHOD_PATH,
+  VaultAccess,
+} from '../vaultAccess';
 
 interface AddPaymentMethodDialogProps {
   onClose: () => void;
@@ -136,6 +141,7 @@ function AddPaymentMethodDialog({ onClose, onAdded, customerEmail }: AddPaymentM
   const [access, setAccess] = useState<Extract<VaultAccess, { state: 'available' }> | null>(null);
   const [isFormReady, setIsFormReady] = useState(false);
   const [hasInitError, setHasInitError] = useState(false);
+  const [hasNoCheckoutContext, setHasNoCheckoutContext] = useState(false);
   const [billing, setBilling] = useState<BillingFormValues>(emptyBillingValues);
   const [countries, setCountries] = useState<BillingCountryOption[]>([]);
   const [email, setEmail] = useState(customerEmail);
@@ -147,38 +153,49 @@ function AddPaymentMethodDialog({ onClose, onAdded, customerEmail }: AddPaymentM
   useEffect(() => {
     let cancelled = false;
 
-    // Mint-fresh access on every open: the vault token lives ~30 minutes, so the page-load
-    // gating result may be stale by the time the customer gets here.
-    Promise.all([
-      getVaultAccess(),
-      createStoredCardFormWithTimeout(),
-      // the prefill's state-name→code mapping needs the country list, so chain them
-      getBillingCountries().then(async (countryList) => ({
-        countryList,
-        prefill: await getBillingPrefill(countryList),
-      })),
-    ])
-      .then(([vaultAccess, form, billingInit]) => {
-        if (cancelled) {
-          form.teardown();
-          return;
-        }
-        if (vaultAccess.state !== 'available') {
-          form.teardown();
-          setHasInitError(true);
-          return;
-        }
-        formRef.current = form;
-        setAccess(vaultAccess);
-        setCountries(billingInit.countryList);
-        setBilling(billingInit.prefill);
-        setIsFormReady(true);
-      })
-      .catch(() => {
+    const init = async () => {
+      // The page gate checked for a cart at load; the cart may have emptied since. Probe
+      // before creating the hosted form so a missing checkout context fails fast into the
+      // honest copy instead of spending the init timeout on a blank field iframe.
+      if (!(await hasCheckoutContext())) {
         if (!cancelled) {
-          setHasInitError(true);
+          setHasNoCheckoutContext(true);
         }
-      });
+        return;
+      }
+
+      // Mint-fresh access on every open: the vault token lives ~30 minutes, so the page-load
+      // gating result may be stale by the time the customer gets here.
+      const [vaultAccess, form, billingInit] = await Promise.all([
+        getVaultAccess(),
+        createStoredCardFormWithTimeout(),
+        // the prefill's state-name→code mapping needs the country list, so chain them
+        getBillingCountries().then(async (countryList) => ({
+          countryList,
+          prefill: await getBillingPrefill(countryList),
+        })),
+      ]);
+      if (cancelled) {
+        form.teardown();
+        return;
+      }
+      if (vaultAccess.state !== 'available') {
+        form.teardown();
+        setHasInitError(true);
+        return;
+      }
+      formRef.current = form;
+      setAccess(vaultAccess);
+      setCountries(billingInit.countryList);
+      setBilling(billingInit.prefill);
+      setIsFormReady(true);
+    };
+
+    init().catch(() => {
+      if (!cancelled) {
+        setHasInitError(true);
+      }
+    });
 
     return () => {
       cancelled = true;
@@ -312,6 +329,19 @@ function AddPaymentMethodDialog({ onClose, onAdded, customerEmail }: AddPaymentM
       billingField('stateOrProvinceCode', 'paymentMethods.addCard.billing.state')
     );
 
+  // Both replace the form entirely: no spinner, no fields, Save stays disabled.
+  const renderInitProblem = () =>
+    hasNoCheckoutContext ? (
+      <Alert severity="info">{b3Lang('paymentMethods.addCard.needsCart')}</Alert>
+    ) : (
+      <Alert severity="error">
+        {b3Lang('paymentMethods.addCard.formError')}{' '}
+        <Link href={NATIVE_ADD_PAYMENT_METHOD_PATH} target="_top">
+          {b3Lang('paymentMethods.addCard.button')}
+        </Link>
+      </Alert>
+    );
+
   return (
     <CacheProvider value={parentDocumentCache}>
       {themeBleedReset}
@@ -327,13 +357,8 @@ function AddPaymentMethodDialog({ onClose, onAdded, customerEmail }: AddPaymentM
       >
         <DialogTitle>{b3Lang('paymentMethods.addCard.dialogTitle')}</DialogTitle>
         <DialogContent>
-          {hasInitError ? (
-            <Alert severity="error">
-              {b3Lang('paymentMethods.addCard.formError')}{' '}
-              <Link href={NATIVE_ADD_PAYMENT_METHOD_PATH} target="_top">
-                {b3Lang('paymentMethods.addCard.button')}
-              </Link>
-            </Alert>
+          {hasNoCheckoutContext || hasInitError ? (
+            renderInitProblem()
           ) : (
             <>
               {!isFormReady && (

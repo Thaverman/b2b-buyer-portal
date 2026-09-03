@@ -71,6 +71,20 @@ session; a `VISA ····1111 12/2030` was attached end-to-end and then deleted 
    posture already includes a merchant-origin card form. Relay to the compliance owner;
    this design improves the posture for portal users and never routes to that form except
    in the explicit fallback.
+9. **The hosted form needs an active cart (found 2026-09-03, after launch).** The field
+   iframe `/checkout/payment/hosted-field?version=…` is served by BigCommerce's *checkout*
+   app: it `302`s to `payments.bigcommerce.com/pay/hosted_forms/<uuid>/field` only when the
+   session has a cart, and otherwise returns a **blank 200** on which the SDK's
+   `initialize()` never settles (no timeout, no console error — an endless spinner).
+   Verified non-destructively with a guest session: no cart → 200/0 bytes;
+   `POST /api/storefront/carts` with one line item → 302; delete the cart → 200 again.
+   Login is not the variable — the spike's test account always carried a large cart, which
+   is why every verification passed while a real customer with an empty cart could never
+   load the fields (Chrome, Incognito and Firefox alike; Firefox surfaces it as a
+   `postMessage` target-origin mismatch). The attach endpoint itself is cart-free; only the
+   provider-hosted *fields* are checkout-bound. Consequence: there is no cart-free,
+   PCI-neutral way to capture a card into BigCommerce's vault from the account page;
+   §6 gates the dialog on cart presence and the dialog preflights the wrapper (§5.5).
 
 ## 3. What already exists / stays
 
@@ -193,11 +207,19 @@ native page during the fallback.
 
 ## 6. Gating summary
 
-| Store state | vaultAccess result | Affordance |
-|---|---|---|
-| Braintree gateway configured (SSW, LG, DS, SR) | `available` | In-portal dialog |
-| No gateway (Preferred) | `unavailable` | Hidden entirely |
-| Scrape broken (CF, theme change, outage) | error | Link-out to native page (`target="_top"`) |
+| Store state | vaultAccess result | Active cart (`hasActiveCart`) | Affordance |
+|---|---|---|---|
+| Braintree gateway configured (SSW, LG, DS, SR) | `available` | yes | In-portal dialog |
+| Braintree gateway configured | `available` | no (or lookup failed) | No dialog; copy: *"To add a card here, add an item to your cart first — or save a card during checkout."* No link-out (chosen 2026-09-03 to keep empty-cart customers off the raw-card native page) |
+| No gateway (Preferred) | `unavailable` | — | Hidden entirely |
+| Scrape broken (CF, theme change, outage) | error | — | Link-out to native page (`target="_top"`) |
+
+The cart gate exists because of §2.9. `hasActiveCart()` (page-local `cartPresence.ts`) wraps
+the existing `getCart()` storefront query and never throws — a failed lookup gates closed to
+the copy. Inside the dialog, `hasCheckoutContext()` (`vaultAccess.ts`) re-probes the wrapper
+with `redirect: 'manual'` before creating the hosted form, so a cart that emptied between page
+load and click shows the same copy immediately instead of spending the init timeout; the
+hosted-form init itself is bounded to 20 s and falls back to the §7 error alert.
 
 Plus the existing gates: Stencil-only, `BC_CONTEXT.paymentMethods` present, not agenting.
 
@@ -211,6 +233,11 @@ existing treatment; a vaultAccess refetch failure at submit time shows the same 
 alert with the link-out offered underneath ("or add it on the payment methods page").
 Client-side guards that still work: hosted-field validation renders per-field messages via
 the SDK's events before submit ever fires; billing-field validation is ours.
+
+Two init-time states added 2026-09-03: **no checkout context** (wrapper preflight returned a
+plain 200 — the cart is empty) shows the §6 needs-cart copy in place of the form; **hosted
+form never initialized** (20 s timeout on the SDK handshake) shows the generic form-error
+alert with the native-page link. Neither leaves a spinner running.
 
 ## 8. i18n
 
