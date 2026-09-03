@@ -1,4 +1,5 @@
 import {
+  act,
   buildB2BFeaturesStateWith,
   buildCompanyStateWith,
   builder,
@@ -16,7 +17,7 @@ import {
 import { snackbar } from '@/utils/b3Tip';
 
 import { StoredInstrument } from './api';
-import { emptyBillingValues, getBillingPrefill } from './billingPrefill';
+import { emptyBillingValues, getBillingCountries, getBillingPrefill } from './billingPrefill';
 import { createStoredCardForm, StoredCardForm } from './hostedForm';
 import PaymentMethods from '.';
 
@@ -33,6 +34,7 @@ vi.mock('./hostedForm', () => ({
 vi.mock('./billingPrefill', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./billingPrefill')>()),
   getBillingPrefill: vi.fn(),
+  getBillingCountries: vi.fn(),
 }));
 
 const { server } = startMockServer();
@@ -81,6 +83,14 @@ const mockNativePage = (body: string, status = 200) =>
 beforeEach(() => {
   window.BC_CONTEXT = { paymentMethods: { apiBase, appClientId } };
   vi.mocked(createStoredCardForm).mockResolvedValue(fakeStoredCardForm());
+  vi.mocked(getBillingCountries).mockResolvedValue([
+    {
+      countryCode: 'US',
+      countryName: 'United States',
+      states: [{ stateCode: 'MO', stateName: 'Missouri' }],
+    },
+    { countryCode: 'AW', countryName: 'Aruba', states: [] },
+  ]);
   vi.mocked(getBillingPrefill).mockResolvedValue({
     firstName: 'Cass',
     lastName: 'Doe',
@@ -493,10 +503,66 @@ describe('add card dialog', () => {
     // containers exist in the document for the SDK to mount into
     expect(document.getElementById('bpm-card-number')).toBeInTheDocument();
 
-    // prefilled and editable
+    // prefilled and editable; country and state are name-displaying dropdowns
     const first = await screen.findByLabelText('First name');
     expect(first).toHaveValue('Cass');
-    expect(screen.getByLabelText('State/Province code')).toHaveValue('MO');
+    expect(screen.getByRole('combobox', { name: 'Country' })).toHaveTextContent('United States');
+    expect(screen.getByRole('combobox', { name: 'State/Province' })).toHaveTextContent('Missouri');
+  });
+
+  it('clears the state and offers free text when the picked country has no states', async () => {
+    const form = fakeStoredCardForm();
+    vi.mocked(createStoredCardForm).mockResolvedValue(form);
+
+    const { user } = await openDialog();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save card' })).toBeEnabled());
+
+    await user.click(screen.getByRole('combobox', { name: 'Country' }));
+    await user.click(screen.getByRole('option', { name: 'Aruba' }));
+
+    const stateInput = screen.getByRole('textbox', { name: 'State/Province' });
+    expect(stateInput).toHaveValue('');
+
+    await user.click(screen.getByRole('button', { name: 'Save card' }));
+
+    await waitFor(() => expect(form.submit).toHaveBeenCalled());
+    const [fields] = vi.mocked(form.submit).mock.calls[0];
+    expect(fields).toMatchObject({ countryCode: 'AW' });
+    expect(fields).not.toHaveProperty('stateOrProvinceCode');
+  });
+
+  it('falls back to free-text country and state fields when the country list is unavailable', async () => {
+    vi.mocked(getBillingCountries).mockResolvedValue([]);
+
+    await openDialog();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save card' })).toBeEnabled());
+
+    expect(screen.getByRole('textbox', { name: 'Country' })).toHaveValue('US');
+    expect(screen.getByRole('textbox', { name: 'State/Province' })).toHaveValue('MO');
+    expect(screen.queryByRole('combobox', { name: 'Country' })).not.toBeInTheDocument();
+  });
+
+  it('neutralizes storefront theme CSS that bleeds into the parent-document dialog', async () => {
+    // The dialog escapes the ThemeFrame, so the theme's global element rules apply to it.
+    // Reproduce the hostile rules the live theme ships for legend/label.
+    const themeCss = document.createElement('style');
+    themeCss.textContent =
+      'legend{background:0 0;border:solid #999;border-width:0 0 1px;display:block;line-height:32px;margin-bottom:.75rem;padding:0;width:100%}' +
+      'label{display:inline-block;font-size:1rem;margin-bottom:.375rem;padding-left:1.875rem;position:relative;width:100%}';
+    document.head.prepend(themeCss);
+
+    try {
+      await openDialog();
+      await screen.findByRole('dialog');
+      await screen.findByLabelText('First name');
+
+      const legend = document.querySelector('[role=dialog] fieldset legend') as HTMLElement;
+      expect(getComputedStyle(legend).borderBottomWidth).toBe('0px');
+      const label = document.querySelector('[role=dialog] label') as HTMLElement;
+      expect(getComputedStyle(label).paddingLeft).toBe('0px');
+    } finally {
+      themeCss.remove();
+    }
   });
 
   it('stacks the dialog above the ThemeFrame overlay (iframe sits at z-index 12000)', async () => {
@@ -519,6 +585,32 @@ describe('add card dialog', () => {
 
     await waitFor(() => expect(form.teardown).toHaveBeenCalled());
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('gives up on a hosted form that never finishes initializing and offers the native page', async () => {
+    // checkout-sdk's initialize() has no timeout — a stalled field iframe hangs it forever
+    vi.mocked(createStoredCardForm).mockReturnValue(new Promise(() => {}));
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+
+    try {
+      await openDialog();
+      await screen.findByRole('dialog');
+      expect(screen.getByRole('progressbar')).toBeInTheDocument();
+
+      await act(async () => {
+        vi.advanceTimersByTime(20_000);
+      });
+
+      expect(
+        await screen.findByText(
+          "The card form couldn't be loaded. Please try again, or add your card on the payment methods page.",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Add card' })).toHaveAttribute('target', '_top');
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('shows the form error with a native-page link when the hosted form fails to initialize', async () => {

@@ -10,8 +10,10 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  GlobalStyles,
   Grid,
   Link,
+  MenuItem,
   TextField,
   Typography,
 } from '@mui/material';
@@ -19,7 +21,13 @@ import {
 import { Z_INDEX } from '@/constants';
 import { useB3Lang } from '@/lib/lang';
 
-import { BillingFormValues, emptyBillingValues, getBillingPrefill } from '../billingPrefill';
+import {
+  BillingCountryOption,
+  BillingFormValues,
+  emptyBillingValues,
+  getBillingCountries,
+  getBillingPrefill,
+} from '../billingPrefill';
 import { createStoredCardForm, StoredCardForm } from '../hostedForm';
 import { getVaultAccess, NATIVE_ADD_PAYMENT_METHOD_PATH, VaultAccess } from '../vaultAccess';
 
@@ -57,6 +65,62 @@ const cardFieldSx = {
   px: 1,
 };
 
+const DIALOG_CLASS = 'bpm-add-card-dialog';
+
+// Outside the ThemeFrame the storefront theme's global element rules apply to us. MUI's
+// own declarations win on specificity, but properties MUI never declares leak through —
+// the theme's `legend { border-width: 0 0 1px; width: 100%; margin-bottom }` draws a line
+// through the floating label's outline notch, and its `label { padding-left; width }`
+// shoves the label around. Zero out exactly those leaks, scoped to this dialog.
+const themeBleedReset = (
+  <GlobalStyles
+    styles={{
+      [`.${DIALOG_CLASS} legend`]: {
+        border: 0,
+        margin: 0,
+        background: 'none',
+        width: 'auto',
+      },
+      [`.${DIALOG_CLASS} label`]: {
+        paddingLeft: 0,
+        width: 'auto',
+        margin: 0,
+      },
+    }}
+  />
+);
+
+// checkout-sdk's initialize() has no timeout of its own: if the hosted-field iframe never
+// completes its handshake (blocked, challenged, offline) it waits forever — seen live as an
+// endless spinner with nothing in the console. Bound the wait so the customer gets the
+// error alert and the native-page link instead.
+const HOSTED_FORM_INIT_TIMEOUT_MS = 20_000;
+
+const createStoredCardFormWithTimeout = (): Promise<StoredCardForm> =>
+  new Promise((resolve, reject) => {
+    let timedOut = false;
+    const timer = window.setTimeout(() => {
+      timedOut = true;
+      reject(new Error('Hosted card form did not initialize in time'));
+    }, HOSTED_FORM_INIT_TIMEOUT_MS);
+
+    createStoredCardForm(CARD_FIELD_CONTAINERS).then(
+      (form) => {
+        if (timedOut) {
+          // too late — the dialog has already fallen back; don't leave live fields behind
+          form.teardown();
+          return;
+        }
+        window.clearTimeout(timer);
+        resolve(form);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+
 // Everything the attach body sends unconditionally must be present (spec §5.4).
 const REQUIRED_FIELDS: (keyof BillingFormValues)[] = [
   'firstName',
@@ -73,6 +137,7 @@ function AddPaymentMethodDialog({ onClose, onAdded, customerEmail }: AddPaymentM
   const [isFormReady, setIsFormReady] = useState(false);
   const [hasInitError, setHasInitError] = useState(false);
   const [billing, setBilling] = useState<BillingFormValues>(emptyBillingValues);
+  const [countries, setCountries] = useState<BillingCountryOption[]>([]);
   const [email, setEmail] = useState(customerEmail);
   const [isSaving, setIsSaving] = useState(false);
   const [hasSubmitError, setHasSubmitError] = useState(false);
@@ -86,10 +151,14 @@ function AddPaymentMethodDialog({ onClose, onAdded, customerEmail }: AddPaymentM
     // gating result may be stale by the time the customer gets here.
     Promise.all([
       getVaultAccess(),
-      createStoredCardForm(CARD_FIELD_CONTAINERS),
-      getBillingPrefill(),
+      createStoredCardFormWithTimeout(),
+      // the prefill's state-name→code mapping needs the country list, so chain them
+      getBillingCountries().then(async (countryList) => ({
+        countryList,
+        prefill: await getBillingPrefill(countryList),
+      })),
     ])
-      .then(([vaultAccess, form, prefill]) => {
+      .then(([vaultAccess, form, billingInit]) => {
         if (cancelled) {
           form.teardown();
           return;
@@ -101,7 +170,8 @@ function AddPaymentMethodDialog({ onClose, onAdded, customerEmail }: AddPaymentM
         }
         formRef.current = form;
         setAccess(vaultAccess);
-        setBilling(prefill);
+        setCountries(billingInit.countryList);
+        setBilling(billingInit.prefill);
         setIsFormReady(true);
       })
       .catch(() => {
@@ -184,11 +254,77 @@ function AddPaymentMethodDialog({ onClose, onAdded, customerEmail }: AddPaymentM
     />
   );
 
+  // The attach body wants ISO codes the customer won't know, and a bad code surfaces as
+  // the undiagnosable generic failure — so country and state are name-displaying
+  // dropdowns submitting codes, falling back to free text when the list is unavailable.
+  const selectedCountry = countries.find((c) => c.countryCode === billing.countryCode);
+  const stateOptions = selectedCountry?.states ?? [];
+
+  const countryField =
+    countries.length > 0 ? (
+      <TextField
+        select
+        fullWidth
+        size="small"
+        label={b3Lang('paymentMethods.addCard.billing.country')}
+        value={selectedCountry ? billing.countryCode : ''}
+        error={missingFields.includes('countryCode')}
+        helperText={
+          missingFields.includes('countryCode')
+            ? b3Lang('paymentMethods.addCard.requiredField')
+            : undefined
+        }
+        onChange={(e) =>
+          setBilling((prev) => ({ ...prev, countryCode: e.target.value, stateOrProvinceCode: '' }))
+        }
+      >
+        {countries.map((c) => (
+          <MenuItem key={c.countryCode} value={c.countryCode}>
+            {c.countryName}
+          </MenuItem>
+        ))}
+      </TextField>
+    ) : (
+      billingField('countryCode', 'paymentMethods.addCard.billing.country')
+    );
+
+  const stateField =
+    stateOptions.length > 0 ? (
+      <TextField
+        select
+        fullWidth
+        size="small"
+        label={b3Lang('paymentMethods.addCard.billing.state')}
+        value={
+          stateOptions.some((s) => s.stateCode === billing.stateOrProvinceCode)
+            ? billing.stateOrProvinceCode
+            : ''
+        }
+        onChange={(e) => setBilling((prev) => ({ ...prev, stateOrProvinceCode: e.target.value }))}
+      >
+        {stateOptions.map((s) => (
+          <MenuItem key={s.stateCode} value={s.stateCode}>
+            {s.stateName}
+          </MenuItem>
+        ))}
+      </TextField>
+    ) : (
+      billingField('stateOrProvinceCode', 'paymentMethods.addCard.billing.state')
+    );
+
   return (
     <CacheProvider value={parentDocumentCache}>
+      {themeBleedReset}
       {/* The ThemeFrame overlay sits at Z_INDEX.IFRAME (12000); MUI's default modal
           z-index (1300) would put this dialog underneath it. */}
-      <Dialog open fullWidth maxWidth="sm" onClose={onClose} sx={{ zIndex: Z_INDEX.MODAL }}>
+      <Dialog
+        open
+        fullWidth
+        maxWidth="sm"
+        className={DIALOG_CLASS}
+        onClose={onClose}
+        sx={{ zIndex: Z_INDEX.MODAL }}
+      >
         <DialogTitle>{b3Lang('paymentMethods.addCard.dialogTitle')}</DialogTitle>
         <DialogContent>
           {hasInitError ? (
@@ -270,13 +406,13 @@ function AddPaymentMethodDialog({ onClose, onAdded, customerEmail }: AddPaymentM
                   {billingField('city', 'paymentMethods.addCard.billing.city')}
                 </Grid>
                 <Grid item xs={6}>
-                  {billingField('stateOrProvinceCode', 'paymentMethods.addCard.billing.state')}
-                </Grid>
-                <Grid item xs={6}>
                   {billingField('postalCode', 'paymentMethods.addCard.billing.postalCode')}
                 </Grid>
                 <Grid item xs={6}>
-                  {billingField('countryCode', 'paymentMethods.addCard.billing.country')}
+                  {countryField}
+                </Grid>
+                <Grid item xs={6}>
+                  {stateField}
                 </Grid>
                 <Grid item xs={12}>
                   {billingField('phone', 'paymentMethods.addCard.billing.phone')}
