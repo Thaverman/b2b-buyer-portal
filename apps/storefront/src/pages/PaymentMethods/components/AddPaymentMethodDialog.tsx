@@ -90,6 +90,37 @@ const themeBleedReset = (
   />
 );
 
+// checkout-sdk's initialize() has no timeout of its own: if the hosted-field iframe never
+// completes its handshake (blocked, challenged, offline) it waits forever — seen live as an
+// endless spinner with nothing in the console. Bound the wait so the customer gets the
+// error alert and the native-page link instead.
+const HOSTED_FORM_INIT_TIMEOUT_MS = 20_000;
+
+const createStoredCardFormWithTimeout = (): Promise<StoredCardForm> =>
+  new Promise((resolve, reject) => {
+    let timedOut = false;
+    const timer = window.setTimeout(() => {
+      timedOut = true;
+      reject(new Error('Hosted card form did not initialize in time'));
+    }, HOSTED_FORM_INIT_TIMEOUT_MS);
+
+    createStoredCardForm(CARD_FIELD_CONTAINERS).then(
+      (form) => {
+        if (timedOut) {
+          // too late — the dialog has already fallen back; don't leave live fields behind
+          form.teardown();
+          return;
+        }
+        window.clearTimeout(timer);
+        resolve(form);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+
 // Everything the attach body sends unconditionally must be present (spec §5.4).
 const REQUIRED_FIELDS: (keyof BillingFormValues)[] = [
   'firstName',
@@ -120,7 +151,7 @@ function AddPaymentMethodDialog({ onClose, onAdded, customerEmail }: AddPaymentM
     // gating result may be stale by the time the customer gets here.
     Promise.all([
       getVaultAccess(),
-      createStoredCardForm(CARD_FIELD_CONTAINERS),
+      createStoredCardFormWithTimeout(),
       // the prefill's state-name→code mapping needs the country list, so chain them
       getBillingCountries().then(async (countryList) => ({
         countryList,

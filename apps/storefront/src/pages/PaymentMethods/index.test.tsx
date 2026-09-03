@@ -1,4 +1,5 @@
 import {
+  act,
   buildB2BFeaturesStateWith,
   buildCompanyStateWith,
   builder,
@@ -584,6 +585,32 @@ describe('add card dialog', () => {
 
     await waitFor(() => expect(form.teardown).toHaveBeenCalled());
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('gives up on a hosted form that never finishes initializing and offers the native page', async () => {
+    // checkout-sdk's initialize() has no timeout — a stalled field iframe hangs it forever
+    vi.mocked(createStoredCardForm).mockReturnValue(new Promise(() => {}));
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+
+    try {
+      await openDialog();
+      await screen.findByRole('dialog');
+      expect(screen.getByRole('progressbar')).toBeInTheDocument();
+
+      await act(async () => {
+        vi.advanceTimersByTime(20_000);
+      });
+
+      expect(
+        await screen.findByText(
+          "The card form couldn't be loaded. Please try again, or add your card on the payment methods page.",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Add card' })).toHaveAttribute('target', '_top');
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('shows the form error with a native-page link when the hosted form fails to initialize', async () => {
