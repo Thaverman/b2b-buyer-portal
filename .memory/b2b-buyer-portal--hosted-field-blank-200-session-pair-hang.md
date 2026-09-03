@@ -62,6 +62,16 @@ billing unprefilled and country/state as text fields — the whole init `Promise
   sessionExpired message immediately instead of a 20 s wait.
 - **Diagnostic fingerprint:** Network shows `hosted-field` **200** (healthy is **302**) and
   **zero** `pay/hosted_forms` requests; DOM has one iframe in `#bpm-card-number`, none elsewhere.
+- **Refined (live user case, 2026-09-03) — the desync is DUPLICATE COOKIES.** A stale
+  `SHOP_SESSION_TOKEN` and/or `SHOP_SESSION_ROTATION_TOKEN` on the **parent domain
+  `.storesupply.com`** (left by another `*.storesupply.com` site) sits alongside the valid
+  host-only `sandbox.storesupply.com` pair. Verified: with the parent-domain duplicates added,
+  `account.php` stays 200 with a vault token (Add card button renders) while the wrapper returns
+  the 0-byte 200 — a duplicate **rotation token alone** is enough. A sandbox re-login reissues
+  the host-only cookies but does **not** remove the parent-domain rows, so the user keeps
+  failing while still "seeing" the rotation token. **Remedy:** delete the `.storesupply.com`
+  `SHOP_SESSION_*` rows (or clear storesupply.com cookies). **Check:** DevTools → Application →
+  Cookies shows two rows per name with different Domain values.
 
 ## Code references
 - `src/pages/PaymentMethods/components/AddPaymentMethodDialog.tsx` (`createStoredCardFormWithTimeout`) — the 20 s bound and late-form teardown.
