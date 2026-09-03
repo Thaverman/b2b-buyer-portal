@@ -47,6 +47,10 @@ tags: [memory, b2b-buyer-portal, payment-methods, hosted-form, checkout-sdk, car
 > infrastructure — an empty-cart customer cannot use it from the account page; gate the
 > in-portal dialog on cart presence (`GET /api/storefront/carts`) and/or preflight the
 > wrapper, falling back to the native page.
+>
+> **Shipped 2026-09-03 in `962195a1`:** `hasActiveCart()` (`cartPresence.ts`, wraps `getCart`)
+> gates the dialog; no cart → honest copy, no link-out (user's choice); `hasCheckoutContext()`
+> (`vaultAccess.ts`) preflights the wrapper inside the dialog; 20 s init timeout kept.
 
 Reported 2026-09-03 on sandbox: Add card opens, the spinner never stops, the checkout-sdk
 chunk loads, no console errors. The DOM shows **only the first card box** holding an
