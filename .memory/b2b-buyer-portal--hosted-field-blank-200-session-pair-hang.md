@@ -1,5 +1,5 @@
 ---
-title: Add-card infinite spinner — /checkout/payment/hosted-field only 302s to the payments field when BOTH SHOP_SESSION_TOKEN and SHOP_SESSION_ROTATION_TOKEN are valid; otherwise a blank 200 hangs checkout-sdk initialize() forever (no timeout, no console error); bounded to 20s in 6d790f58
+title: Add-card infinite spinner — BigCommerce /checkout/payment/hosted-field only 302s to the payments field when the session has an ACTIVE CART (checkout context); empty cart or no session = blank 200 that hangs checkout-sdk initialize() forever (no timeout, no console error); test account always had a cart so the spike never saw it; bounded to 20s in 6d790f58
 type: concept
 created: 2026-09-03
 updated: 2026-09-03
@@ -26,10 +26,27 @@ codeRefs:
     package: apps/storefront
     path: src/pages/PaymentMethods/vaultAccess.ts
     symbol: getVaultAccess
-tags: [memory, b2b-buyer-portal, payment-methods, hosted-form, checkout-sdk, session, cookies, gotcha]
+tags: [memory, b2b-buyer-portal, payment-methods, hosted-form, checkout-sdk, cart, checkout-context, gotcha]
 ---
 
-# Add-card infinite spinner — the hosted-field wrapper needs BOTH storefront session cookies, or it returns a blank 200 that hangs `initialize()` forever
+# Add-card infinite spinner — the hosted-field wrapper needs an ACTIVE CART, or it returns a blank 200 that hangs `initialize()` forever
+
+> **Correction (2026-09-03, supersedes the cookie-pair explanation below).** The wrapper's
+> redirect depends on an **active cart / checkout context**, not on login or the
+> `SHOP_SESSION_*` pair. Verified non-destructively with a **guest** session: no cart →
+> `200`/0 bytes; `POST /api/storefront/carts` with one line item → the wrapper **302s** to
+> `payments.bigcommerce.com/pay/hosted_forms/<uuid>/field`; `DELETE` the cart → `200`/0 bytes
+> again. The cookie experiments only looked causal because removing the session cookie also
+> removed the server-side persistent cart. The test account (`thaverman@storesupply.com`)
+> carries a ~195-item cart — that is why every headless session worked — while the reporting
+> user (empty cart; Chrome, Incognito, Firefox) got a plain `basic 200` from
+> `fetch(wrapper, { redirect: 'manual' })` regardless of which portal build was deployed (an
+> A/B revert to the pre-style build `8274e53d` changed nothing). Firefox surfaces it as
+> *postMessage target origin `payments.bigcommerce.com` does not match recipient origin
+> `sandbox.storesupply.com`*. **Implication:** `createStoredCardHostedFormService` is checkout
+> infrastructure — an empty-cart customer cannot use it from the account page; gate the
+> in-portal dialog on cart presence (`GET /api/storefront/carts`) and/or preflight the
+> wrapper, falling back to the native page.
 
 Reported 2026-09-03 on sandbox: Add card opens, the spinner never stops, the checkout-sdk
 chunk loads, no console errors. The DOM shows **only the first card box** holding an
