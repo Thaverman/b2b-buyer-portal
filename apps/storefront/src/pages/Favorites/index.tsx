@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Alert, Box, Button, Typography } from '@mui/material';
 
@@ -15,7 +15,8 @@ import ListTabs from './components/ListTabs';
 import ListToolbar from './components/ListToolbar';
 import SaveToListsDialog from './components/SaveToListsDialog';
 import { isFavoritesAvailable } from './api';
-import { FavoriteList, FavoriteRow, hydrateRows, planAddToCart } from './favorites';
+import { FavoriteList, FavoriteRow, hydrateRows, planAddToCart, planGuestMerge } from './favorites';
+import { getDefaultListId, readGuestFavorites } from './storage';
 import { SaveToListsInput, useFavoriteActions } from './useFavoriteActions';
 import { useFavoriteLists } from './useFavoriteLists';
 import { useFavoriteProducts } from './useFavoriteProducts';
@@ -57,6 +58,28 @@ function Favorites() {
   const [nameDialog, setNameDialog] = useState<NameDialogState | null>(null);
   const [pendingDelete, setPendingDelete] = useState<FavoriteList | null>(null);
   const [pickerRow, setPickerRow] = useState<FavoriteRow | null>(null);
+
+  // Guest favorites saved before signing in join the customer's lists the first time this
+  // page sees them (spec §9). Once per mount; the theme does the same on storefront pages, and
+  // duplicate adds are server-side no-ops, so the two never conflict.
+  const mergeAttempted = useRef(false);
+  const { mutate: mergeGuest } = actions.mergeGuest;
+  useEffect(() => {
+    if (mergeAttempted.current || !listsQuery.data) {
+      return;
+    }
+
+    mergeAttempted.current = true;
+    const plan = planGuestMerge({
+      guest: readGuestFavorites(),
+      lists: listsQuery.data,
+      defaultListId: getDefaultListId(),
+    });
+
+    if (plan) {
+      mergeGuest({ plan });
+    }
+  }, [listsQuery.data, mergeGuest]);
 
   const selectListId = (listId: number) =>
     setSearchParams({ list: String(listId) }, { replace: true });

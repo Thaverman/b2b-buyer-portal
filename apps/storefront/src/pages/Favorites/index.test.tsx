@@ -6,6 +6,7 @@ import {
   buildFavoriteProductWith,
   buildFavoriteVariantWith,
   buildGlobalStateWith,
+  buildGuestFavoriteWith,
   graphql,
   HttpResponse,
   renderWithProviders,
@@ -830,5 +831,162 @@ describe('add to cart', () => {
     await user.click(within(row).getByRole('button', { name: 'Add to cart' }));
 
     await waitFor(() => expect(snackbar.error).toHaveBeenCalledWith('Not enough stock'));
+  });
+});
+
+describe('guest merge', () => {
+  const guestStore = (rows: unknown[]) =>
+    window.localStorage.setItem('favorites_guest', JSON.stringify({ value: rows, expiry: null }));
+
+  const addItemsHandler = (received: ReturnType<typeof vi.fn>) =>
+    graphql.mutation('AddFavoritesItems', ({ variables }) => {
+      received(variables);
+
+      return HttpResponse.json({
+        data: { wishlist: { addWishlistItems: { result: { entityId: variables.listId } } } },
+      });
+    });
+
+  it('adds the missing guest favorites to the default list, clears the guest store, and toasts', async () => {
+    const present = buildFavoriteProductWith({ name: 'Already saved' });
+    const missing = buildFavoriteProductWith({ name: 'New find' });
+    const defaultList = buildFavoriteListWith({
+      name: 'My Favorites',
+      items: [buildFavoriteItemWith({ productId: present.id, variantId: null })],
+    });
+    const other = buildFavoriteListWith({ name: 'Other', items: [] });
+    window.localStorage.setItem('favorites_default_list', String(defaultList.id));
+    guestStore([
+      buildGuestFavoriteWith({ productId: present.id, variantId: null }),
+      buildGuestFavoriteWith({ productId: missing.id, variantId: 77 }),
+    ]);
+    const received = vi.fn();
+    mockLists([other, defaultList]);
+    mockProducts([present, missing]);
+    server.use(addItemsHandler(received));
+
+    renderWithProviders(<Favorites />, { preloadedState });
+
+    await waitFor(() =>
+      expect(received).toHaveBeenCalledWith({
+        listId: defaultList.id,
+        items: [{ productEntityId: missing.id, variantEntityId: 77 }],
+      }),
+    );
+    expect(snackbar.success).toHaveBeenCalledWith('1 favorite added to My Favorites');
+    expect(JSON.parse(window.localStorage.getItem('favorites_guest') ?? '')).toEqual({
+      value: [],
+      expiry: null,
+    });
+    expect(window.dataLayer).toContainEqual({
+      event: 'add_to_wishlist',
+      ecommerce: {
+        items: [
+          {
+            item_id: String(missing.id),
+            item_variant: '77',
+            item_list_name: 'My Favorites',
+            quantity: 1,
+          },
+        ],
+      },
+    });
+  });
+
+  it('creates "My Favorites" for the merge when the customer has no lists', async () => {
+    const productA = buildFavoriteProductWith('WHATEVER_VALUES');
+    const productB = buildFavoriteProductWith('WHATEVER_VALUES');
+    guestStore([
+      buildGuestFavoriteWith({ productId: productA.id }),
+      buildGuestFavoriteWith({ productId: productB.id }),
+    ]);
+    const created = buildFavoriteListWith({ name: 'My Favorites', items: [] });
+    const createReceived = vi.fn();
+    const added = vi.fn();
+    let lists: FavoriteList[] = [];
+    server.use(
+      graphql.query('FavoritesLists', () =>
+        HttpResponse.json({ data: { customer: { wishlists: connection(lists.map(rawList)) } } }),
+      ),
+      graphql.mutation('CreateFavoritesList', ({ variables }) => {
+        createReceived(variables);
+        lists = [created];
+
+        return HttpResponse.json({
+          data: {
+            wishlist: { createWishlist: { result: { entityId: created.id, name: created.name } } },
+          },
+        });
+      }),
+      addItemsHandler(added),
+    );
+    mockProducts([productA, productB]);
+
+    renderWithProviders(<Favorites />, { preloadedState });
+
+    await waitFor(() => expect(createReceived).toHaveBeenCalledWith({ name: 'My Favorites' }));
+    await waitFor(() =>
+      expect(added).toHaveBeenCalledWith({
+        listId: created.id,
+        items: [{ productEntityId: productA.id }, { productEntityId: productB.id }],
+      }),
+    );
+    expect(snackbar.success).toHaveBeenCalledWith('2 favorites added to My Favorites');
+    expect(window.localStorage.getItem('favorites_default_list')).toBe(String(created.id));
+  });
+
+  it('clears the guest store without an API call or toast when every guest row is already saved', async () => {
+    const product = buildFavoriteProductWith('WHATEVER_VALUES');
+    guestStore([buildGuestFavoriteWith({ productId: product.id, variantId: null })]);
+    const added = vi.fn();
+    mockLists([listWith(product)]);
+    mockProducts([product]);
+    server.use(addItemsHandler(added));
+
+    renderWithProviders(<Favorites />, { preloadedState });
+
+    await waitFor(() =>
+      expect(JSON.parse(window.localStorage.getItem('favorites_guest') ?? '')).toEqual({
+        value: [],
+        expiry: null,
+      }),
+    );
+    expect(added).not.toHaveBeenCalled();
+    expect(snackbar.success).not.toHaveBeenCalled();
+  });
+
+  it('leaves the guest store intact and shows the generic error when the merge fails', async () => {
+    const guestRows = [buildGuestFavoriteWith('WHATEVER_VALUES')];
+    guestStore(guestRows);
+    mockLists([buildFavoriteListWith({ items: [] })]);
+    server.use(
+      graphql.mutation('AddFavoritesItems', () =>
+        HttpResponse.json({ errors: [{ message: 'nope' }] }),
+      ),
+    );
+
+    renderWithProviders(<Favorites />, { preloadedState });
+
+    await waitFor(() =>
+      expect(snackbar.error).toHaveBeenCalledWith(
+        'Something went wrong updating your favorites. Please try again.',
+      ),
+    );
+    expect(JSON.parse(window.localStorage.getItem('favorites_guest') ?? '')).toEqual({
+      value: guestRows,
+      expiry: null,
+    });
+  });
+
+  it('does nothing when the guest store is empty', async () => {
+    const list = buildFavoriteListWith({ items: [] });
+    const added = vi.fn();
+    mockLists([list]);
+    server.use(addItemsHandler(added));
+
+    renderWithProviders(<Favorites />, { preloadedState });
+
+    await screen.findByRole('tab', { name: `${list.name} (0)` });
+    expect(added).not.toHaveBeenCalled();
   });
 });

@@ -14,9 +14,17 @@ import b3TriggerCartNumber from '@/utils/b3TriggerCartNumber';
 import { createOrUpdateExistingCart } from '@/utils/cartUtils';
 
 import { trackAddToWishlist } from './analytics';
-import { AddToCartPlan, FavoriteList, FavoriteRow, ItemRef, SaveToListsPlan } from './favorites';
+import {
+  AddToCartPlan,
+  FavoriteList,
+  FavoriteRow,
+  GuestMergePlan,
+  ItemRef,
+  SaveToListsPlan,
+} from './favorites';
 import {
   clearDefaultListId,
+  clearGuestFavorites,
   getDefaultListId,
   invalidateListsCache,
   setDefaultListId,
@@ -176,9 +184,64 @@ export const useFavoriteActions = (customerId: number) => {
     },
   });
 
-  const isBusy = [createList, renameList, deleteList, removeItem, saveToLists, addToCart].some(
-    (mutation) => mutation.isPending,
-  );
+  const mergeGuest = useMutation({
+    mutationFn: async ({ plan }: { plan: GuestMergePlan }) => {
+      const target =
+        plan.target.kind === 'existing'
+          ? { id: plan.target.listId, name: plan.target.name }
+          : await createWishlist(b3Lang('favorites.defaultListName')).then((created) => ({
+              id: created.entityId,
+              name: created.name,
+            }));
 
-  return { createList, renameList, deleteList, removeItem, saveToLists, addToCart, isBusy };
+      if (plan.rows.length > 0) {
+        await addWishlistItems(target.id, plan.rows.map(toWishlistItem));
+      }
+
+      // Only once the server has the rows: a failure above leaves the guest store for a retry
+      // by either side (spec §13).
+      clearGuestFavorites();
+
+      return { target, rows: plan.rows };
+    },
+    onSuccess: ({ target, rows }) => {
+      if (rows.length > 0) {
+        setDefaultListId(target.id);
+        rows.forEach((row) =>
+          trackAddToWishlist({
+            productId: row.productId,
+            variantId: row.variantId,
+            listName: target.name,
+          }),
+        );
+        snackbar.success(
+          b3Lang('favorites.merge.added', { count: rows.length, list: target.name }),
+        );
+      }
+
+      refresh();
+    },
+    onError,
+  });
+
+  const isBusy = [
+    createList,
+    renameList,
+    deleteList,
+    removeItem,
+    saveToLists,
+    addToCart,
+    mergeGuest,
+  ].some((mutation) => mutation.isPending);
+
+  return {
+    createList,
+    renameList,
+    deleteList,
+    removeItem,
+    saveToLists,
+    addToCart,
+    mergeGuest,
+    isBusy,
+  };
 };
