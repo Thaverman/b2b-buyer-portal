@@ -1,16 +1,23 @@
 import {
   buildFavoriteItemWith,
   buildFavoriteListWith,
+  buildFavoriteProductWith,
+  buildFavoriteRowWith,
+  buildFavoriteVariantWith,
   buildWishlistItemNodeWith,
   buildWishlistNodeWith,
   faker,
 } from 'tests/test-utils';
 
+import { PRODUCT_DEFAULT_IMAGE } from '@/constants';
+
 import {
+  hydrateRows,
   isEmptyPlan,
   itemKey,
   membership,
   normalizeLists,
+  planAddToCart,
   planGuestMerge,
   planSaveToLists,
 } from './favorites';
@@ -186,5 +193,242 @@ describe('planGuestMerge', () => {
     expect(
       planGuestMerge({ guest: [guestRow(1)], lists: [list], defaultListId: list.id })?.rows,
     ).toEqual([]);
+  });
+});
+
+describe('hydrateRows', () => {
+  const priced = (exclusive: number) => ({
+    as_entered: exclusive,
+    tax_inclusive: exclusive * 2,
+    tax_exclusive: exclusive,
+    entered_inclusive: false,
+  });
+
+  it('joins a variant favorite with its product: variant SKU, image and price, product URL', () => {
+    const variant = buildFavoriteVariantWith({
+      sku: 'VAR-1',
+      image_url: 'https://img.example/var.png',
+      bc_calculated_price: priced(10),
+    });
+    const product = buildFavoriteProductWith({
+      variants: [buildFavoriteVariantWith('WHATEVER_VALUES'), variant],
+      orderQuantityMinimum: 4,
+    });
+    const item = buildFavoriteItemWith({ productId: product.id, variantId: variant.variant_id });
+    const list = buildFavoriteListWith({ items: [item] });
+
+    expect(hydrateRows(list, { [product.id]: product }, false)).toEqual([
+      {
+        item,
+        available: true,
+        name: product.name,
+        sku: 'VAR-1',
+        imageUrl: 'https://img.example/var.png',
+        price: 10,
+        productUrl: product.productUrl,
+        requiresOptions: false,
+        purchasable: true,
+        orderQuantityMinimum: 4,
+        cartVariantId: variant.variant_id,
+      },
+    ]);
+  });
+
+  it('uses the tax-inclusive price when the store displays inclusive prices', () => {
+    const variant = buildFavoriteVariantWith({ bc_calculated_price: priced(10) });
+    const product = buildFavoriteProductWith({ variants: [variant] });
+    const item = buildFavoriteItemWith({ productId: product.id, variantId: variant.variant_id });
+
+    const [row] = hydrateRows(
+      buildFavoriteListWith({ items: [item] }),
+      { [product.id]: product },
+      true,
+    );
+
+    expect(row.price).toBe(20);
+  });
+
+  it('falls back to the product SKU and image and the first variant price for a product-only favorite', () => {
+    const first = buildFavoriteVariantWith({ bc_calculated_price: priced(7) });
+    const product = buildFavoriteProductWith({
+      sku: 'PROD-1',
+      imageUrl: 'https://img.example/prod.png',
+      variants: [first, buildFavoriteVariantWith('WHATEVER_VALUES')],
+      options: [],
+    });
+    const item = buildFavoriteItemWith({ productId: product.id, variantId: null });
+
+    const [row] = hydrateRows(
+      buildFavoriteListWith({ items: [item] }),
+      { [product.id]: product },
+      false,
+    );
+
+    expect(row).toMatchObject({
+      sku: 'PROD-1',
+      imageUrl: 'https://img.example/prod.png',
+      price: 7,
+      requiresOptions: false,
+      cartVariantId: first.variant_id,
+    });
+  });
+
+  it('hides the price when the catalog hides it for this buyer', () => {
+    const product = buildFavoriteProductWith({ isPriceHidden: true });
+    const item = buildFavoriteItemWith({ productId: product.id, variantId: null });
+
+    const [row] = hydrateRows(
+      buildFavoriteListWith({ items: [item] }),
+      { [product.id]: product },
+      false,
+    );
+
+    expect(row.price).toBeNull();
+  });
+
+  it('requires options for a product-only favorite of a product with options', () => {
+    const product = buildFavoriteProductWith({
+      options: [{ option_id: 1, display_name: 'Size', sort_order: 0, is_required: true }],
+    });
+    const item = buildFavoriteItemWith({ productId: product.id, variantId: null });
+
+    const [row] = hydrateRows(
+      buildFavoriteListWith({ items: [item] }),
+      { [product.id]: product },
+      false,
+    );
+
+    expect(row.requiresOptions).toBe(true);
+  });
+
+  it('does not require options when the favorite saved a variant of an option product', () => {
+    const variant = buildFavoriteVariantWith('WHATEVER_VALUES');
+    const product = buildFavoriteProductWith({
+      variants: [variant],
+      options: [{ option_id: 1, display_name: 'Size', sort_order: 0, is_required: true }],
+    });
+    const item = buildFavoriteItemWith({ productId: product.id, variantId: variant.variant_id });
+
+    const [row] = hydrateRows(
+      buildFavoriteListWith({ items: [item] }),
+      { [product.id]: product },
+      false,
+    );
+
+    expect(row.requiresOptions).toBe(false);
+  });
+
+  it('requires options when a modifier is required, even with a saved variant', () => {
+    const variant = buildFavoriteVariantWith('WHATEVER_VALUES');
+    const product = buildFavoriteProductWith({
+      variants: [variant],
+      modifiers: [{ required: true }],
+    });
+    const item = buildFavoriteItemWith({ productId: product.id, variantId: variant.variant_id });
+
+    const [row] = hydrateRows(
+      buildFavoriteListWith({ items: [item] }),
+      { [product.id]: product },
+      false,
+    );
+
+    expect(row.requiresOptions).toBe(true);
+  });
+
+  it('marks a variant the catalog disabled for purchase', () => {
+    const variant = buildFavoriteVariantWith({ purchasing_disabled: true });
+    const product = buildFavoriteProductWith({ variants: [variant] });
+    const item = buildFavoriteItemWith({ productId: product.id, variantId: variant.variant_id });
+
+    const [row] = hydrateRows(
+      buildFavoriteListWith({ items: [item] }),
+      { [product.id]: product },
+      false,
+    );
+
+    expect(row.purchasable).toBe(false);
+  });
+
+  it('marks the row unavailable when the product is missing from the catalog response', () => {
+    const item = buildFavoriteItemWith('WHATEVER_VALUES');
+
+    expect(hydrateRows(buildFavoriteListWith({ items: [item] }), {}, false)).toEqual([
+      {
+        item,
+        available: false,
+        name: '',
+        sku: '',
+        imageUrl: PRODUCT_DEFAULT_IMAGE,
+        price: null,
+        productUrl: '',
+        requiresOptions: false,
+        purchasable: false,
+        orderQuantityMinimum: 1,
+        cartVariantId: null,
+      },
+    ]);
+  });
+
+  it('marks the row unavailable but keeps the product name when the saved variant is gone', () => {
+    const product = buildFavoriteProductWith('WHATEVER_VALUES');
+    const item = buildFavoriteItemWith({ productId: product.id, variantId: 999_999_999 });
+
+    const [row] = hydrateRows(
+      buildFavoriteListWith({ items: [item] }),
+      { [product.id]: product },
+      false,
+    );
+
+    expect(row).toMatchObject({ available: false, name: product.name, cartVariantId: null });
+  });
+
+  it('raises the quantity minimum to at least one', () => {
+    const product = buildFavoriteProductWith({ orderQuantityMinimum: 0 });
+    const item = buildFavoriteItemWith({ productId: product.id, variantId: null });
+
+    const [row] = hydrateRows(
+      buildFavoriteListWith({ items: [item] }),
+      { [product.id]: product },
+      false,
+    );
+
+    expect(row.orderQuantityMinimum).toBe(1);
+  });
+});
+
+describe('planAddToCart', () => {
+  it('builds one cart line per addable row at the catalog minimum with no option selection', () => {
+    const row = buildFavoriteRowWith({ orderQuantityMinimum: 6 });
+
+    expect(planAddToCart([row])).toEqual({
+      lineItems: [
+        {
+          productId: row.item.productId,
+          variantId: row.cartVariantId,
+          quantity: 6,
+          newSelectOptionList: [],
+        },
+      ],
+      skipped: [],
+    });
+  });
+
+  it('skips unavailable, options-required and not-purchasable rows with a reason each', () => {
+    const unavailable = buildFavoriteRowWith({ available: false });
+    const needsOptions = buildFavoriteRowWith({ requiresOptions: true });
+    const disabled = buildFavoriteRowWith({ purchasable: false });
+    const noVariant = buildFavoriteRowWith({ cartVariantId: null });
+    const addable = buildFavoriteRowWith('WHATEVER_VALUES');
+
+    const plan = planAddToCart([unavailable, needsOptions, disabled, noVariant, addable]);
+
+    expect(plan.lineItems).toHaveLength(1);
+    expect(plan.lineItems[0].productId).toBe(addable.item.productId);
+    expect(plan.skipped).toEqual([
+      { row: unavailable, reason: 'unavailable' },
+      { row: needsOptions, reason: 'optionsRequired' },
+      { row: disabled, reason: 'notPurchasable' },
+      { row: noVariant, reason: 'unavailable' },
+    ]);
   });
 });

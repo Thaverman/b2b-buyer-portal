@@ -1,3 +1,5 @@
+import { PRODUCT_DEFAULT_IMAGE } from '@/constants';
+import type { ProductSearch } from '@/shared/service/b2b/graphql/product';
 import type { WishlistNode } from '@/shared/service/bc/graphql/wishlist';
 
 export interface ItemRef {
@@ -131,3 +133,151 @@ export const planGuestMerge = ({
     rows: rows.filter((row) => !listHas(target, itemKey(row))),
   };
 };
+
+export type ProductsById = Record<number, ProductSearch | undefined>;
+
+export interface FavoriteRow {
+  item: FavoriteItem;
+  /** False when the product, or the saved variant, is no longer in the catalog response. */
+  available: boolean;
+  name: string;
+  sku: string;
+  imageUrl: string;
+  /** null = hidden for this buyer, or unknown. */
+  price: number | null;
+  productUrl: string;
+  /** Needs the product page: a required modifier, or options with no saved variant. */
+  requiresOptions: boolean;
+  purchasable: boolean;
+  orderQuantityMinimum: number;
+  /** The variant a cart line needs: the saved one, else the product's first (base) variant. */
+  cartVariantId: number | null;
+}
+
+type Variant = ProductSearch['variants'][number];
+
+const hasRequiredModifier = (modifiers: unknown[]): boolean =>
+  modifiers.some(
+    (modifier) =>
+      typeof modifier === 'object' &&
+      modifier !== null &&
+      (modifier as { required?: unknown }).required === true,
+  );
+
+const priceOf = (variant: Variant | undefined, showInclusiveTaxPrice: boolean): number | null => {
+  if (!variant) {
+    return null;
+  }
+
+  const { tax_inclusive: inclusive, tax_exclusive: exclusive } = variant.bc_calculated_price;
+
+  return showInclusiveTaxPrice ? inclusive : exclusive;
+};
+
+const unavailableRow = (item: FavoriteItem, product?: ProductSearch): FavoriteRow => ({
+  item,
+  available: false,
+  name: product?.name ?? '',
+  sku: product?.sku ?? '',
+  imageUrl: product?.imageUrl || PRODUCT_DEFAULT_IMAGE,
+  price: null,
+  productUrl: product?.productUrl ?? '',
+  requiresOptions: false,
+  purchasable: false,
+  orderQuantityMinimum: 1,
+  cartVariantId: null,
+});
+
+/** Joins a list's items with the productsSearch results (spec §8). */
+export const hydrateRows = (
+  list: FavoriteList,
+  productsById: ProductsById,
+  showInclusiveTaxPrice: boolean,
+): FavoriteRow[] =>
+  list.items.map((item) => {
+    const product = productsById[item.productId];
+
+    if (!product) {
+      return unavailableRow(item);
+    }
+
+    const savedVariant =
+      item.variantId === null
+        ? undefined
+        : product.variants.find((variant) => variant.variant_id === item.variantId);
+
+    if (item.variantId !== null && !savedVariant) {
+      return unavailableRow(item, product);
+    }
+
+    const variant = savedVariant ?? product.variants[0];
+
+    return {
+      item,
+      available: true,
+      name: product.name,
+      sku: savedVariant?.sku ?? product.sku,
+      imageUrl: savedVariant?.image_url || product.imageUrl || PRODUCT_DEFAULT_IMAGE,
+      price: product.isPriceHidden ? null : priceOf(variant, showInclusiveTaxPrice),
+      productUrl: product.productUrl,
+      requiresOptions:
+        hasRequiredModifier(product.modifiers) ||
+        (item.variantId === null && product.options.length > 0),
+      purchasable: variant ? !variant.purchasing_disabled : false,
+      orderQuantityMinimum: Math.max(1, product.orderQuantityMinimum || 1),
+      cartVariantId: variant?.variant_id ?? null,
+    };
+  });
+
+// CartLineItem and SkipReason stay module-internal: knip fails the build on unused exports.
+/** The shape `createOrUpdateExistingCart` reads: productId, variantId, quantity, empty option selection. */
+interface CartLineItem {
+  productId: number;
+  variantId: number;
+  quantity: number;
+  newSelectOptionList: never[];
+}
+
+type SkipReason = 'unavailable' | 'optionsRequired' | 'notPurchasable';
+
+export interface AddToCartPlan {
+  lineItems: CartLineItem[];
+  skipped: { row: FavoriteRow; reason: SkipReason }[];
+}
+
+const skipReasonFor = (row: FavoriteRow): SkipReason | null => {
+  if (!row.available || row.cartVariantId === null) {
+    return 'unavailable';
+  }
+
+  if (row.requiresOptions) {
+    return 'optionsRequired';
+  }
+
+  if (!row.purchasable) {
+    return 'notPurchasable';
+  }
+
+  return null;
+};
+
+/** Quantity is fixed: 1 raised to the catalog minimum (spec §1). */
+export const planAddToCart = (rows: FavoriteRow[]): AddToCartPlan => ({
+  lineItems: rows.flatMap((row) =>
+    skipReasonFor(row) === null && row.cartVariantId !== null
+      ? [
+          {
+            productId: row.item.productId,
+            variantId: row.cartVariantId,
+            quantity: row.orderQuantityMinimum,
+            newSelectOptionList: [],
+          },
+        ]
+      : [],
+  ),
+  skipped: rows.flatMap((row) => {
+    const reason = skipReasonFor(row);
+
+    return reason === null ? [] : [{ row, reason }];
+  }),
+});
