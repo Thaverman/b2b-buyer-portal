@@ -567,6 +567,7 @@ at BigCommerce's default page size once a list grows; this is relayed to the the
 | `yarn lint:eslint` | only the pre-existing `ManageSubscriptions/index.tsx` findings (untouched by this branch) |
 | `yarn lint:knip` | only the pre-existing `BillingStateOption` export in `PaymentMethods/billingPrefill.ts` (untouched by this branch) |
 | `yarn build` | succeeds; `translation-template.csv` regenerated with 920 entries |
+| broader run: `src/shared`, `tests`, `PaymentMethods`, `Loyalty`, `Login`, `Favorites` | 33 files, 455 of 459 tests pass; the 4 failures are in `Loyalty/index.test.tsx` and reproduce identically on the `dev` checkout (pre-existing copy drift, untouched by this branch) |
 
 Every new test was proven able to fail with a revert-and-rerun negative control; two tests
 were rewritten when the control showed them vacuous (the masquerading route test needed an
