@@ -539,6 +539,16 @@ the portal's token. Fallback if it fails: the theme adds `storefrontToken` to
 `BC_CONTEXT.favorites` and `wishlist.ts` prefers it when present. Either way the field
 names in §6.1 are checked against the live schema in the same session.
 
+**Verified 2026-09-09 on sandbox.storesupply.com** (Task 0 of the plan, run by THaverman in the
+browser console with the portal's `bcGraphqlToken` and the session cookie):
+
+- Customer-scoped read ✓: `customer.entityId` 264118 resolved with two lists ("My Favorites",
+  "Test List 1"); `wishlists.pageInfo` and `items.pageInfo` returned cursors, so paging works.
+  Rows carried both variant-bound (`variantEntityId` 12649) and product-only (`null`) items.
+- Mutation round-trip ✓: `createWishlist` then `deleteWishlists` returned `result: "success"`.
+- Outcome: the portal token authorizes the storefront wishlist operations. **The theme-token
+  fallback is not needed**; `BC_CONTEXT.favorites` stays `{ enabled: boolean }`.
+
 ### 12.2 Page sizes
 
 The portal pages both connections. The theme's contract query is unpaged and will truncate
