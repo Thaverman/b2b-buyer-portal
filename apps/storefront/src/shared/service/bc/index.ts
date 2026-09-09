@@ -4,3 +4,4 @@ export * from './graphql/login';
 export * from './graphql/company';
 export * from './graphql/user';
 export * from './graphql/orders';
+export * from './graphql/wishlist';
