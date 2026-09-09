@@ -4,11 +4,13 @@ import { Alert, Box, Button, Typography } from '@mui/material';
 
 import B3Dialog from '@/components/B3Dialog';
 import B3Spin from '@/components/spin/B3Spin';
+import { useMobile } from '@/hooks/useMobile';
 import { useB3Lang } from '@/lib/lang';
 import { activeCurrencyInfoSelector, useAppSelector } from '@/store';
 import { snackbar } from '@/utils/b3Tip';
 
 import EmptyState from './components/EmptyState';
+import FavoriteItemCard from './components/FavoriteItemCard';
 import FavoriteItemsTable from './components/FavoriteItemsTable';
 import ListNameDialog from './components/ListNameDialog';
 import ListTabs from './components/ListTabs';
@@ -30,6 +32,7 @@ const selectList = (lists: FavoriteList[], param: string | null): FavoriteList |
 function Favorites() {
   const b3Lang = useB3Lang();
   const navigate = useNavigate();
+  const [isMobile] = useMobile();
   const customerId = useAppSelector(({ company }) => company.customer.id);
   const companyId = useAppSelector(({ company }) => company.companyInfo.id);
   const customerGroupId = useAppSelector(({ company }) => company.customer.customerGroupId);
@@ -128,6 +131,16 @@ function Favorites() {
   const addRowToCart = (row: FavoriteRow) =>
     actions.addToCart.mutate({ plan: planAddToCart([row]) });
 
+  const removeRow = (row: FavoriteRow) => {
+    if (selectedList) {
+      actions.removeItem.mutate({
+        listId: selectedList.id,
+        listName: selectedList.name,
+        itemId: row.item.id,
+      });
+    }
+  };
+
   const handleAddAllToCart = () => {
     const plan = planAddToCart(rows);
 
@@ -193,24 +206,30 @@ function Favorites() {
               onDelete={() => setPendingDelete(selectedList)}
               onAddAll={handleAddAllToCart}
             />
-            {rows.length === 0 ? (
-              <Typography>{b3Lang('favorites.empty.list')}</Typography>
-            ) : (
+            {rows.length === 0 && <Typography>{b3Lang('favorites.empty.list')}</Typography>}
+            {rows.length > 0 && !isMobile && (
               <FavoriteItemsTable
                 rows={rows}
                 productsFailed={productsFailed}
                 disabled={actions.isBusy}
                 onAddToCart={addRowToCart}
                 onSaveToLists={setPickerRow}
-                onRemove={(row) =>
-                  actions.removeItem.mutate({
-                    listId: selectedList.id,
-                    listName: selectedList.name,
-                    itemId: row.item.id,
-                  })
-                }
+                onRemove={removeRow}
               />
             )}
+            {rows.length > 0 &&
+              isMobile &&
+              rows.map((row) => (
+                <FavoriteItemCard
+                  key={row.item.id}
+                  row={row}
+                  productsFailed={productsFailed}
+                  disabled={actions.isBusy}
+                  onAddToCart={addRowToCart}
+                  onSaveToLists={setPickerRow}
+                  onRemove={removeRow}
+                />
+              ))}
           </>
         )}
       </Box>
