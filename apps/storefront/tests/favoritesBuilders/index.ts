@@ -1,6 +1,7 @@
 import { faker } from '@faker-js/faker';
 import { builder } from 'tests/builder';
 
+import { FavoriteItem, FavoriteList } from '@/pages/Favorites/favorites';
 import { GuestFavorite } from '@/pages/Favorites/storage';
 import { WishlistItemNode, WishlistNode } from '@/shared/service/bc/graphql/wishlist';
 
@@ -21,4 +22,17 @@ export const buildGuestFavoriteWith = builder<GuestFavorite>(() => ({
   productId: faker.number.int({ min: 1, max: 1_000_000_000 }),
   variantId: null,
   addedAt: faker.date.recent().getTime(),
+}));
+
+export const buildFavoriteItemWith = builder<FavoriteItem>(() => ({
+  id: faker.number.int({ min: 1, max: 1_000_000_000 }),
+  productId: faker.number.int({ min: 1, max: 1_000_000_000 }),
+  variantId: null,
+}));
+
+export const buildFavoriteListWith = builder<FavoriteList>(() => ({
+  id: faker.number.int({ min: 1, max: 1_000_000_000 }),
+  name: faker.commerce.department(),
+  isPublic: false,
+  items: [],
 }));
