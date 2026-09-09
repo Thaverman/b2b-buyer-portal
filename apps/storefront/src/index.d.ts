@@ -87,6 +87,13 @@ declare global {
         /** Theme override for the My-benefits banner image; absent = the relative default. */
         benefitsBannerUrl?: string;
       };
+      /**
+       * Gates the /favorites page; absent or enabled:false = feature off. Emitted by the
+       * theme from the same theme setting that turns on the Stencil favorites star.
+       */
+      favorites?: {
+        enabled: boolean;
+      };
     };
     /** Theme-set free-shipping config; absent = shipping tracker off. */
     loyaltyShippingConfig?: {
