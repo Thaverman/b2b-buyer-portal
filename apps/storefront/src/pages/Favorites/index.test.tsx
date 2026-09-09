@@ -670,3 +670,165 @@ describe('remove and save to lists', () => {
     expect(snackbar.success).toHaveBeenCalledWith('Saved to Gift ideas');
   });
 });
+
+describe('add to cart', () => {
+  const existingCart = { data: { site: { cart: { entityId: 'cart-1', lineItems: {} } } } };
+  const sizeOption = { option_id: 1, display_name: 'Size', sort_order: 0, is_required: true };
+
+  const mockCart = (received: ReturnType<typeof vi.fn>) =>
+    server.use(
+      graphql.query('getCart', () => HttpResponse.json(existingCart)),
+      graphql.mutation('addCartLineItemsTwo', ({ variables }) => {
+        received(variables);
+
+        return HttpResponse.json({
+          data: { cart: { addCartLineItems: { cart: { entityId: 'cart-1' } } } },
+        });
+      }),
+    );
+
+  it('adds an item to the cart at the catalog minimum quantity', async () => {
+    const variant = buildFavoriteVariantWith('WHATEVER_VALUES');
+    const product = buildFavoriteProductWith({
+      name: 'Slicker Brush',
+      variants: [variant],
+      orderQuantityMinimum: 6,
+    });
+    const received = vi.fn();
+    mockLists([listWith(product)]);
+    mockProducts([product]);
+    mockCart(received);
+
+    const { user } = renderWithProviders(<Favorites />, { preloadedState });
+
+    const row = await screen.findByRole('row', { name: /Slicker Brush/ });
+    await user.click(within(row).getByRole('button', { name: 'Add to cart' }));
+
+    await waitFor(() =>
+      expect(received).toHaveBeenCalledWith({
+        addCartLineItemsInput: {
+          cartEntityId: 'cart-1',
+          data: {
+            lineItems: [
+              {
+                quantity: 6,
+                productEntityId: product.id,
+                variantEntityId: variant.variant_id,
+                selectedOptions: { multipleChoices: [], textFields: [] },
+              },
+            ],
+          },
+        },
+      }),
+    );
+    expect(snackbar.success).toHaveBeenCalledWith(
+      'Added to cart',
+      expect.objectContaining({ action: expect.objectContaining({ label: 'View cart' }) }),
+    );
+  });
+
+  it('adds every addable row to the cart and reports the skipped rows', async () => {
+    const addable = buildFavoriteProductWith({ name: 'Addable' });
+    const needsOptions = buildFavoriteProductWith({ name: 'Needs options', options: [sizeOption] });
+    const gone = buildFavoriteProductWith({ name: 'Gone' });
+    const list = buildFavoriteListWith({
+      name: 'My Favorites',
+      items: [addable, needsOptions, gone].map((product) =>
+        buildFavoriteItemWith({ productId: product.id, variantId: null }),
+      ),
+    });
+    const received = vi.fn();
+    mockLists([list]);
+    mockProducts([addable, needsOptions]); // `gone` is missing from the catalog response
+    mockCart(received);
+
+    const { user } = renderWithProviders(<Favorites />, { preloadedState });
+
+    await screen.findByRole('row', { name: /Addable/ });
+    await user.click(screen.getByRole('button', { name: 'Add all to cart' }));
+
+    await waitFor(() => expect(received).toHaveBeenCalledTimes(1));
+    expect(received.mock.calls[0][0].addCartLineItemsInput.data.lineItems).toEqual([
+      {
+        quantity: 1,
+        productEntityId: addable.id,
+        variantEntityId: addable.variants[0].variant_id,
+        selectedOptions: { multipleChoices: [], textFields: [] },
+      },
+    ]);
+    expect(snackbar.success).toHaveBeenCalledWith(
+      '1 item added to cart',
+      expect.objectContaining({
+        description: '2 items skipped: they need options or are unavailable',
+      }),
+    );
+  });
+
+  it('says there is nothing to add when no row can go to the cart', async () => {
+    const needsOptions = buildFavoriteProductWith({ name: 'Needs options', options: [sizeOption] });
+    const received = vi.fn();
+    mockLists([listWith(needsOptions)]);
+    mockProducts([needsOptions]);
+    mockCart(received);
+
+    const { user } = renderWithProviders(<Favorites />, { preloadedState });
+
+    await screen.findByRole('row', { name: /Needs options/ });
+    await user.click(screen.getByRole('button', { name: 'Add all to cart' }));
+
+    await waitFor(() =>
+      expect(snackbar.info).toHaveBeenCalledWith(
+        'Nothing to add: these items need options or are unavailable.',
+      ),
+    );
+    expect(received).not.toHaveBeenCalled();
+  });
+
+  it('links option products to the product page in the top window instead of adding blindly', async () => {
+    const needsOptions = buildFavoriteProductWith({
+      name: 'Needs options',
+      productUrl: 'https://store.example/needs-options/',
+      options: [sizeOption],
+    });
+    mockLists([listWith(needsOptions)]);
+    mockProducts([needsOptions]);
+
+    renderWithProviders(<Favorites />, { preloadedState });
+
+    const row = await screen.findByRole('row', { name: /Needs options/ });
+    const link = within(row).getByRole('link', { name: 'Choose options' });
+    expect(link).toHaveAttribute('href', 'https://store.example/needs-options/');
+    expect(link).toHaveAttribute('target', '_top');
+    expect(within(row).queryByRole('button', { name: 'Add to cart' })).not.toBeInTheDocument();
+  });
+
+  it('offers no cart action for a favorite whose product is gone', async () => {
+    mockLists([buildFavoriteListWith({ items: [buildFavoriteItemWith('WHATEVER_VALUES')] })]);
+    mockProducts([]);
+
+    renderWithProviders(<Favorites />, { preloadedState });
+
+    const row = await screen.findByRole('row', { name: /No longer available/ });
+    expect(within(row).queryByRole('button', { name: 'Add to cart' })).not.toBeInTheDocument();
+    expect(within(row).queryByRole('link', { name: 'Choose options' })).not.toBeInTheDocument();
+  });
+
+  it('shows the storefront message when the cart rejects the add', async () => {
+    const product = buildFavoriteProductWith({ name: 'Slicker Brush' });
+    mockLists([listWith(product)]);
+    mockProducts([product]);
+    server.use(
+      graphql.query('getCart', () => HttpResponse.json(existingCart)),
+      graphql.mutation('addCartLineItemsTwo', () =>
+        HttpResponse.json({ errors: [{ message: 'Not enough stock' }] }),
+      ),
+    );
+
+    const { user } = renderWithProviders(<Favorites />, { preloadedState });
+
+    const row = await screen.findByRole('row', { name: /Slicker Brush/ });
+    await user.click(within(row).getByRole('button', { name: 'Add to cart' }));
+
+    await waitFor(() => expect(snackbar.error).toHaveBeenCalledWith('Not enough stock'));
+  });
+});

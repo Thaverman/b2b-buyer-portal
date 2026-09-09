@@ -10,9 +10,11 @@ import {
   WishlistItemInput,
 } from '@/shared/service/bc';
 import { snackbar } from '@/utils/b3Tip';
+import b3TriggerCartNumber from '@/utils/b3TriggerCartNumber';
+import { createOrUpdateExistingCart } from '@/utils/cartUtils';
 
 import { trackAddToWishlist } from './analytics';
-import { FavoriteList, FavoriteRow, ItemRef, SaveToListsPlan } from './favorites';
+import { AddToCartPlan, FavoriteList, FavoriteRow, ItemRef, SaveToListsPlan } from './favorites';
 import {
   clearDefaultListId,
   getDefaultListId,
@@ -32,6 +34,8 @@ const toWishlistItem = ({ productId, variantId }: ItemRef): WishlistItemInput =>
   variantId === null
     ? { productEntityId: productId }
     : { productEntityId: productId, variantEntityId: variantId };
+
+const CART_URL = '/cart.php';
 
 /**
  * Every write the page makes. Each success drops the theme's session cache and refetches
@@ -130,9 +134,51 @@ export const useFavoriteActions = (customerId: number) => {
     onError,
   });
 
-  const isBusy = [createList, renameList, deleteList, removeItem, saveToLists].some(
+  const addToCart = useMutation({
+    mutationFn: async ({ plan }: { plan: AddToCartPlan }) => {
+      try {
+        await createOrUpdateExistingCart(plan.lineItems);
+      } finally {
+        // Refresh the header count whether or not the add went through, as Quick Order does.
+        b3TriggerCartNumber();
+      }
+
+      return plan;
+    },
+    onSuccess: (plan) => {
+      // The React realm is the top window (only the DOM is portaled into the ThemeFrame),
+      // so assigning location here leaves the portal correctly.
+      const action = {
+        label: b3Lang('favorites.cart.view'),
+        onClick: () => {
+          window.location.href = CART_URL;
+        },
+      };
+      const added = plan.lineItems.length;
+      const skipped = plan.skipped.length;
+
+      if (added === 1 && skipped === 0) {
+        snackbar.success(b3Lang('favorites.cart.addedOne'), { action });
+
+        return;
+      }
+
+      snackbar.success(b3Lang('favorites.cart.addedMany', { count: added }), {
+        action,
+        description: skipped > 0 ? b3Lang('favorites.cart.skipped', { count: skipped }) : undefined,
+      });
+    },
+    onError: (error: unknown) => {
+      // The cart helper throws the storefront's own message; show it as the other pages do.
+      snackbar.error(
+        error instanceof Error && error.message ? error.message : b3Lang('favorites.error.generic'),
+      );
+    },
+  });
+
+  const isBusy = [createList, renameList, deleteList, removeItem, saveToLists, addToCart].some(
     (mutation) => mutation.isPending,
   );
 
-  return { createList, renameList, deleteList, removeItem, saveToLists, isBusy };
+  return { createList, renameList, deleteList, removeItem, saveToLists, addToCart, isBusy };
 };

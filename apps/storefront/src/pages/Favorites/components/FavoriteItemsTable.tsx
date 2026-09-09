@@ -12,6 +12,7 @@ interface FavoriteItemsTableProps {
   rows: FavoriteRow[];
   productsFailed: boolean;
   disabled: boolean;
+  onAddToCart: (row: FavoriteRow) => void;
   onSaveToLists: (row: FavoriteRow) => void;
   onRemove: (row: FavoriteRow) => void;
 }
@@ -20,6 +21,7 @@ export default function FavoriteItemsTable({
   rows,
   productsFailed,
   disabled,
+  onAddToCart,
   onSaveToLists,
   onRemove,
 }: FavoriteItemsTableProps) {
@@ -48,7 +50,9 @@ export default function FavoriteItemsTable({
             <TableCell align="right">
               <RowActions
                 row={row}
+                productsFailed={productsFailed}
                 disabled={disabled}
+                onAddToCart={onAddToCart}
                 onSaveToLists={onSaveToLists}
                 onRemove={onRemove}
               />

@@ -6,6 +6,7 @@ import B3Dialog from '@/components/B3Dialog';
 import B3Spin from '@/components/spin/B3Spin';
 import { useB3Lang } from '@/lib/lang';
 import { activeCurrencyInfoSelector, useAppSelector } from '@/store';
+import { snackbar } from '@/utils/b3Tip';
 
 import EmptyState from './components/EmptyState';
 import FavoriteItemsTable from './components/FavoriteItemsTable';
@@ -14,7 +15,7 @@ import ListTabs from './components/ListTabs';
 import ListToolbar from './components/ListToolbar';
 import SaveToListsDialog from './components/SaveToListsDialog';
 import { isFavoritesAvailable } from './api';
-import { FavoriteList, FavoriteRow, hydrateRows } from './favorites';
+import { FavoriteList, FavoriteRow, hydrateRows, planAddToCart } from './favorites';
 import { SaveToListsInput, useFavoriteActions } from './useFavoriteActions';
 import { useFavoriteLists } from './useFavoriteLists';
 import { useFavoriteProducts } from './useFavoriteProducts';
@@ -101,6 +102,21 @@ function Favorites() {
     }
   };
 
+  const addRowToCart = (row: FavoriteRow) =>
+    actions.addToCart.mutate({ plan: planAddToCart([row]) });
+
+  const handleAddAllToCart = () => {
+    const plan = planAddToCart(rows);
+
+    if (plan.lineItems.length === 0) {
+      snackbar.info(b3Lang('favorites.cart.nothingToAdd'));
+
+      return;
+    }
+
+    actions.addToCart.mutate({ plan });
+  };
+
   if (!isAvailable) {
     return <Typography>{b3Lang('favorites.unavailable')}</Typography>;
   }
@@ -149,8 +165,10 @@ function Favorites() {
             <ListToolbar
               list={selectedList}
               disabled={actions.isBusy}
+              hasItems={rows.length > 0}
               onRename={() => setNameDialog({ mode: 'rename', list: selectedList })}
               onDelete={() => setPendingDelete(selectedList)}
+              onAddAll={handleAddAllToCart}
             />
             {rows.length === 0 ? (
               <Typography>{b3Lang('favorites.empty.list')}</Typography>
@@ -159,6 +177,7 @@ function Favorites() {
                 rows={rows}
                 productsFailed={productsFailed}
                 disabled={actions.isBusy}
+                onAddToCart={addRowToCart}
                 onSaveToLists={setPickerRow}
                 onRemove={(row) =>
                   actions.removeItem.mutate({
