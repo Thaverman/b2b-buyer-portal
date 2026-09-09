@@ -1,17 +1,24 @@
+import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Alert, Box, Button, Typography } from '@mui/material';
 
+import B3Dialog from '@/components/B3Dialog';
 import B3Spin from '@/components/spin/B3Spin';
 import { useB3Lang } from '@/lib/lang';
 import { activeCurrencyInfoSelector, useAppSelector } from '@/store';
 
 import EmptyState from './components/EmptyState';
 import FavoriteItemsTable from './components/FavoriteItemsTable';
+import ListNameDialog from './components/ListNameDialog';
 import ListTabs from './components/ListTabs';
+import ListToolbar from './components/ListToolbar';
 import { isFavoritesAvailable } from './api';
 import { FavoriteList, hydrateRows } from './favorites';
+import { useFavoriteActions } from './useFavoriteActions';
 import { useFavoriteLists } from './useFavoriteLists';
 import { useFavoriteProducts } from './useFavoriteProducts';
+
+type NameDialogState = { mode: 'create' } | { mode: 'rename'; list: FavoriteList };
 
 // `?list=<id>` selects the list; unknown or missing falls back to the first one (spec §4.5).
 const selectList = (lists: FavoriteList[], param: string | null): FavoriteList | undefined =>
@@ -44,9 +51,44 @@ function Favorites() {
   const rows = selectedList
     ? hydrateRows(selectedList, productsQuery.data ?? {}, showInclusiveTaxPrice)
     : [];
+  const actions = useFavoriteActions(customerId);
+  const [nameDialog, setNameDialog] = useState<NameDialogState | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<FavoriteList | null>(null);
 
   const selectListId = (listId: number) =>
     setSearchParams({ list: String(listId) }, { replace: true });
+
+  const handleCreateList = async (name: string) => {
+    try {
+      const created = await actions.createList.mutateAsync(name);
+      setNameDialog(null);
+      selectListId(created.entityId);
+    } catch {
+      // the actions hook already toasted the failure; keep the dialog open to retry
+    }
+  };
+
+  const handleRenameList = async (list: FavoriteList, name: string) => {
+    try {
+      await actions.renameList.mutateAsync({ listId: list.id, name });
+      setNameDialog(null);
+    } catch {
+      // toasted by the actions hook
+    }
+  };
+
+  const handleDeleteList = async (list: FavoriteList) => {
+    try {
+      await actions.deleteList.mutateAsync(list.id);
+      setPendingDelete(null);
+
+      if (selectedList?.id === list.id) {
+        setSearchParams({}, { replace: true });
+      }
+    } catch {
+      // toasted by the actions hook
+    }
+  };
 
   if (!isAvailable) {
     return <Typography>{b3Lang('favorites.unavailable')}</Typography>;
@@ -68,6 +110,15 @@ function Favorites() {
   return (
     <B3Spin isSpinning={isLoading}>
       <Box>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+          <Button
+            variant="outlined"
+            disabled={actions.isBusy}
+            onClick={() => setNameDialog({ mode: 'create' })}
+          >
+            {b3Lang('favorites.newList')}
+          </Button>
+        </Box>
         {productsFailed && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {b3Lang('favorites.error.products')}
@@ -84,9 +135,12 @@ function Favorites() {
         {selectedList && (
           <>
             <ListTabs lists={lists} selectedId={selectedList.id} onSelect={selectListId} />
-            <Typography variant="h6" component="h2" sx={{ mb: 2 }}>
-              {selectedList.name}
-            </Typography>
+            <ListToolbar
+              list={selectedList}
+              disabled={actions.isBusy}
+              onRename={() => setNameDialog({ mode: 'rename', list: selectedList })}
+              onDelete={() => setPendingDelete(selectedList)}
+            />
             {rows.length === 0 ? (
               <Typography>{b3Lang('favorites.empty.list')}</Typography>
             ) : (
@@ -95,6 +149,44 @@ function Favorites() {
           </>
         )}
       </Box>
+      {/* Dialogs sit after the layout Box: B3Dialog renders an in-flow wrapper even while closed. */}
+      <ListNameDialog
+        isOpen={nameDialog !== null}
+        dialogKey={nameDialog?.mode === 'rename' ? `rename-${nameDialog.list.id}` : 'create'}
+        title={b3Lang(nameDialog?.mode === 'rename' ? 'favorites.rename' : 'favorites.newList')}
+        initialName={nameDialog?.mode === 'rename' ? nameDialog.list.name : ''}
+        submitLabel={b3Lang(
+          nameDialog?.mode === 'rename' ? 'favorites.listName.save' : 'favorites.listName.create',
+        )}
+        loading={actions.createList.isPending || actions.renameList.isPending}
+        onCancel={() => setNameDialog(null)}
+        onSubmit={(name) =>
+          nameDialog?.mode === 'rename'
+            ? handleRenameList(nameDialog.list, name)
+            : handleCreateList(name)
+        }
+      />
+      <B3Dialog
+        isOpen={pendingDelete !== null}
+        title={b3Lang('favorites.deleteList')}
+        rightSizeBtn={b3Lang('favorites.deleteList')}
+        loading={actions.deleteList.isPending}
+        handleLeftClick={() => setPendingDelete(null)}
+        handRightClick={() => {
+          if (pendingDelete) {
+            handleDeleteList(pendingDelete);
+          }
+        }}
+      >
+        <Typography>
+          {pendingDelete
+            ? b3Lang('favorites.deleteList.confirm', {
+                name: pendingDelete.name,
+                count: pendingDelete.items.length,
+              })
+            : ''}
+        </Typography>
+      </B3Dialog>
     </B3Spin>
   );
 }

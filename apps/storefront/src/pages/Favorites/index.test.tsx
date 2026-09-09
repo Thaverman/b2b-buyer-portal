@@ -11,11 +11,13 @@ import {
   renderWithProviders,
   screen,
   startMockServer,
+  waitFor,
   within,
 } from 'tests/test-utils';
 
 import { ProductSearch } from '@/shared/service/b2b/graphql/product';
 import { CustomerRole, UserTypes } from '@/types';
+import { snackbar } from '@/utils/b3Tip';
 
 import { FavoriteList } from './favorites';
 import Favorites from '.';
@@ -289,5 +291,186 @@ describe('lists and rows', () => {
       await screen.findByText("We couldn't load product details for your favorites."),
     ).toBeInTheDocument();
     expect(screen.getByText('Product details unavailable')).toBeInTheDocument();
+  });
+});
+
+describe('list management', () => {
+  it('creates a list, trims the name, and selects the new list', async () => {
+    const existing = buildFavoriteListWith({ name: 'Existing', items: [] });
+    const created = buildFavoriteListWith({ name: 'Gift ideas', items: [] });
+    const received = vi.fn();
+    let lists = [existing];
+    server.use(
+      graphql.query('FavoritesLists', () =>
+        HttpResponse.json({ data: { customer: { wishlists: connection(lists.map(rawList)) } } }),
+      ),
+      graphql.mutation('CreateFavoritesList', ({ variables }) => {
+        received(variables);
+        lists = [existing, created];
+
+        return HttpResponse.json({
+          data: {
+            wishlist: { createWishlist: { result: { entityId: created.id, name: created.name } } },
+          },
+        });
+      }),
+    );
+
+    const { user, navigation } = renderWithProviders(<Favorites />, { preloadedState });
+
+    await user.click(await screen.findByRole('button', { name: 'New list' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByRole('textbox', { name: 'List name' }), '  Gift ideas ');
+    await user.click(within(dialog).getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => expect(received).toHaveBeenCalledWith({ name: 'Gift ideas' }));
+    expect(await screen.findByRole('tab', { name: 'Gift ideas (0)' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(navigation).toHaveBeenCalledWith(`/?list=${created.id}`);
+    // The dialog closes through MUI's exit transition, so its removal is asynchronous.
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('disables Create until a name is entered', async () => {
+    mockLists([buildFavoriteListWith({ items: [] })]);
+
+    const { user } = renderWithProviders(<Favorites />, { preloadedState });
+
+    await user.click(await screen.findByRole('button', { name: 'New list' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: 'Create' })).toBeDisabled();
+
+    await user.type(within(dialog).getByRole('textbox', { name: 'List name' }), '   ');
+
+    expect(within(dialog).getByRole('button', { name: 'Create' })).toBeDisabled();
+    expect(within(dialog).getByText('Enter a list name')).toBeInTheDocument();
+  });
+
+  it('renames the selected list', async () => {
+    const list = buildFavoriteListWith({ name: 'Old name', items: [] });
+    const received = vi.fn();
+    mockLists([list]);
+    server.use(
+      graphql.mutation('RenameFavoritesList', ({ variables }) => {
+        received(variables);
+
+        return HttpResponse.json({
+          data: {
+            wishlist: { updateWishlist: { result: { entityId: list.id, name: variables.name } } },
+          },
+        });
+      }),
+    );
+
+    const { user } = renderWithProviders(<Favorites />, { preloadedState });
+
+    await user.click(await screen.findByRole('button', { name: 'Rename' }));
+    const dialog = await screen.findByRole('dialog');
+    const input = within(dialog).getByRole('textbox', { name: 'List name' });
+    expect(input).toHaveValue('Old name');
+    await user.clear(input);
+    await user.type(input, 'New name');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(received).toHaveBeenCalledWith({ listId: list.id, name: 'New name' }),
+    );
+    expect(snackbar.success).toHaveBeenCalledWith('List renamed');
+  });
+
+  it('deletes the selected list, clears the default-list key, and falls back to the first remaining list', async () => {
+    const keep = buildFavoriteListWith({ name: 'Keep', items: [] });
+    const doomed = buildFavoriteListWith({
+      name: 'Doomed',
+      items: [buildFavoriteItemWith('WHATEVER_VALUES'), buildFavoriteItemWith('WHATEVER_VALUES')],
+    });
+    const received = vi.fn();
+    let lists = [keep, doomed];
+    window.localStorage.setItem('favorites_default_list', String(doomed.id));
+    window.sessionStorage.setItem('favorites_lists', '{"value":[],"expiry":1}');
+    server.use(
+      graphql.query('FavoritesLists', () =>
+        HttpResponse.json({ data: { customer: { wishlists: connection(lists.map(rawList)) } } }),
+      ),
+      graphql.mutation('DeleteFavoritesLists', ({ variables }) => {
+        received(variables);
+        lists = [keep];
+
+        return HttpResponse.json({ data: { wishlist: { deleteWishlists: { result: 'ok' } } } });
+      }),
+    );
+    mockProducts([]);
+
+    const { user } = renderWithProviders(<Favorites />, {
+      preloadedState,
+      initialEntries: [`/favorites?list=${doomed.id}`],
+    });
+
+    await user.click(await screen.findByRole('button', { name: 'Delete list' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText('Delete Doomed? Its 2 favorites will be removed.'),
+    ).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Delete list' }));
+
+    await waitFor(() => expect(received).toHaveBeenCalledWith({ listIds: [doomed.id] }));
+    expect(await screen.findByRole('tab', { name: 'Keep (0)' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(screen.queryByRole('tab', { name: 'Doomed (2)' })).not.toBeInTheDocument();
+    expect(window.localStorage.getItem('favorites_default_list')).toBeNull();
+    expect(window.sessionStorage.getItem('favorites_lists')).toBeNull();
+    expect(snackbar.success).toHaveBeenCalledWith('List deleted');
+  });
+
+  it('keeps the default-list key when a different list is deleted', async () => {
+    const defaultList = buildFavoriteListWith({ name: 'Default', items: [] });
+    const other = buildFavoriteListWith({ name: 'Other', items: [] });
+    window.localStorage.setItem('favorites_default_list', String(defaultList.id));
+    mockLists([defaultList, other]);
+    server.use(
+      graphql.mutation('DeleteFavoritesLists', () =>
+        HttpResponse.json({ data: { wishlist: { deleteWishlists: { result: 'ok' } } } }),
+      ),
+    );
+
+    const { user } = renderWithProviders(<Favorites />, {
+      preloadedState,
+      initialEntries: [`/favorites?list=${other.id}`],
+    });
+
+    await user.click(await screen.findByRole('button', { name: 'Delete list' }));
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete list' }),
+    );
+
+    await waitFor(() => expect(snackbar.success).toHaveBeenCalledWith('List deleted'));
+    expect(window.localStorage.getItem('favorites_default_list')).toBe(String(defaultList.id));
+  });
+
+  it('shows the generic error and keeps the dialog open when renaming fails', async () => {
+    mockLists([buildFavoriteListWith({ name: 'Old', items: [] })]);
+    server.use(
+      graphql.mutation('RenameFavoritesList', () =>
+        HttpResponse.json({ errors: [{ message: 'nope' }] }),
+      ),
+    );
+
+    const { user } = renderWithProviders(<Favorites />, { preloadedState });
+
+    await user.click(await screen.findByRole('button', { name: 'Rename' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByRole('textbox', { name: 'List name' }), ' 2');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(snackbar.error).toHaveBeenCalledWith(
+        'Something went wrong updating your favorites. Please try again.',
+      ),
+    );
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });
