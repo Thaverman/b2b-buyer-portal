@@ -1,25 +1,293 @@
-import { buildB2BFeaturesStateWith, renderWithProviders, screen } from 'tests/test-utils';
+import {
+  buildB2BFeaturesStateWith,
+  buildCompanyStateWith,
+  buildFavoriteItemWith,
+  buildFavoriteListWith,
+  buildFavoriteProductWith,
+  buildFavoriteVariantWith,
+  buildGlobalStateWith,
+  graphql,
+  HttpResponse,
+  renderWithProviders,
+  screen,
+  startMockServer,
+  within,
+} from 'tests/test-utils';
 
+import { ProductSearch } from '@/shared/service/b2b/graphql/product';
+import { CustomerRole, UserTypes } from '@/types';
+
+import { FavoriteList } from './favorites';
 import Favorites from '.';
+
+vi.mock('@/utils/b3Tip', () => ({
+  snackbar: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
+}));
+
+vi.mock('@/utils/b3Logger');
+
+const { server } = startMockServer();
+
+const preloadedState = {
+  company: buildCompanyStateWith({
+    customer: {
+      id: 4242,
+      emailAddress: 'buyer@example.com',
+      role: CustomerRole.B2C,
+      userType: UserTypes.B2C,
+    },
+    tokens: { bcGraphqlToken: 'storefront-token' },
+  }),
+};
+
+const lastPage = { hasNextPage: false, endCursor: null };
+
+const connection = <T,>(nodes: T[]) => ({
+  pageInfo: lastPage,
+  edges: nodes.map((node) => ({ node })),
+});
+
+// The storefront API shape of a normalized list.
+const rawList = (list: FavoriteList) => ({
+  entityId: list.id,
+  name: list.name,
+  isPublic: list.isPublic,
+  items: connection(
+    list.items.map((item) => ({
+      entityId: item.id,
+      productEntityId: item.productId,
+      variantEntityId: item.variantId,
+    })),
+  ),
+});
+
+const mockLists = (lists: FavoriteList[]) =>
+  server.use(
+    graphql.query('FavoritesLists', () =>
+      HttpResponse.json({ data: { customer: { wishlists: connection(lists.map(rawList)) } } }),
+    ),
+  );
+
+const mockProducts = (products: ProductSearch[]) =>
+  server.use(
+    graphql.query('SearchProducts', () =>
+      HttpResponse.json({ data: { productsSearch: products } }),
+    ),
+  );
+
+// A list holding one product-only favorite of `product`.
+const listWith = (product: ProductSearch, name = 'My Favorites') =>
+  buildFavoriteListWith({
+    name,
+    items: [buildFavoriteItemWith({ productId: product.id, variantId: null })],
+  });
+
+beforeEach(() => {
+  window.BC_CONTEXT = { favorites: { enabled: true } };
+  window.localStorage.clear();
+  window.sessionStorage.clear();
+  window.dataLayer = [];
+});
 
 afterEach(() => {
   delete window.BC_CONTEXT;
 });
 
-it('shows the unavailable state when the host has not enabled favorites', () => {
-  renderWithProviders(<Favorites />);
+describe('availability', () => {
+  it('shows the unavailable state when the host has not enabled favorites', () => {
+    delete window.BC_CONTEXT;
 
-  expect(screen.getByText('Favorites are not available for this account.')).toBeInTheDocument();
-});
+    renderWithProviders(<Favorites />, { preloadedState });
 
-it('shows the unavailable state while a sales rep is masquerading', () => {
-  window.BC_CONTEXT = { favorites: { enabled: true } };
-
-  renderWithProviders(<Favorites />, {
-    preloadedState: {
-      b2bFeatures: buildB2BFeaturesStateWith({ masqueradeCompany: { isAgenting: true } }),
-    },
+    expect(screen.getByText('Favorites are not available for this account.')).toBeInTheDocument();
   });
 
-  expect(screen.getByText('Favorites are not available for this account.')).toBeInTheDocument();
+  it('shows the unavailable state while a sales rep is masquerading', () => {
+    renderWithProviders(<Favorites />, {
+      preloadedState: {
+        ...preloadedState,
+        b2bFeatures: buildB2BFeaturesStateWith({ masqueradeCompany: { isAgenting: true } }),
+      },
+    });
+
+    expect(screen.getByText('Favorites are not available for this account.')).toBeInTheDocument();
+  });
+
+  it('shows the signed-out state when the storefront session has no customer', async () => {
+    server.use(
+      graphql.query('FavoritesLists', () => HttpResponse.json({ data: { customer: null } })),
+    );
+
+    const { user, navigation } = renderWithProviders(<Favorites />, { preloadedState });
+
+    expect(await screen.findByText('Sign in to see your favorites.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    expect(navigation).toHaveBeenCalledWith('/login');
+  });
+});
+
+describe('lists and rows', () => {
+  it('shows the empty state with a top-window shopping link when the customer has no lists', async () => {
+    mockLists([]);
+
+    renderWithProviders(<Favorites />, { preloadedState });
+
+    expect(
+      await screen.findByText('No favorites yet. Look for the star on any product to save it.'),
+    ).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: 'Start shopping' });
+    expect(link).toHaveAttribute('href', '/');
+    expect(link).toHaveAttribute('target', '_top');
+  });
+
+  it('renders lists as tabs and the selected list rows with image, name, SKU and price', async () => {
+    const variant = buildFavoriteVariantWith({
+      sku: 'VAR-77',
+      image_url: 'https://img.example/var.png',
+      bc_calculated_price: {
+        as_entered: 12.5,
+        tax_inclusive: 15,
+        tax_exclusive: 12.5,
+        entered_inclusive: false,
+      },
+    });
+    const product = buildFavoriteProductWith({ name: 'Slicker Brush', variants: [variant] });
+    const first = buildFavoriteListWith({
+      name: 'My Favorites',
+      items: [buildFavoriteItemWith({ productId: product.id, variantId: variant.variant_id })],
+    });
+    const second = buildFavoriteListWith({ name: 'Spring order', items: [] });
+    mockLists([first, second]);
+    mockProducts([product]);
+
+    renderWithProviders(<Favorites />, { preloadedState });
+
+    expect(await screen.findByRole('tab', { name: 'My Favorites (1)' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(screen.getByRole('tab', { name: 'Spring order (0)' })).toBeInTheDocument();
+
+    const row = await screen.findByRole('row', { name: /Slicker Brush/ });
+    expect(within(row).getByRole('presentation')).toHaveAttribute(
+      'src',
+      'https://img.example/var.png',
+    );
+    expect(within(row).getByText('VAR-77')).toBeInTheDocument();
+    expect(within(row).getByText('$12.50')).toBeInTheDocument();
+  });
+
+  it('shows the tax-inclusive price when the store displays inclusive prices', async () => {
+    const variant = buildFavoriteVariantWith({
+      bc_calculated_price: {
+        as_entered: 12.5,
+        tax_inclusive: 15,
+        tax_exclusive: 12.5,
+        entered_inclusive: false,
+      },
+    });
+    const product = buildFavoriteProductWith({ variants: [variant] });
+    mockLists([listWith(product)]);
+    mockProducts([product]);
+
+    renderWithProviders(<Favorites />, {
+      preloadedState: {
+        ...preloadedState,
+        global: buildGlobalStateWith({ showInclusiveTaxPrice: true }),
+      },
+    });
+
+    expect(await screen.findByText('$15.00')).toBeInTheDocument();
+  });
+
+  it('hides the price when the catalog hides it for this buyer', async () => {
+    const product = buildFavoriteProductWith({ name: 'Hidden Price Brush', isPriceHidden: true });
+    mockLists([listWith(product)]);
+    mockProducts([product]);
+
+    renderWithProviders(<Favorites />, { preloadedState });
+
+    const row = await screen.findByRole('row', { name: /Hidden Price Brush/ });
+    expect(within(row).queryByText(/\$/)).not.toBeInTheDocument();
+  });
+
+  it('selects the list named in the URL', async () => {
+    const first = buildFavoriteListWith({ name: 'First', items: [] });
+    const second = buildFavoriteListWith({ name: 'Second', items: [] });
+    mockLists([first, second]);
+
+    renderWithProviders(<Favorites />, {
+      preloadedState,
+      initialEntries: [`/favorites?list=${second.id}`],
+    });
+
+    expect(await screen.findByRole('tab', { name: 'Second (0)' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  });
+
+  it('falls back to the first list when the URL names an unknown list', async () => {
+    const first = buildFavoriteListWith({ name: 'First', items: [] });
+    const second = buildFavoriteListWith({ name: 'Second', items: [] });
+    mockLists([first, second]);
+
+    renderWithProviders(<Favorites />, {
+      preloadedState,
+      initialEntries: ['/favorites?list=999999'],
+    });
+
+    expect(await screen.findByRole('tab', { name: 'First (0)' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  });
+
+  it('switches lists through the URL when a tab is clicked', async () => {
+    const first = buildFavoriteListWith({ name: 'First', items: [] });
+    const second = buildFavoriteListWith({ name: 'Second', items: [] });
+    mockLists([first, second]);
+
+    const { user, navigation } = renderWithProviders(<Favorites />, { preloadedState });
+
+    await user.click(await screen.findByRole('tab', { name: 'Second (0)' }));
+
+    expect(navigation).toHaveBeenCalledWith(`/?list=${second.id}`);
+    expect(screen.getByRole('heading', { name: 'Second' })).toBeInTheDocument();
+  });
+
+  it('shows the empty-list message for a list with no items', async () => {
+    mockLists([buildFavoriteListWith({ items: [] })]);
+
+    renderWithProviders(<Favorites />, { preloadedState });
+
+    expect(await screen.findByText('This list is empty.')).toBeInTheDocument();
+  });
+
+  it('marks a favorite whose product is no longer in the catalog', async () => {
+    mockLists([buildFavoriteListWith({ items: [buildFavoriteItemWith('WHATEVER_VALUES')] })]);
+    mockProducts([]);
+
+    renderWithProviders(<Favorites />, { preloadedState });
+
+    expect(await screen.findByText('No longer available')).toBeInTheDocument();
+  });
+
+  it('keeps the page usable with placeholders when product details fail to load', async () => {
+    mockLists([listWith(buildFavoriteProductWith('WHATEVER_VALUES'))]);
+    server.use(
+      graphql.query('SearchProducts', () =>
+        HttpResponse.json({ errors: [{ message: 'B2B API down' }] }),
+      ),
+    );
+
+    renderWithProviders(<Favorites />, { preloadedState });
+
+    expect(
+      await screen.findByText("We couldn't load product details for your favorites."),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Product details unavailable')).toBeInTheDocument();
+  });
 });
