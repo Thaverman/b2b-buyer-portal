@@ -1,7 +1,7 @@
 # Favorites management UI (BigCommerce wishlists) — Design
 
 - **Date:** 2026-09-09
-- **Status:** Approved (brainstormed with THaverman, 2026-09-09)
+- **Status:** Implemented on branch `worktree-favorites-management-ui` (2026-09-09); sandbox live check pending (§12.4)
 - **Page:** `apps/storefront/src/pages/Favorites/` plus a thin storefront wishlist service
 - **Plan:** `docs/superpowers/plans/2026-09-09-favorites-management-ui.md`
 - **Interop partner:** the Stencil favorites star in the `LoveGroomers` theme repo
@@ -554,6 +554,26 @@ browser console with the portal's `bcGraphqlToken` and the session cookie):
 The portal pages both connections. The theme's contract query is unpaged and will truncate
 at BigCommerce's default page size once a list grows; this is relayed to the theme team
 (§15), not worked around in the portal.
+
+### 12.4 Verification and live check
+
+**Automated verification (2026-09-09, worktree branch, 14 commits over `dev` 112ddf8c):**
+
+| check | result |
+|---|---|
+| `yarn test --run src/pages/Favorites src/shared/service/bc/graphql/wishlist.test.ts src/shared/routeList.test.ts src/shared/routeList.platform.test.ts` | 9 files, 106 tests, all passing |
+| `yarn tsc --noEmit` | clean |
+| `yarn lint:dependencies` | no violations (714 modules); the former `src/utils/analytics.ts` orphan finding is gone now that it has a consumer |
+| `yarn lint:eslint` | only the pre-existing `ManageSubscriptions/index.tsx` findings (untouched by this branch) |
+| `yarn lint:knip` | only the pre-existing `BillingStateOption` export in `PaymentMethods/billingPrefill.ts` (untouched by this branch) |
+| `yarn build` | succeeds; `translation-template.csv` regenerated with 920 entries |
+
+Every new test was proven able to fail with a revert-and-rerun negative control; two tests
+were rewritten when the control showed them vacuous (the masquerading route test needed an
+otherwise-visible buyer, and the mutation-error service test needed to assert the message).
+
+**Live check on the SSW sandbox:** pending. Steps and expected outcomes are in the plan,
+Task 14 step 3; record results here when run.
 
 ### 12.3 Concurrent merge
 

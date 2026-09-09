@@ -6126,3 +6126,32 @@ export const useFavoriteActions = (customerId: number) => {
   };
 };
 ```
+
+## Execution notes (2026-09-09)
+
+Tasks 0–13 executed inline on the worktree branch `worktree-favorites-management-ui`
+(based on local `dev` 112ddf8c). Deviations from the task text, all reflected in the code:
+
+- **Task 0:** read and mutation round-trip both succeeded with the portal token; no fallback.
+- **Task 2 test:** `lists.map(rawList)` leaked the array index into `rawList`'s optional second
+  parameter, and `lastPage` inferred `endCursor: null`. The test now maps with an explicit
+  lambda and types `lastPage` as `{ hasNextPage: boolean; endCursor: string | null }`. The
+  mutation-error test asserts the message (`new WishlistError('Name too long')`); asserting
+  only the class was vacuous because an errors-only envelope also trips the "no data" check.
+- **Tasks 4, 5, 10, 11:** `MergeTarget`, `CartLineItem`, `SkipReason` and `RowActionsProps`
+  are module-internal (not exported) so knip stays clean.
+- **Task 6:** `searchProducts` returns the untyped `CustomFieldItems`; `fetchFavoriteProducts`
+  narrows it once with `as Promise<ProductsSearchPage>` at the call boundary.
+- **Task 7 test:** the masquerading route test was vacuous with a role-3 rep (hidden anyway by
+  the permissions list and the missing storefront config). It now uses an approved B2B buyer
+  with the storefront config loaded, so only the agenting term can hide the route.
+- **Task 9 test:** the create-list test waits for the dialog's MUI exit transition with
+  `waitFor` before asserting it is gone.
+- **Task 14:** ESLint and knip each report one pre-existing finding in files this branch never
+  touched (`ManageSubscriptions/index.tsx`, `PaymentMethods/billingPrefill.ts`); the
+  `analytics.ts` orphan finding is gone. Live check on the sandbox pending at hand-off.
+- **Worktree mechanics:** the worktree guard refuses compound shell commands that mix file
+  redirection or `cd` with package or version-control commands, and heredoc redirections.
+  Files were written with the Write tool or a single `python3` heredoc script; add-and-commit
+  chains were accepted. `node_modules` was symlinked from the main checkout at both the root
+  and `apps/storefront`.
