@@ -1,11 +1,37 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { useB3Lang } from '@/lib/lang';
-import { createWishlist, deleteWishlists, updateWishlistName } from '@/shared/service/bc';
+import {
+  addWishlistItems,
+  createWishlist,
+  deleteWishlistItems,
+  deleteWishlists,
+  updateWishlistName,
+  WishlistItemInput,
+} from '@/shared/service/bc';
 import { snackbar } from '@/utils/b3Tip';
 
-import { clearDefaultListId, getDefaultListId, invalidateListsCache } from './storage';
+import { trackAddToWishlist } from './analytics';
+import { FavoriteList, FavoriteRow, ItemRef, SaveToListsPlan } from './favorites';
+import {
+  clearDefaultListId,
+  getDefaultListId,
+  invalidateListsCache,
+  setDefaultListId,
+} from './storage';
 import { favoritesListsQueryKey } from './useFavoriteLists';
+
+export interface SaveToListsInput {
+  plan: SaveToListsPlan;
+  row: FavoriteRow;
+  /** Every list the dialog showed, including ones created inside it, so names resolve for toasts and GA4. */
+  lists: FavoriteList[];
+}
+
+const toWishlistItem = ({ productId, variantId }: ItemRef): WishlistItemInput =>
+  variantId === null
+    ? { productEntityId: productId }
+    : { productEntityId: productId, variantEntityId: variantId };
 
 /**
  * Every write the page makes. Each success drops the theme's session cache and refetches
@@ -58,7 +84,55 @@ export const useFavoriteActions = (customerId: number) => {
     onError,
   });
 
-  const isBusy = [createList, renameList, deleteList].some((mutation) => mutation.isPending);
+  const removeItem = useMutation({
+    mutationFn: ({ listId, itemId }: { listId: number; listName: string; itemId: number }) =>
+      deleteWishlistItems(listId, [itemId]),
+    onSuccess: (_, { listName }) => {
+      snackbar.success(b3Lang('favorites.item.removed', { list: listName }));
+      refresh();
+    },
+    onError,
+  });
 
-  return { createList, renameList, deleteList, isBusy };
+  const saveToLists = useMutation({
+    mutationFn: async ({ plan, row, lists }: SaveToListsInput) => {
+      const item = toWishlistItem(row.item);
+      await Promise.all(plan.adds.map(({ listId }) => addWishlistItems(listId, [item])));
+      await Promise.all(
+        plan.removes.map(({ listId, itemId }) => deleteWishlistItems(listId, [itemId])),
+      );
+      const addedTo = plan.adds.flatMap(({ listId }) => lists.filter((list) => list.id === listId));
+
+      return { addedTo, removedCount: plan.removes.length };
+    },
+    onSuccess: ({ addedTo, removedCount }, { row }) => {
+      const lastAdded = addedTo[addedTo.length - 1];
+
+      if (lastAdded) {
+        setDefaultListId(lastAdded.id);
+      }
+
+      addedTo.forEach((list) =>
+        trackAddToWishlist({
+          productId: row.item.productId,
+          variantId: row.item.variantId,
+          name: row.name,
+          listName: list.name,
+        }),
+      );
+      snackbar.success(
+        lastAdded && addedTo.length === 1 && removedCount === 0
+          ? b3Lang('favorites.picker.saved', { list: lastAdded.name })
+          : b3Lang('favorites.picker.updated'),
+      );
+      refresh();
+    },
+    onError,
+  });
+
+  const isBusy = [createList, renameList, deleteList, removeItem, saveToLists].some(
+    (mutation) => mutation.isPending,
+  );
+
+  return { createList, renameList, deleteList, removeItem, saveToLists, isBusy };
 };

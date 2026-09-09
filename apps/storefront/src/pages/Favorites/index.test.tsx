@@ -474,3 +474,199 @@ describe('list management', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });
+
+describe('remove and save to lists', () => {
+  const addItemsHandler = (received: ReturnType<typeof vi.fn>) =>
+    graphql.mutation('AddFavoritesItems', ({ variables }) => {
+      received(variables);
+
+      return HttpResponse.json({
+        data: { wishlist: { addWishlistItems: { result: { entityId: variables.listId } } } },
+      });
+    });
+
+  const deleteItemsHandler = (received: ReturnType<typeof vi.fn>) =>
+    graphql.mutation('DeleteFavoritesItems', ({ variables }) => {
+      received(variables);
+
+      return HttpResponse.json({
+        data: { wishlist: { deleteWishlistItems: { result: { entityId: variables.listId } } } },
+      });
+    });
+
+  it('removes an item and invalidates the theme cache', async () => {
+    const product = buildFavoriteProductWith({ name: 'Slicker Brush' });
+    const list = listWith(product);
+    const received = vi.fn();
+    window.sessionStorage.setItem('favorites_lists', '{"value":[],"expiry":1}');
+    mockLists([list]);
+    mockProducts([product]);
+    server.use(deleteItemsHandler(received));
+
+    const { user } = renderWithProviders(<Favorites />, { preloadedState });
+
+    const row = await screen.findByRole('row', { name: /Slicker Brush/ });
+    await user.click(within(row).getByRole('button', { name: 'Remove' }));
+
+    await waitFor(() =>
+      expect(received).toHaveBeenCalledWith({ listId: list.id, itemIds: [list.items[0].id] }),
+    );
+    expect(snackbar.success).toHaveBeenCalledWith('Removed from My Favorites');
+    expect(window.sessionStorage.getItem('favorites_lists')).toBeNull();
+  });
+
+  it('copies an item to another list from the save-to-lists dialog', async () => {
+    const variant = buildFavoriteVariantWith('WHATEVER_VALUES');
+    const product = buildFavoriteProductWith({ name: 'Slicker Brush', variants: [variant] });
+    const current = buildFavoriteListWith({
+      name: 'My Favorites',
+      items: [buildFavoriteItemWith({ productId: product.id, variantId: variant.variant_id })],
+    });
+    const other = buildFavoriteListWith({ name: 'Spring order', items: [] });
+    const received = vi.fn();
+    mockLists([current, other]);
+    mockProducts([product]);
+    server.use(addItemsHandler(received));
+
+    const { user } = renderWithProviders(<Favorites />, { preloadedState });
+
+    const row = await screen.findByRole('row', { name: /Slicker Brush/ });
+    await user.click(within(row).getByRole('button', { name: 'Save to lists' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Save Slicker Brush to lists' });
+    expect(within(dialog).getByRole('checkbox', { name: 'My Favorites' })).toBeChecked();
+    expect(within(dialog).getByRole('checkbox', { name: 'Spring order' })).not.toBeChecked();
+    expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled();
+
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Spring order' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(received).toHaveBeenCalledWith({
+        listId: other.id,
+        items: [{ productEntityId: product.id, variantEntityId: variant.variant_id }],
+      }),
+    );
+    expect(snackbar.success).toHaveBeenCalledWith('Saved to Spring order');
+    expect(window.localStorage.getItem('favorites_default_list')).toBe(String(other.id));
+    expect(window.dataLayer).toContainEqual({
+      event: 'add_to_wishlist',
+      ecommerce: {
+        items: [
+          {
+            item_id: String(product.id),
+            item_name: 'Slicker Brush',
+            item_variant: String(variant.variant_id),
+            item_list_name: 'Spring order',
+            quantity: 1,
+          },
+        ],
+      },
+    });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('moves an item by checking another list and unchecking the current one', async () => {
+    const product = buildFavoriteProductWith({ name: 'Slicker Brush' });
+    const current = listWith(product);
+    const other = buildFavoriteListWith({ name: 'Spring order', items: [] });
+    const added = vi.fn();
+    const deleted = vi.fn();
+    mockLists([current, other]);
+    mockProducts([product]);
+    server.use(addItemsHandler(added), deleteItemsHandler(deleted));
+
+    const { user } = renderWithProviders(<Favorites />, { preloadedState });
+
+    const row = await screen.findByRole('row', { name: /Slicker Brush/ });
+    await user.click(within(row).getByRole('button', { name: 'Save to lists' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Spring order' }));
+    await user.click(within(dialog).getByRole('checkbox', { name: 'My Favorites' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(added).toHaveBeenCalledWith({
+        listId: other.id,
+        items: [{ productEntityId: product.id }],
+      }),
+    );
+    expect(deleted).toHaveBeenCalledWith({ listId: current.id, itemIds: [current.items[0].id] });
+    expect(snackbar.success).toHaveBeenCalledWith('Favorites updated');
+  });
+
+  it('warns that unchecking every list removes the product, then removes it on save', async () => {
+    const product = buildFavoriteProductWith({ name: 'Slicker Brush' });
+    const current = listWith(product);
+    const added = vi.fn();
+    const deleted = vi.fn();
+    mockLists([current]);
+    mockProducts([product]);
+    server.use(addItemsHandler(added), deleteItemsHandler(deleted));
+
+    const { user } = renderWithProviders(<Favorites />, { preloadedState });
+
+    const row = await screen.findByRole('row', { name: /Slicker Brush/ });
+    await user.click(within(row).getByRole('button', { name: 'Save to lists' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('checkbox', { name: 'My Favorites' }));
+
+    expect(
+      within(dialog).getByText('Unchecking every list removes this product from your favorites.'),
+    ).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(deleted).toHaveBeenCalledWith({ listId: current.id, itemIds: [current.items[0].id] }),
+    );
+    expect(added).not.toHaveBeenCalled();
+  });
+
+  it('creates a new list from the dialog, pre-checks it, and saves into it', async () => {
+    const product = buildFavoriteProductWith({ name: 'Slicker Brush' });
+    const current = listWith(product);
+    const created = buildFavoriteListWith({ name: 'Gift ideas', items: [] });
+    const createReceived = vi.fn();
+    const added = vi.fn();
+    let lists = [current];
+    server.use(
+      graphql.query('FavoritesLists', () =>
+        HttpResponse.json({ data: { customer: { wishlists: connection(lists.map(rawList)) } } }),
+      ),
+      graphql.mutation('CreateFavoritesList', ({ variables }) => {
+        createReceived(variables);
+        lists = [current, created];
+
+        return HttpResponse.json({
+          data: {
+            wishlist: { createWishlist: { result: { entityId: created.id, name: created.name } } },
+          },
+        });
+      }),
+      addItemsHandler(added),
+    );
+    mockProducts([product]);
+
+    const { user } = renderWithProviders(<Favorites />, { preloadedState });
+
+    const row = await screen.findByRole('row', { name: /Slicker Brush/ });
+    await user.click(within(row).getByRole('button', { name: 'Save to lists' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByRole('textbox', { name: 'New list name' }), 'Gift ideas');
+    await user.click(within(dialog).getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => expect(createReceived).toHaveBeenCalledWith({ name: 'Gift ideas' }));
+    expect(await within(dialog).findByRole('checkbox', { name: 'Gift ideas' })).toBeChecked();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(added).toHaveBeenCalledWith({
+        listId: created.id,
+        items: [{ productEntityId: product.id }],
+      }),
+    );
+    expect(snackbar.success).toHaveBeenCalledWith('Saved to Gift ideas');
+  });
+});

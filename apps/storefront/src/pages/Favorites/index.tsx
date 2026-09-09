@@ -12,9 +12,10 @@ import FavoriteItemsTable from './components/FavoriteItemsTable';
 import ListNameDialog from './components/ListNameDialog';
 import ListTabs from './components/ListTabs';
 import ListToolbar from './components/ListToolbar';
+import SaveToListsDialog from './components/SaveToListsDialog';
 import { isFavoritesAvailable } from './api';
-import { FavoriteList, hydrateRows } from './favorites';
-import { useFavoriteActions } from './useFavoriteActions';
+import { FavoriteList, FavoriteRow, hydrateRows } from './favorites';
+import { SaveToListsInput, useFavoriteActions } from './useFavoriteActions';
 import { useFavoriteLists } from './useFavoriteLists';
 import { useFavoriteProducts } from './useFavoriteProducts';
 
@@ -54,6 +55,7 @@ function Favorites() {
   const actions = useFavoriteActions(customerId);
   const [nameDialog, setNameDialog] = useState<NameDialogState | null>(null);
   const [pendingDelete, setPendingDelete] = useState<FavoriteList | null>(null);
+  const [pickerRow, setPickerRow] = useState<FavoriteRow | null>(null);
 
   const selectListId = (listId: number) =>
     setSearchParams({ list: String(listId) }, { replace: true });
@@ -87,6 +89,15 @@ function Favorites() {
       }
     } catch {
       // toasted by the actions hook
+    }
+  };
+
+  const handleSaveToLists = async (input: SaveToListsInput) => {
+    try {
+      await actions.saveToLists.mutateAsync(input);
+      setPickerRow(null);
+    } catch {
+      // toasted by the actions hook; keep the picker open
     }
   };
 
@@ -144,7 +155,19 @@ function Favorites() {
             {rows.length === 0 ? (
               <Typography>{b3Lang('favorites.empty.list')}</Typography>
             ) : (
-              <FavoriteItemsTable rows={rows} productsFailed={productsFailed} />
+              <FavoriteItemsTable
+                rows={rows}
+                productsFailed={productsFailed}
+                disabled={actions.isBusy}
+                onSaveToLists={setPickerRow}
+                onRemove={(row) =>
+                  actions.removeItem.mutate({
+                    listId: selectedList.id,
+                    listName: selectedList.name,
+                    itemId: row.item.id,
+                  })
+                }
+              />
             )}
           </>
         )}
@@ -187,6 +210,14 @@ function Favorites() {
             : ''}
         </Typography>
       </B3Dialog>
+      <SaveToListsDialog
+        row={pickerRow}
+        lists={lists}
+        loading={actions.saveToLists.isPending}
+        onCancel={() => setPickerRow(null)}
+        onSave={handleSaveToLists}
+        onCreateList={(name) => actions.createList.mutateAsync(name)}
+      />
     </B3Spin>
   );
 }
