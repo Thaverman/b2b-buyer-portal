@@ -94,6 +94,13 @@ const legacyPermissions = {
     CustomerRole.B2C,
     CustomerRole.SUPER_ADMIN_BEFORE_AGENCY,
   ],
+  favoritesPermissions: [
+    CustomerRole.ADMIN,
+    CustomerRole.SENIOR_BUYER,
+    CustomerRole.JUNIOR_BUYER,
+    CustomerRole.CUSTOM_ROLE,
+    CustomerRole.B2C,
+  ],
   companyHierarchyPermissions: [
     CustomerRole.ADMIN,
     CustomerRole.SENIOR_BUYER,

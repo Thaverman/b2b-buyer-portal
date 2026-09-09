@@ -50,6 +50,7 @@ const {
   accountSettingPermissions,
   companyHierarchyPermissions,
   quoteDetailPermissions,
+  favoritesPermissions,
 } = legacyPermissions;
 
 const {
@@ -135,6 +136,15 @@ export const routeList: (BuyerPortalRoute | RouteItem)[] = [
     permissionCodes: shoppingListsPermissionCodes,
     isTokenLogin: true,
     idLang: 'global.navMenu.shoppingLists',
+  },
+  {
+    path: '/favorites',
+    name: 'Favorites',
+    wsKey: 'favorites',
+    isMenuItem: true,
+    permissions: favoritesPermissions,
+    isTokenLogin: true,
+    idLang: 'global.navMenu.favorites',
   },
   {
     path: '/purchased-products',
@@ -313,6 +323,16 @@ export const getAllowedRoutesWithoutComponent = (globalState: GlobalState): Buye
         !window.BC_CONTEXT?.loyalty ||
         isAgenting ||
         isLoyaltyEntitled === false)
+    ) {
+      return false;
+    }
+
+    // /favorites is Stencil-only, host-configured, and hidden while agenting — the storefront
+    // session cookie identifies the logged-in rep, not the masqueraded buyer. Mirrors
+    // isFavoritesAvailable() in src/pages/Favorites/api.ts; keep the two in sync.
+    if (
+      path === '/favorites' &&
+      (platform !== 'bigcommerce' || !window.BC_CONTEXT?.favorites?.enabled || isAgenting)
     ) {
       return false;
     }

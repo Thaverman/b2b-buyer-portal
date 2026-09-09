@@ -1,8 +1,9 @@
 import { buildCompanyStateWith, builder } from 'tests/test-utils';
 
 import { GlobalState, initState } from '@/shared/global/context/config';
-import { store } from '@/store';
-import { setCustomerInfo } from '@/store/slices/company';
+import { setMasqueradeCompany, store } from '@/store';
+import { setCompanyInfo, setCustomerInfo } from '@/store/slices/company';
+import { CompanyStatus, CustomerRole, UserTypes } from '@/types';
 
 import { getAllowedRoutesWithoutComponent, isNativePaymentMethodsPage } from './routeList';
 
@@ -88,5 +89,80 @@ describe('isNativePaymentMethodsPage', () => {
 
     setUrl('/account.php');
     expect(isNativePaymentMethodsPage()).toBe(false);
+  });
+});
+
+describe('/favorites', () => {
+  const hasFavoritesRoute = (globalState = buildGlobalStateWith({})) =>
+    getAllowedRoutesWithoutComponent(globalState).some((route) => route.path === '/favorites');
+
+  const primeCustomerRole = (role: CustomerRole, userType = UserTypes.B2C) => {
+    const { customer } = buildCompanyStateWith({});
+    store.dispatch(setCustomerInfo({ ...customer, role, userType }));
+  };
+
+  const setAgenting = (isAgenting: boolean) =>
+    store.dispatch(
+      setMasqueradeCompany({
+        masqueradeCompany: { id: 0, isAgenting, companyName: '', customerGroupId: 0 },
+      }),
+    );
+
+  beforeEach(() => {
+    window.BC_CONTEXT = { favorites: { enabled: true } };
+    setAgenting(false);
+  });
+
+  it('offers the route to a B2C customer when the host enables favorites', () => {
+    primeCustomerRole(CustomerRole.B2C);
+
+    expect(hasFavoritesRoute()).toBe(true);
+  });
+
+  it('offers the route to a B2B buyer of an approved company', () => {
+    primeCustomerRole(CustomerRole.ADMIN, UserTypes.MULTIPLE_B2C);
+    store.dispatch(
+      setCompanyInfo({ id: '1', companyName: 'Acme', status: CompanyStatus.APPROVED }),
+    );
+    // B2B routes are only offered once the storefront config has loaded.
+    const loadedConfig = buildGlobalStateWith({
+      storefrontConfig: { shoppingLists: true, tradeProfessionalApplication: false },
+    });
+
+    expect(hasFavoritesRoute(loadedConfig)).toBe(true);
+  });
+
+  it('withholds the route when the host has no favorites config', () => {
+    delete window.BC_CONTEXT;
+    primeCustomerRole(CustomerRole.B2C);
+
+    expect(hasFavoritesRoute()).toBe(false);
+  });
+
+  it('withholds the route when the host disables favorites', () => {
+    window.BC_CONTEXT = { favorites: { enabled: false } };
+    primeCustomerRole(CustomerRole.B2C);
+
+    expect(hasFavoritesRoute()).toBe(false);
+  });
+
+  // Same setup as the approved-buyer case above, so only the agenting term can hide the route.
+  it('withholds the route while a sales rep is masquerading as a buyer who could see it', () => {
+    primeCustomerRole(CustomerRole.ADMIN, UserTypes.MULTIPLE_B2C);
+    store.dispatch(
+      setCompanyInfo({ id: '1', companyName: 'Acme', status: CompanyStatus.APPROVED }),
+    );
+    const loadedConfig = buildGlobalStateWith({
+      storefrontConfig: { shoppingLists: true, tradeProfessionalApplication: false },
+    });
+    setAgenting(true);
+
+    expect(hasFavoritesRoute(loadedConfig)).toBe(false);
+  });
+
+  it('withholds the route from a sales rep who is not masquerading', () => {
+    primeCustomerRole(CustomerRole.SUPER_ADMIN, UserTypes.B2B_SUPER_ADMIN);
+
+    expect(hasFavoritesRoute()).toBe(false);
   });
 });
