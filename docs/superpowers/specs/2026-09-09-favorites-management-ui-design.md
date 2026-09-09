@@ -1,7 +1,7 @@
 # Favorites management UI (BigCommerce wishlists) — Design
 
 - **Date:** 2026-09-09
-- **Status:** Implemented on branch `worktree-favorites-management-ui` (2026-09-09); sandbox live check pending (§12.4)
+- **Status:** Merged to local `dev` (2026-09-09, fast-forward after rebasing onto b89418b5); sandbox live check pending (§12.4)
 - **Page:** `apps/storefront/src/pages/Favorites/` plus a thin storefront wishlist service
 - **Plan:** `docs/superpowers/plans/2026-09-09-favorites-management-ui.md`
 - **Interop partner:** the Stencil favorites star in the `LoveGroomers` theme repo
@@ -572,6 +572,11 @@ at BigCommerce's default page size once a list grows; this is relayed to the the
 Every new test was proven able to fail with a revert-and-rerun negative control; two tests
 were rewritten when the control showed them vacuous (the masquerading route test needed an
 otherwise-visible buyer, and the mutation-error service test needed to assert the message).
+
+**Merged result (2026-09-09):** rebased onto `dev` b89418b5 (the registration prefill commit)
+and fast-forwarded; `tsc --noEmit` clean; the scoped suites plus `PaymentMethods` and
+`Registered` pass (202 of 204 under a 19-file parallel run, and the two `Registered` failures
+pass 12 of 12 in isolation, so they were load flakiness).
 
 **Live check on the SSW sandbox:** pending. Steps and expected outcomes are in the plan,
 Task 14 step 3; record results here when run.
