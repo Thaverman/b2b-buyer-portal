@@ -3,6 +3,7 @@
 - **Date:** 2026-09-09
 - **Status:** Approved (brainstormed with THaverman, 2026-09-09)
 - **Page:** `apps/storefront/src/pages/Favorites/` plus a thin storefront wishlist service
+- **Plan:** `docs/superpowers/plans/2026-09-09-favorites-management-ui.md`
 - **Interop partner:** the Stencil favorites star in the `LoveGroomers` theme repo
   (`docs/superpowers/specs/2026-09-08-favorites-star-design.md`, code under
   `assets/js/theme/f/favorites/`). This document restates the parts of that contract the
@@ -148,10 +149,13 @@ The route filter cannot import from a page folder, so the condition is duplicate
 
 Inserted directly after the `/shoppingLists` entry (menu order follows array order).
 `favoritesPermissions` is added to `legacyPermissions` in `src/shared/routes/config.ts`:
-`[ADMIN, SENIOR_BUYER, JUNIOR_BUYER, CUSTOM_ROLE, B2C]`. Guests (100) and sales reps
-(3 and 4) are excluded; with the existing filter logic that hides the menu item for guests,
-for reps not agenting (the `permissions.includes(4)` branch) and for reps agenting (role 3 is
-not in the list, and the explicit clause above also fires).
+`[ADMIN, SENIOR_BUYER, JUNIOR_BUYER, CUSTOM_ROLE, B2C]`. Sales reps (3 and 4) are excluded:
+a rep who is not agenting hits the `permissions.includes(4)` branch, and an agenting rep
+(role 3) is caught by the explicit clause above and by 3 not being in the list. Guests are
+not listed either, but the filter's non-B2B branch tests the B2C permission regardless of the
+actual role; that is fine, because guests never reach the portal layout (it redirects them to
+login) and the nav's guest click handler prompts registration, exactly as for every other
+B2C-permitted route. No guest-specific clause is needed.
 
 `src/shared/routes/index.tsx` gains `const Favorites = lazy(() => import('@/pages/Favorites'))`
 and `'/favorites': Favorites` in `routesMap`. The layout auto-titles the page from the route's
@@ -168,36 +172,45 @@ up history entries.
 
 ```
 apps/storefront/src/
-├── shared/service/bc/graphql/wishlist.ts        # 6 storefront operations, paged, typed
+├── index.d.ts                                   # + BC_CONTEXT.favorites
+├── shared/service/bc/graphql/wishlist.ts        # 6 storefront operations, paged, typed, errors checked
 ├── shared/service/bc/graphql/wishlist.test.ts   # MSW tests for the service
 ├── shared/service/bc/index.ts                   # + wishlist exports
 ├── shared/routeList.ts                          # + route entry + gate clause
+├── shared/routeList.test.ts                     # + /favorites gate matrix
+├── shared/routeList.platform.test.ts            # /favorites hidden on non-bigcommerce platforms
 ├── shared/routes/config.ts                      # + favoritesPermissions
 ├── shared/routes/index.tsx                      # + lazy Favorites in routesMap
-├── index.d.ts                                   # + BC_CONTEXT.favorites
 ├── lib/lang/locales/en.json                     # + global.navMenu.favorites, favorites.*
 └── pages/Favorites/
-    ├── index.tsx                  # gate, queries, URL list selection, merge trigger, layout
+    ├── index.tsx                  # gate, queries, URL list selection, merge trigger, dialogs
     ├── index.test.tsx             # desktop integration tests
-    ├── index.mobile.test.tsx      # mobile card layout tests
+    ├── index.mobile.test.tsx      # mobile card layout test
+    ├── index.platform.test.tsx    # unavailable on non-bigcommerce platforms
     ├── api.ts                     # isFavoritesAvailable, fetchFavoriteProducts (chunked)
     ├── api.test.ts
     ├── storage.ts                 # theme storage-contract adapter (the ONLY web-storage code)
     ├── storage.test.ts
-    ├── favorites.ts               # pure: normalizeLists, planSaveToLists, planGuestMerge,
-    │                              #       planAddToCart, hydrateRows, itemKey
+    ├── favorites.ts               # pure: normalizeLists, itemKey, membership, planSaveToLists,
+    │                              #       isEmptyPlan, planGuestMerge, hydrateRows, planAddToCart
     ├── favorites.test.ts
     ├── analytics.ts               # trackAddToWishlist → pushDataLayerEvent
-    ├── useFavoriteLists.ts        # lists query + mutations (invalidate cache key + query)
+    ├── useFavoriteLists.ts        # lists query (+ query key)
     ├── useFavoriteProducts.ts     # products query keyed by the id set
+    ├── useFavoriteActions.ts      # every mutation: toasts, GA4, cache invalidation
     └── components/
-        ├── ListTabs.tsx           # MUI Tabs, one per list, "+ New list" button
+        ├── EmptyState.tsx
+        ├── ListTabs.tsx           # MUI Tabs, one per list
         ├── ListToolbar.tsx        # list name + Rename / Delete list / Add all to cart
+        ├── ProductSummary.tsx     # image + name + unavailable chip (table and card)
+        ├── RowActions.tsx         # Add to cart / Choose options / Save to lists / Remove
         ├── FavoriteItemsTable.tsx # desktop rows
         ├── FavoriteItemCard.tsx   # mobile card
-        ├── SaveToListsDialog.tsx  # the picker
         ├── ListNameDialog.tsx     # create / rename (one component, two modes)
-        └── EmptyState.tsx
+        └── SaveToListsDialog.tsx  # the picker
+apps/storefront/tests/
+├── favoritesBuilders/index.ts                   # builders shared by the favorites tests
+└── test-utils.tsx                               # + export * from 'tests/favoritesBuilders'
 ```
 
 Division of ownership: `storefront-shared` owns everything under `shared/` and `index.d.ts`;
@@ -274,9 +287,9 @@ mutation DeleteFavoritesLists($listIds: [Int!]!) {
 | `getCustomerWishlists(): Promise<WishlistNode[] \| null>` | Pages `wishlists` with cursors; for any list whose `items.pageInfo.hasNextPage` is true, pages `FavoritesListItems` until complete. Returns `null` when `data.customer` is `null` (signed out). |
 | `createWishlist(name)` | returns `{ entityId, name }` |
 | `updateWishlistName(listId, name)` | returns `{ entityId, name }` |
-| `addWishlistItems(listId, items: { productEntityId: number; variantEntityId?: number }[])` | returns `{ entityId }` |
-| `deleteWishlistItems(listId, itemEntityIds: number[])` | returns `{ entityId }` |
-| `deleteWishlists(listIds: number[])` | returns `void` |
+| `addWishlistItems(listId, items: { productEntityId: number; variantEntityId?: number }[])` | resolves to `void` |
+| `deleteWishlistItems(listId, itemIds: number[])` | resolves to `void` |
+| `deleteWishlists(listIds: number[])` | resolves to `void` |
 
 Any response with a non-empty `errors` array, or a missing `data` payload, throws
 `WishlistError` (a plain `Error` subclass carrying the first GraphQL message). Types are
@@ -325,19 +338,21 @@ type ItemRef = { productId: number; variantId: number | null };
   key are adds; lists containing the key but not in `selected` are removes. Empty `selected`
   therefore removes the product from every list.
 - `planGuestMerge({ guest, lists, defaultListId })` →
-  `{ target: { kind: 'existing'; listId; name } | { kind: 'create'; name: 'My Favorites' }; rows: ItemRef[] } | null`.
-  Target is the default list **if it exists in `lists`**, else the first list, else create.
+  `{ target: { kind: 'existing'; listId; name } | { kind: 'create' }; rows: ItemRef[] } | null`.
+  Target is the default list **if it exists in `lists`**, else the first list, else create
+  (the caller names the new list with the `favorites.defaultListName` copy, "My Favorites").
   `rows` are guest rows whose key is absent from the target (de-duplicated among
   themselves). When `guest` is empty the plan is `null`. When `guest` is non-empty but every
   row is already in the target, the plan has `rows: []`; the caller then clears the guest
   store without calling the API and shows no toast.
 - `planAddToCart(rows: FavoriteRow[])` →
-  `{ lineItems: LineItem[]; skipped: { row; reason: 'optionsRequired' | 'notPurchasable' | 'unavailable' }[] }`.
-  Per row: unavailable → skipped; `requiresOptions` → skipped; variant `purchasing_disabled`
-  → skipped; otherwise `{ productEntityId, variantEntityId, quantity }` with
-  `variantEntityId` = the saved variant id, or the product's first variant id for an
-  option-less product (as the product-search dialog does), and
-  `quantity = max(1, orderQuantityMinimum || 1)`.
+  `{ lineItems: CartLineItem[]; skipped: { row; reason: 'optionsRequired' | 'notPurchasable' | 'unavailable' }[] }`.
+  Per row: unavailable (including a product with no variant at all) → skipped;
+  `requiresOptions` → skipped; variant `purchasing_disabled` → skipped; otherwise
+  `{ productId, variantId, quantity, newSelectOptionList: [] }`, the shape
+  `createOrUpdateExistingCart` reads, with `variantId` = the saved variant id, or the
+  product's first variant id for an option-less product (as the product-search dialog does),
+  and `quantity = max(1, orderQuantityMinimum || 1)`.
 - `hydrateRows(list, productsById, { showInclusiveTaxPrice })` → `FavoriteRow[]`, joining
   each item with its `productsSearch` product:
   - `available`: product present and, when a variant is saved, that variant present.
@@ -345,8 +360,8 @@ type ItemRef = { productId: number; variantId: number | null };
   - `imageUrl`: the saved variant's `image_url`, else the product `imageUrl`, else the
     portal's default product image.
   - `price`: the saved variant's `bc_calculated_price.tax_inclusive` or `tax_exclusive` per
-    the setting, else the first variant's; `null` when `isPriceHidden` applies per the same
-    `judgmentBuyerProduct` rule `B3ProductList` uses for shopping lists.
+    the setting, else the first variant's; `null` when the catalog flags `isPriceHidden` for
+    this buyer.
   - `requiresOptions`: any modifier is required, **or** no variant is saved and the product
     has options.
   - `purchasable`: the resolved variant is not `purchasing_disabled`.
@@ -398,7 +413,7 @@ Quick Order card style — image left; name, SKU and price stacked; actions bene
 | zero lists | `favorites.empty.noLists` + "Start shopping" link (`href="/"`, `target="_top"`) + New list button |
 | selected list has zero items | `favorites.empty.list` |
 | loading | portal `B3Spin` over the content until lists **and** products settle |
-| products query failed | rows render `favorites.item.detailsUnavailable`, cart actions disabled, one `favorites.error.products` toast; list-level and remove/save actions keep working |
+| products query failed | rows render `favorites.item.detailsUnavailable` with no cart action, and an inline error alert with `favorites.error.products` sits above the rows (no extra toast: the B2B client already toasts its own message); list-level and remove/save actions keep working |
 
 ### 10.3 Flows
 
@@ -506,7 +521,8 @@ trackAddToWishlist({ productId, variantId, name, listName }) =>
 ```
 
 Fired once per item for every successful add: save-to-lists adds (copy and move alike) and
-merge rows. **Assumption to confirm with the theme team:** `item_id` is the product id and
+merge rows (merge rows carry no `item_name`, since they are saved before the catalog is
+loaded). **Assumption to confirm with the theme team:** `item_id` is the product id and
 `item_variant` the variant id, as the star's `data-product-id` / `data-variant-id`
 attributes expose; if the theme sends SKUs, the portal matches the theme.
 
@@ -581,9 +597,10 @@ repo's record of vacuous tests. No `act`, no hardcoded data, use-case-named `it`
   "My Favorites" when there are no lists, adds only missing rows, clears the store, plural
   toast; merge failure leaves the store; signed-out state; unavailable state when agenting.
 - **`index.mobile.test.tsx`** — cards render name, SKU, price and actions.
-- **`routeList.test.ts`** — `/favorites` visible for B2B roles and B2C with the flag on;
-  hidden when the flag is absent, `enabled:false`, platform is not `bigcommerce`, agenting,
-  guest, or sales rep.
+- **`routeList.test.ts`** — `/favorites` visible for a B2C customer and for a B2B buyer of
+  an approved company with the flag on; hidden when the flag is absent, `enabled:false`,
+  agenting, or the customer is a sales rep. **`routeList.platform.test.ts`** — hidden on a
+  non-`bigcommerce` platform (its own file because the platform mock is module-wide).
 
 ## 15. Theme-side asks (relay to the LoveGroomers team)
 
