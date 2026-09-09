@@ -891,9 +891,9 @@ type RegistrationData = {
   password: Record<string, string>;
 };
 
-async function completeRegistration(
+async function fillAccountStep(
   user: ReturnType<typeof renderWithProviders>['user'],
-  { accountType, contactInfo, businessDetails, address, password }: RegistrationData,
+  { accountType, contactInfo }: Pick<RegistrationData, 'accountType' | 'contactInfo'>,
 ) {
   // Step 1: Account type selection
   await user.click(screen.getByLabelText(accountType));
@@ -921,6 +921,13 @@ async function completeRegistration(
     await user.click(screen.getByLabelText(/Email me special promotions and updates/i));
   }
   await user.click(screen.getByRole('button', { name: 'Continue' }));
+}
+
+async function completeRegistration(
+  user: ReturnType<typeof renderWithProviders>['user'],
+  { accountType, contactInfo, businessDetails, address, password }: RegistrationData,
+) {
+  await fillAccountStep(user, { accountType, contactInfo });
 
   // Step 2: Business Details (B2B only)
   if (businessDetails) {
@@ -946,16 +953,21 @@ async function completeRegistration(
   }
 
   // Step 3: Address
+  // These four are prefilled from the account step, so clear before typing an override.
   if (address['First Name']) {
+    await user.clear(screen.getByLabelText(/First Name/i));
     await user.type(screen.getByLabelText(/First Name/i), address['First Name'] as string);
   }
   if (address['Last Name']) {
+    await user.clear(screen.getByLabelText(/Last Name/i));
     await user.type(screen.getByLabelText(/Last Name/i), address['Last Name'] as string);
   }
   if (address['Company Name']) {
+    await user.clear(screen.getByLabelText(/Company Name/i));
     await user.type(screen.getByLabelText(/Company Name/i), address['Company Name'] as string);
   }
   if (address['Phone Number']) {
+    await user.clear(screen.getByLabelText(/Phone Number/i));
     await user.type(screen.getByLabelText(/Phone Number/i), address['Phone Number'] as string);
   }
   if (address['Address Line 1'] || address['Address 1']) {
@@ -1103,6 +1115,52 @@ describe('Registered Page', () => {
     await waitFor(() => {
       expect(navigation).toHaveBeenCalledWith(expect.stringMatching(/\/orders/i));
     });
+  });
+
+  it('prefills the address step with the name, company and phone from the account step', async () => {
+    const { user } = renderWithProviders(
+      <RegisteredProvider>
+        <Registered setOpenPage={vi.fn()} />
+      </RegisteredProvider>,
+      { preloadedState: preloadedStateB2bCompanyCreate },
+    );
+
+    await fillAccountStep(user, mockRegistrationData.b2c);
+
+    expect(screen.getByLabelText(/First Name/i)).toHaveValue(
+      mockRegistrationData.b2c.contactInfo['First Name'],
+    );
+    expect(screen.getByLabelText(/Last Name/i)).toHaveValue(
+      mockRegistrationData.b2c.contactInfo['Last Name'],
+    );
+    expect(screen.getByLabelText(/Company Name/i)).toHaveValue(
+      mockRegistrationData.b2c.contactInfo['Company Name'],
+    );
+    expect(screen.getByLabelText(/Phone Number/i)).toHaveValue(
+      mockRegistrationData.b2c.contactInfo['Phone Number'],
+    );
+  });
+
+  it('keeps an address value the buyer typed when they go back and change the account step', async () => {
+    const { user } = renderWithProviders(
+      <RegisteredProvider>
+        <Registered setOpenPage={vi.fn()} />
+      </RegisteredProvider>,
+      { preloadedState: preloadedStateB2bCompanyCreate },
+    );
+
+    await fillAccountStep(user, mockRegistrationData.b2c);
+
+    await user.clear(screen.getByLabelText(/First Name/i));
+    await user.type(screen.getByLabelText(/First Name/i), 'Tom');
+
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+
+    await user.clear(screen.getByLabelText(/First Name/i));
+    await user.type(screen.getByLabelText(/First Name/i), 'Jane');
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+
+    expect(screen.getByLabelText(/First Name/i)).toHaveValue('Tom');
   });
 
   it('renders and completes Business (B2B) registration flow with auto approval', async () => {

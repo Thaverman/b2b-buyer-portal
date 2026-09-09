@@ -110,12 +110,7 @@ function PaymentMethods() {
   });
 
   if (!isAvailable) {
-    return (
-      <Box>
-        <Typography variant="h4">{b3Lang('paymentMethods.title')}</Typography>
-        <Typography sx={{ mt: 2 }}>{b3Lang('paymentMethods.unavailable')}</Typography>
-      </Box>
-    );
+    return <Typography>{b3Lang('paymentMethods.unavailable')}</Typography>;
   }
 
   const isSessionExpired = error instanceof PaymentMethodsError && error.kind === 'sessionExpired';
@@ -124,9 +119,6 @@ function PaymentMethods() {
   return (
     <B3Spin isSpinning={isFetching}>
       <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, width: '100%' }}>
-        <Typography variant="h4" sx={{ mb: 3 }}>
-          {b3Lang('paymentMethods.title')}
-        </Typography>
         {isSessionExpired && (
           <Alert severity="warning">{b3Lang('paymentMethods.sessionExpired')}</Alert>
         )}

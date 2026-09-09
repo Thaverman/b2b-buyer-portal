@@ -194,6 +194,17 @@ it('shows the empty state when the customer has no saved cards', async () => {
   ).toBeInTheDocument();
 });
 
+it('leaves the page title to the layout header instead of rendering its own', async () => {
+  mockJwt();
+  mockList([]);
+
+  renderWithProviders(<PaymentMethods />);
+
+  await screen.findByText('You have no saved cards. Cards can be saved during checkout.');
+
+  expect(screen.queryByRole('heading', { name: 'Payment methods' })).not.toBeInTheDocument();
+});
+
 it('shows the session-expired state when the jwt fetch fails', async () => {
   server.use(http.get(currentJwtUrl, () => HttpResponse.text('{"errors":[]}', { status: 401 })));
 
@@ -229,6 +240,7 @@ it('shows the unavailable state when BC_CONTEXT is not configured', () => {
   renderWithProviders(<PaymentMethods />);
 
   expect(screen.getByText('Payment methods are not available.')).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Payment methods' })).not.toBeInTheDocument();
 });
 
 it('shows the unavailable state while a sales rep is masquerading', () => {

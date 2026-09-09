@@ -22,6 +22,8 @@ import { RegisterFields } from '../../types';
 import { PrimaryButton } from '../PrimaryButton';
 import { InformationFourLabels, TipContent } from '../styled';
 
+import { prefillAddressFromContact } from './prefillAddressFromContact';
+
 interface AccountStepProps {
   handleNext: (email: string) => void;
 }
@@ -49,6 +51,8 @@ export default function AccountStep({ handleNext }: AccountStepProps) {
     additionalInformation,
     bcContactInformation,
     bcAdditionalInformation,
+    addressBasicFields = [],
+    bcAddressBasicFields = [],
   } = state;
 
   const {
@@ -79,6 +83,9 @@ export default function AccountStep({ handleNext }: AccountStepProps) {
   const contactInfo: RegisterFields[] =
     accountType === '1' ? (newContactInformation ?? []) : bcContactInformation || [];
   const contactName = accountType === '1' ? 'contactInformation' : 'bcContactInformationFields';
+
+  const addressBasicName = accountType === '1' ? 'addressBasicFields' : 'bcAddressBasicFields';
+  const addressBasicList = accountType === '1' ? addressBasicFields : bcAddressBasicFields;
 
   const contactInformationLabel = contactInfo.length ? contactInfo[0]?.groupName : '';
 
@@ -220,6 +227,7 @@ export default function AccountStep({ handleNext }: AccountStepProps) {
         payload: {
           [additionName]: [...newAdditionalInformation],
           [contactName]: [...newContactInfo],
+          [addressBasicName]: prefillAddressFromContact(newContactInfo, addressBasicList),
         },
       });
       handleNext(data[emailName]);
