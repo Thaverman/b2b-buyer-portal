@@ -5,13 +5,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import B3Dialog from '@/components/B3Dialog';
 import B3Spin from '@/components/spin/B3Spin';
 import { useB3Lang } from '@/lib/lang';
+import { PageProps } from '@/pages/PageProps';
 import { useAppSelector } from '@/store';
 import { snackbar } from '@/utils/b3Tip';
 
+import AddPaymentMethodBraintreeDialog from './components/AddPaymentMethodBraintreeDialog';
 import AddPaymentMethodDialog from './components/AddPaymentMethodDialog';
 import PaymentMethodRow from './components/PaymentMethodRow';
 import {
   deleteStoredInstrument,
+  getBraintreeClientToken,
   isPaymentMethodsAvailable,
   listStoredInstruments,
   PaymentMethodsError,
@@ -21,7 +24,15 @@ import {
 import { hasActiveCart } from './cartPresence';
 import { getVaultAccess, NATIVE_ADD_PAYMENT_METHOD_PATH } from './vaultAccess';
 
-function PaymentMethods() {
+export type AddCardVariant = 'hostedForm' | 'braintree';
+
+// Intersected with PageProps because routesMap is typed as components taking PageProps,
+// and a props type with no properties in common trips TypeScript's weak-type check.
+type PaymentMethodsProps = Partial<PageProps> & {
+  variant?: AddCardVariant;
+};
+
+function PaymentMethods({ variant = 'hostedForm' }: PaymentMethodsProps) {
   const b3Lang = useB3Lang();
   const queryClient = useQueryClient();
   const [pendingDelete, setPendingDelete] = useState<StoredInstrument | null>(null);
@@ -29,6 +40,7 @@ function PaymentMethods() {
   const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
   // The JWT identifies the logged-in customer, so a masquerading rep must not manage cards here.
   const isAvailable = isPaymentMethodsAvailable() && !isAgenting;
+  const isBraintree = variant === 'braintree';
 
   const { data, isFetching, isError, error, refetch } = useQuery({
     queryKey: ['storedInstruments', customerId],
@@ -45,7 +57,7 @@ function PaymentMethods() {
   const vaultAccess = useQuery({
     queryKey: ['vaultAccess', customerId],
     queryFn: getVaultAccess,
-    enabled: isAvailable,
+    enabled: isAvailable && !isBraintree,
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
@@ -55,12 +67,24 @@ function PaymentMethods() {
   const activeCart = useQuery({
     queryKey: ['activeCart', customerId],
     queryFn: hasActiveCart,
-    enabled: isAvailable,
+    enabled: isAvailable && !isBraintree,
+  });
+
+  // Braintree needs no cart and no VAT: gate on whether a client token can be minted,
+  // which also self-gates brands with no Braintree gateway.
+  const braintreeClientToken = useQuery({
+    queryKey: ['braintreeClientToken', customerId],
+    queryFn: getBraintreeClientToken,
+    enabled: isAvailable && isBraintree,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
   });
 
   const isVaultAvailable = vaultAccess.data?.state === 'available';
-  const canAddInPortal = isVaultAvailable && activeCart.data === true;
-  const needsCart = isVaultAvailable && activeCart.data === false;
+  const canAddInPortal = isBraintree
+    ? Boolean(braintreeClientToken.data)
+    : isVaultAvailable && activeCart.data === true;
+  const needsCart = !isBraintree && isVaultAvailable && activeCart.data === false;
 
   const handleAdded = () => {
     setIsAddOpen(false);
@@ -144,7 +168,7 @@ function PaymentMethods() {
         {needsCart && (
           <Typography sx={{ mb: 2 }}>{b3Lang('paymentMethods.addCard.needsCart')}</Typography>
         )}
-        {vaultAccess.isError && (
+        {!isBraintree && vaultAccess.isError && (
           <Box sx={{ mb: 2 }}>
             {/* The portal renders inside the ThemeFrame; a plain anchor would navigate the frame. */}
             <Link href={NATIVE_ADD_PAYMENT_METHOD_PATH} target="_top">
@@ -152,13 +176,21 @@ function PaymentMethods() {
             </Link>
           </Box>
         )}
-        {isAddOpen && (
-          <AddPaymentMethodDialog
-            onClose={() => setIsAddOpen(false)}
-            onAdded={handleAdded}
-            customerEmail={customerEmail}
-          />
-        )}
+        {isAddOpen &&
+          (isBraintree && braintreeClientToken.data ? (
+            <AddPaymentMethodBraintreeDialog
+              clientToken={braintreeClientToken.data}
+              customerEmail={customerEmail}
+              onAdded={handleAdded}
+              onClose={() => setIsAddOpen(false)}
+            />
+          ) : (
+            <AddPaymentMethodDialog
+              customerEmail={customerEmail}
+              onAdded={handleAdded}
+              onClose={() => setIsAddOpen(false)}
+            />
+          ))}
         {data && data.instruments.length === 0 && (
           <Typography>
             {canAddInPortal

@@ -36,6 +36,12 @@ vi.mock('./cartPresence', () => ({
   hasActiveCart: vi.fn(),
 }));
 
+// Guards against a real CDN script injection if a future test opens the Braintree dialog.
+vi.mock('./dropin', () => ({
+  createDropinWithTimeout: vi.fn(),
+  DROPIN_INIT_TIMEOUT_MS: 20_000,
+}));
+
 vi.mock('./billingPrefill', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./billingPrefill')>()),
   getBillingPrefill: vi.fn(),
@@ -808,5 +814,64 @@ describe('add card dialog', () => {
     // settle the in-flight submit so its state updates land inside the test
     resolveSubmit();
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+});
+
+describe('braintree variant', () => {
+  const mockBraintreeClientToken = (status: 200 | 502) =>
+    server.use(
+      http.post(`${apiBase}/customers/Customer/BraintreeClientToken`, () =>
+        status === 200
+          ? HttpResponse.json({ clientToken: 'bt-client-token' })
+          : HttpResponse.json({}, { status: 502 }),
+      ),
+    );
+
+  it('offers Add card without ever asking about the cart', async () => {
+    mockJwt();
+    mockList([]);
+    mockBraintreeClientToken(200);
+
+    renderWithProviders(<PaymentMethods variant="braintree" />);
+
+    expect(await screen.findByRole('button', { name: 'Add card' })).toBeInTheDocument();
+    expect(hasActiveCart).not.toHaveBeenCalled();
+    expect(
+      screen.queryByText(/To add a card here, add an item to your cart first/),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'You have no saved cards. Add your first card and it will become your default.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('renders no add affordance when the client-token probe fails', async () => {
+    mockJwt();
+    mockList([]);
+    mockBraintreeClientToken(502);
+
+    renderWithProviders(<PaymentMethods variant="braintree" />);
+
+    expect(
+      await screen.findByText('You have no saved cards. Cards can be saved during checkout.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add card' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Add card' })).not.toBeInTheDocument();
+  });
+
+  it('still gates the hosted-form variant on the cart', async () => {
+    mockJwt();
+    mockList([]);
+    // The needs-cart copy only appears once the VAT scrape says the gateway is available.
+    mockNativePage(availableNativePage);
+    vi.mocked(hasActiveCart).mockResolvedValue(false);
+
+    renderWithProviders(<PaymentMethods variant="hostedForm" />);
+
+    expect(
+      await screen.findByText(/To add a card here, add an item to your cart first/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add card' })).not.toBeInTheDocument();
   });
 });
