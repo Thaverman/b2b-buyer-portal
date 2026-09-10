@@ -65,6 +65,8 @@ declare global {
         apiBase: string;
         appClientId: string;
       };
+      /** Gates the parallel Braintree add-card route; absent = the route does not exist. */
+      paymentMethodsBraintree?: { enabled: boolean };
       /** Gates the /loyalty page; absent (or any field missing) = feature off. */
       loyalty?: {
         /** Influence.io shop key (public). */

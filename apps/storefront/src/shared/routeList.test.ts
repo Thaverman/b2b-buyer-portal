@@ -5,7 +5,11 @@ import { setMasqueradeCompany, store } from '@/store';
 import { setCompanyInfo, setCustomerInfo } from '@/store/slices/company';
 import { CompanyStatus, CustomerRole, UserTypes } from '@/types';
 
-import { getAllowedRoutesWithoutComponent, isNativePaymentMethodsPage } from './routeList';
+import {
+  getAllowedRoutesWithoutComponent,
+  isNativePaymentMethodsPage,
+  routeList,
+} from './routeList';
 
 const loyaltyConfig = {
   shopKey: 'shop-key',
@@ -164,5 +168,47 @@ describe('/favorites', () => {
     primeCustomerRole(CustomerRole.SUPER_ADMIN, UserTypes.B2B_SUPER_ADMIN);
 
     expect(hasFavoritesRoute()).toBe(false);
+  });
+});
+
+describe('braintree payment-methods route', () => {
+  const paymentMethodsConfig = {
+    apiBase: 'https://api.example.com',
+    appClientId: 'app-client-id',
+  };
+
+  const hasBraintreePaymentRoute = () =>
+    getAllowedRoutesWithoutComponent(buildGlobalStateWith({})).some(
+      (route) => route.path === '/payment-methods-braintree',
+    );
+
+  it('is offered when the flag is enabled alongside the payment-methods config', () => {
+    window.BC_CONTEXT = {
+      paymentMethods: paymentMethodsConfig,
+      paymentMethodsBraintree: { enabled: true },
+    };
+    primeCustomer(false);
+
+    expect(hasBraintreePaymentRoute()).toBe(true);
+  });
+
+  it('is withheld when the flag is absent', () => {
+    window.BC_CONTEXT = { paymentMethods: paymentMethodsConfig };
+    primeCustomer(false);
+
+    expect(hasBraintreePaymentRoute()).toBe(false);
+  });
+
+  it('is withheld when payment methods themselves are not configured', () => {
+    window.BC_CONTEXT = { paymentMethodsBraintree: { enabled: true } };
+    primeCustomer(false);
+
+    expect(hasBraintreePaymentRoute()).toBe(false);
+  });
+
+  it('is never a nav menu item', () => {
+    expect(routeList.find((route) => route.path === '/payment-methods-braintree')?.isMenuItem).toBe(
+      false,
+    );
   });
 });
