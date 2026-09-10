@@ -64,7 +64,12 @@ const normalize = (raw: RawStoredInstrumentsResponse): StoredInstrumentsResponse
   instruments: (raw.instruments ?? raw.Instruments ?? []).map(normalizeInstrument),
 });
 
-type PaymentMethodsErrorKind = 'sessionExpired' | 'notFound' | 'rateLimited' | 'upstream';
+type PaymentMethodsErrorKind =
+  | 'sessionExpired'
+  | 'notFound'
+  | 'rateLimited'
+  | 'declined'
+  | 'upstream';
 
 export class PaymentMethodsError extends Error {
   kind: PaymentMethodsErrorKind;
@@ -121,6 +126,12 @@ const fetchJson = async (action: string, body: Record<string, string>) => {
   }
   if (response.status === 404) {
     throw new PaymentMethodsError('notFound');
+  }
+  if (response.status === 422) {
+    // The card itself failed verification. The response deliberately carries no
+    // detail: a verification endpoint that explains its declines is a card-testing
+    // oracle (spec §9). One generic message, never wording that blames the card.
+    throw new PaymentMethodsError('declined');
   }
   if (response.status === 429) {
     throw new PaymentMethodsError('rateLimited');

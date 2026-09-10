@@ -204,3 +204,16 @@ it('maps a network failure to upstream', async () => {
   expect(error).toBeInstanceOf(PaymentMethodsError);
   expect(error.kind).toBe('upstream');
 });
+
+it('maps a 422 to the declined kind', async () => {
+  mockJwt();
+  server.use(
+    http.post(`${apiBase}/customers/Customer/SetDefaultStoredInstrument`, () =>
+      HttpResponse.json({}, { status: 422 }),
+    ),
+  );
+
+  await expect(setDefaultStoredInstrument('card-token')).rejects.toMatchObject({
+    kind: 'declined',
+  });
+});
