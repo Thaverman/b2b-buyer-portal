@@ -45,18 +45,48 @@ merchant than the one our backend holds credentials for.** In that case the impo
 would register a token BC's gateway cannot charge: the card would appear in the list and then
 fail at payment time, which is worse than not shipping.
 
-Research status: **contested / unrecorded.** No artifact in any repo names the Braintree
-merchant id behind any BC store's `braintree` payment method. Indirect production signals
-(the legacy migration imported `x876bp8kkc6bdwzx` tokens as `braintree.credit_card`;
-`OrderService` looks up BC `gateway_transaction_id` against the internal business service's
-`txndetails`) point at "same merchant", but nobody has verified it.
+### 2.1 GATE RESULT — sandbox PASSES (verified 2026-09-10)
 
-Cheapest decisive checks, read-only, either is sufficient:
+Verified live on `sandbox.storesupply.com`, signed in as the test account with a two-item cart,
+read-only, no order placed. `GET /api/storefront/payments/braintree` returns the method with
+its Braintree `clientToken`; decoded, it reads:
 
-- Base64-decode the `clientToken` that BC's own `braintree` payment method hands the
-  storefront at checkout, and read its `merchantId` and `environment`.
-- Read `CustomerDetails.Id` and the merchant context from the internal `txndetails` response
-  for one signed-in BC card order.
+| Field | Value |
+| --- | --- |
+| `merchantId` | **`7p3bsm9pq3dccypd`** |
+| `environment` | `sandbox` |
+| `merchantAccountId` | **`storesupplywarehouse`** |
+| `clientApiUrl` host | `api.sandbox.braintreegateway.com` |
+
+**BigCommerce's own `braintree` method tokenizes against exactly the merchant our backend holds
+credentials for** (`GuestVault:Braintree` in Testing, and the legacy `Braintree` sandbox block,
+are both `7p3bsm9pq3dccypd`). The same token also surfaced on `braintreepaypal`,
+`braintreepaypalcredit` and `applepay`, so the whole Braintree family on this store points at
+one merchant.
+
+Bonus confirmation for §6.2 step 2: the `merchantAccountId` BigCommerce settles through,
+`storesupplywarehouse`, is precisely the `GuestVault:MerchantAccounts` sandbox name for this
+brand. So passing that value as `VerificationMerchantAccountId` puts our card verification on
+the same merchant account, and therefore the same currency and AVS/CVV rules, that BigCommerce
+uses at checkout.
+
+**Reusable technique:** the decisive check is one authenticated storefront GET,
+`/api/storefront/payments/braintree`, not a checkout-page scrape. Re-runnable per store and per
+environment in seconds.
+
+**Still open: production.** Both production Braintree config blocks are `x876bp8kkc6bdwzx`, and
+production's BigCommerce gateway has **not** been checked. Run the same GET against the
+production storefront while signed in with a cart before go-live. Sandbox passing does not
+license a production release.
+
+**Downgraded, not resolved.** The contested claim below ("BigPay vaulting creates no
+Braintree-side tokens") is now weakly supported: BigCommerce mints its card nonces on
+`7p3bsm9pq3dccypd`, and a nonce minted on that merchant can only become a payment method in
+that merchant's vault. That makes Braintree-side records the likely outcome of a
+save-card-at-checkout, though it remains an inference: BigCommerce's server could consume the
+nonce for a single transaction without vaulting. Identity discovery (§7 step 1) is what settles
+it empirically on the first customer with order history, and the design degrades cleanly either
+way.
 
 Related, also unresolved and **contested**: whether BC-saved cards exist as Braintree
 Customer/PaymentMethod records at all. A checkout spec (2026-07-16 §1) asserts "no tokens

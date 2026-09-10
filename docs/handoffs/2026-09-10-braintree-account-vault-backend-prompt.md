@@ -9,7 +9,7 @@
 
 This document is written to be pasted into a fresh backend session. It assumes no context.
 
-## 0. Go/no-go gate — do this before writing anything
+## 0. Go/no-go gate — sandbox PASSED, production still unverified
 
 **The whole feature is void if BigCommerce's configured `braintree` gateway is a different
 Braintree merchant than the one `GuestVault:Braintree` holds credentials for.**
@@ -20,16 +20,33 @@ validate imported instruments ("if you post incorrect data, the instrument will 
 payment"). So if the merchants differ, the customer sees a saved card that fails at checkout.
 That is strictly worse than shipping nothing.
 
-Nobody has ever recorded which Braintree merchant sits behind any BC store's `braintree`
-payment method. Two read-only checks, either is decisive:
+### SANDBOX GATE: PASSED (verified 2026-09-10) — you may build against Testing
 
-- Base64-decode the `clientToken` BigCommerce's own `braintree` payment method hands the
-  storefront at checkout; read `merchantId` and `environment`.
-- For one signed-in BC card order, read the internal business service `txndetails` response and
-  compare its merchant context and `CustomerDetails.Id`.
+Verified live, read-only, signed in with a cart, no order placed.
+`GET /api/storefront/payments/braintree` on `sandbox.storesupply.com` returns a Braintree
+`clientToken` that decodes to:
 
-Record the answer in the frontend spec §2 and in team memory either way. **If the merchants
-differ, stop and report; do not build.** Fallbacks are listed in the frontend spec §11.
+- `merchantId` = **`7p3bsm9pq3dccypd`**
+- `environment` = `sandbox`
+- `merchantAccountId` = **`storesupplywarehouse`**
+
+That merchant id is the same one `GuestVault:Braintree` uses in Testing, and that merchant
+account name is exactly `GuestVault:MerchantAccounts:StoreSupply` for sandbox. So on Testing,
+we vault into the same merchant **and** verify against the same merchant account that
+BigCommerce settles through. Import-then-charge is viable.
+
+**Production is NOT verified.** Both production blocks are `x876bp8kkc6bdwzx` and nobody has
+checked production's BigCommerce gateway. Run the same one-line GET against the production
+storefront, signed in with a cart, before go-live. Sandbox passing does not license a
+production release, and if production differs the feature must stay flag-off there.
+
+The reusable technique is worth keeping: this is answerable with a single authenticated
+storefront GET per store and environment, not a checkout scrape.
+
+Consequence for the "no Braintree-side tokens" claim below: it is now weakly supported, since
+BigCommerce mints its card nonces on `7p3bsm9pq3dccypd` and such a nonce can only vault into
+that merchant's vault. Treat Braintree-side records as likely but unproven; §4 step 1 settles
+it empirically on the first customer with order history.
 
 Related, also unresolved: whether BC-saved cards exist as Braintree Customer/PaymentMethod
 records at all. A 2026-07-16 checkout spec claims they do not ("merchant-confirmed"), but that
