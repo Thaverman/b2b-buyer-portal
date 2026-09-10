@@ -1,7 +1,8 @@
 # Payment Methods: parallel Braintree add-card page (vault + BigCommerce import) — Design
 
 - **Date:** 2026-09-10
-- **Status:** Approved (brainstormed with THaverman)
+- **Status:** **Portal side implemented 2026-09-10** (dev `3487971c`); live verification
+  pending deployment and the backend handoff. See §16.
 - **Page:** `apps/storefront/src/pages/PaymentMethods/` (second route, same page component)
 - **Relationship to other specs:** does **not** supersede
   `2026-09-01-payment-methods-add-card-hosted-form-design.md`. That design is shipped and
@@ -645,3 +646,57 @@ per-customer rate limit; and no nonce or PAN in any log.
 - Verify `knip` is satisfied: every new export needs a consumer or a test.
 - Diff lint and test failures against the dev red baseline; do not fix pre-existing redness
   here.
+
+## 16. Implementation record (2026-09-10)
+
+Portal side complete on dev; plan
+`docs/superpowers/plans/2026-09-10-payment-methods-braintree-parallel-page.md`, tasks 1-7 of 8.
+
+| Commit | Task |
+| --- | --- |
+| `41e71ead` | Drop-in loader recovered from `e434e41d` plus the 20s init timeout |
+| `0a2d27aa` | `declined` error kind for HTTP 422 |
+| `453fe30c` | Request-body type widening (isolated, no behavior change) |
+| `e6023417` | `getBraintreeClientToken` + `vaultBraintreeInstrument` |
+| `c439ff20` | `BillingAddressFields` extracted from the shipped dialog |
+| `d074ba47` | `AddPaymentMethodBraintreeDialog` (in-frame) |
+| `14d43d6f` | Page `variant` prop and Braintree gating |
+| `525b96c3` + `3487971c` | Route, flag, gate, wrapper (see the staging note below) |
+| `b5afa54e` | `AddCardVariant` un-exported for knip |
+
+**Verification.** 112 tests green across `src/pages/PaymentMethods` and the two `routeList`
+suites. `tsc --noEmit` clean. `eslint` clean on every touched area. `knip` reports only the
+pre-existing `BillingStateOption`. `depcruise` clean at 722 modules. Build succeeds, and the
+only `braintreegateway` strings in `dist` are the CDN URL in the new `braintreeRoute` chunk
+plus pre-existing checkout-sdk, confirming no npm Braintree dependency was bundled. Full-suite
+baseline measured in an isolated worktree at the pre-work commit `acfba2bf`: **109 failures in
+20 files**; after this work **105 in 19**, with 27 new passing tests. No failure is in a file
+this work touched, and `MyOrders` passes 43/43 in isolation both before and after, so those
+suites are full-suite-pollution-sensitive rather than newly broken.
+
+**Three findings worth keeping.**
+
+1. **A vacuous test, caught by its negative control.** The Drop-in timeout test advanced fake
+   timers by `DROPIN_INIT_TIMEOUT_MS`, the very constant under test, so it passed with the
+   budget inflated a thousandfold. It now advances a literal 20s with the budget pinned by a
+   separate assertion.
+2. **MUI Dialog renders through a Portal, which attaches children in an effect**, so a plain
+   `ref` is still null during the component's own mount effect and Drop-in never initialized.
+   The container node is now held in state with the init effect keyed on it. On the live page
+   this would have presented as an endless spinner, the same symptom as the September
+   hosted-field incident.
+3. **A stale git index silently reverted committed work.** A diagnostic ran
+   `git checkout <baseline> -- routeList.ts routes/index.tsx` to test whether those files
+   caused unrelated failures; that **staged** the baseline versions, and the next commit
+   (`b5afa54e`) picked them up from the index even though only one unrelated file was
+   explicitly added, deleting 22 lines of route wiring. Every test still passed because the
+   working tree was correct and only the commit was wrong. Restored in `3487971c`. The lesson:
+   after any diagnostic that touches the index, verify with `git show <branch>:<path>` rather
+   than trusting a green test run.
+
+**Not done, and why.** §13 live verification steps b-e need both a deployed build with
+`BC_CONTEXT.paymentMethodsBraintree = { enabled: true }` and the backend endpoints from
+`docs/handoffs/2026-09-10-braintree-account-vault-backend-prompt.md`, which has not been
+picked up. Step 3 of §13, placing a sandbox order with the newly added card, remains the real
+success criterion and is unproven. Production's Braintree merchant is still unverified (§2.1)
+and is a go-live gate.
