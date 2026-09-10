@@ -182,6 +182,17 @@ describe('lists and rows', () => {
     expect(within(row).getByText('$12.50')).toBeInTheDocument();
   });
 
+  it('puts the table in a scroll container so its columns cannot overflow the page', async () => {
+    const product = buildFavoriteProductWith({ name: 'Slicker Brush' });
+    mockLists([listWith(product)]);
+    mockProducts([product]);
+
+    renderWithProviders(<Favorites />, { preloadedState });
+
+    const table = await screen.findByRole('table');
+    expect(table.closest('.MuiTableContainer-root')).toHaveStyle({ overflowX: 'auto' });
+  });
+
   it('shows the tax-inclusive price when the store displays inclusive prices', async () => {
     const variant = buildFavoriteVariantWith({
       bc_calculated_price: {

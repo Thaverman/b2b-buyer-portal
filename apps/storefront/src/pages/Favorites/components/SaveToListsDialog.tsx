@@ -153,8 +153,10 @@ export default function SaveToListsDialog({
             }
           }}
         />
+        {/* The field is fullWidth, so without this the button is the one that gets squeezed. */}
         <Button
           variant="outlined"
+          sx={{ flexShrink: 0, minHeight: '44px' }}
           disabled={isCreating || current.newListName.trim().length === 0}
           onClick={createList}
         >

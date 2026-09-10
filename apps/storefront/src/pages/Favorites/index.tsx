@@ -172,10 +172,14 @@ function Favorites() {
 
   return (
     <B3Spin isSpinning={isLoading}>
-      <Box>
+      {/* B3Spin wraps children in a `display: flex` context and B3MobileLayout lays its
+          content out in a row, so the page has to claim the width or it shrinks to fit its
+          own text — narrow, ragged cards on mobile. Same shape as Loyalty and PaymentMethods. */}
+      <Box data-testid="favorites-page" sx={{ flex: 1, width: '100%' }}>
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
           <Button
             variant="outlined"
+            sx={{ minHeight: '44px' }}
             disabled={actions.isBusy}
             onClick={() => setNameDialog({ mode: 'create' })}
           >

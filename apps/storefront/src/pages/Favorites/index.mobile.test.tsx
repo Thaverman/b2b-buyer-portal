@@ -12,6 +12,7 @@ import {
   within,
 } from 'tests/test-utils';
 
+import { ProductSearch } from '@/shared/service/b2b/graphql/product';
 import { CustomerRole, UserTypes } from '@/types';
 
 import Favorites from '.';
@@ -38,6 +39,46 @@ const preloadedState = {
 
 const lastPage = { hasNextPage: false, endCursor: null };
 
+const connection = <T,>(nodes: T[]) => ({
+  pageInfo: lastPage,
+  edges: nodes.map((node) => ({ node })),
+});
+
+// One list holding one favorite of `product`, in the storefront API shape.
+const mockOneFavorite = (product: ProductSearch, variantId: number | null) => {
+  const list = buildFavoriteListWith({
+    name: 'My Favorites',
+    items: [buildFavoriteItemWith({ productId: product.id, variantId })],
+  });
+  server.use(
+    graphql.query('FavoritesLists', () =>
+      HttpResponse.json({
+        data: {
+          customer: {
+            wishlists: connection([
+              {
+                entityId: list.id,
+                name: list.name,
+                isPublic: false,
+                items: connection(
+                  list.items.map((item) => ({
+                    entityId: item.id,
+                    productEntityId: item.productId,
+                    variantEntityId: item.variantId,
+                  })),
+                ),
+              },
+            ]),
+          },
+        },
+      }),
+    ),
+    graphql.query('SearchProducts', () =>
+      HttpResponse.json({ data: { productsSearch: [product] } }),
+    ),
+  );
+};
+
 beforeEach(() => {
   window.BC_CONTEXT = { favorites: { enabled: true } };
   // The portal's mobile breakpoint (useMobile) is 768px.
@@ -59,45 +100,7 @@ it('renders favorites as cards with name, SKU, price and actions on mobile', asy
     },
   });
   const product = buildFavoriteProductWith({ name: 'Slicker Brush', variants: [variant] });
-  const list = buildFavoriteListWith({
-    name: 'My Favorites',
-    items: [buildFavoriteItemWith({ productId: product.id, variantId: variant.variant_id })],
-  });
-  server.use(
-    graphql.query('FavoritesLists', () =>
-      HttpResponse.json({
-        data: {
-          customer: {
-            wishlists: {
-              pageInfo: lastPage,
-              edges: [
-                {
-                  node: {
-                    entityId: list.id,
-                    name: list.name,
-                    isPublic: false,
-                    items: {
-                      pageInfo: lastPage,
-                      edges: list.items.map((item) => ({
-                        node: {
-                          entityId: item.id,
-                          productEntityId: item.productId,
-                          variantEntityId: item.variantId,
-                        },
-                      })),
-                    },
-                  },
-                },
-              ],
-            },
-          },
-        },
-      }),
-    ),
-    graphql.query('SearchProducts', () =>
-      HttpResponse.json({ data: { productsSearch: [product] } }),
-    ),
-  );
+  mockOneFavorite(product, variant.variant_id);
 
   renderWithProviders(<Favorites />, { preloadedState });
 
@@ -108,4 +111,28 @@ it('renders favorites as cards with name, SKU, price and actions on mobile', asy
   expect(within(card).getByRole('button', { name: 'Add to cart' })).toBeInTheDocument();
   expect(within(card).getByRole('button', { name: 'Save to lists' })).toBeInTheDocument();
   expect(within(card).getByRole('button', { name: 'Remove' })).toBeInTheDocument();
+});
+
+it('stretches the page across the width of the mobile layout', async () => {
+  const product = buildFavoriteProductWith({ name: 'Slicker Brush' });
+  mockOneFavorite(product, null);
+
+  renderWithProviders(<Favorites />, { preloadedState });
+  await screen.findByText('Slicker Brush');
+
+  // B3Spin wraps children in a `display: flex` context, so a page that never claims the
+  // width shrinks to its own content instead of filling the layout column.
+  expect(screen.getByTestId('favorites-page')).toHaveStyle({ width: '100%' });
+});
+
+it('gives every card action a 44px touch target', async () => {
+  const product = buildFavoriteProductWith({ name: 'Slicker Brush' });
+  mockOneFavorite(product, null);
+
+  renderWithProviders(<Favorites />, { preloadedState });
+  const card = (await screen.findByText('Slicker Brush')).closest('.MuiCard-root') as HTMLElement;
+
+  const buttons = within(within(card).getByTestId('favorites-row-actions')).getAllByRole('button');
+  expect(buttons.length).toBeGreaterThan(0);
+  buttons.forEach((button) => expect(button).toHaveStyle({ minHeight: '44px' }));
 });

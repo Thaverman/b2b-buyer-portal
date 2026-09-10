@@ -9,6 +9,8 @@ interface RowActionsProps {
   /** The catalog call failed: no cart action, since minimums and options are unknown. */
   productsFailed: boolean;
   disabled: boolean;
+  /** `card` shares the card's width between the buttons; `row` right-aligns them in a table cell. */
+  layout?: 'row' | 'card';
   onAddToCart: (row: FavoriteRow) => void;
   onSaveToLists: (row: FavoriteRow) => void;
   onRemove: (row: FavoriteRow) => void;
@@ -18,15 +20,33 @@ export default function RowActions({
   row,
   productsFailed,
   disabled,
+  layout = 'row',
   onAddToCart,
   onSaveToLists,
   onRemove,
 }: RowActionsProps) {
   const b3Lang = useB3Lang();
   const showCartAction = !productsFailed && row.available;
+  const isCard = layout === 'card';
 
   return (
-    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'flex-end' }}>
+    <Box
+      data-testid="favorites-row-actions"
+      sx={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 1,
+        // Right-aligning is correct in a table cell but leaves a ragged edge on a ~320px
+        // card, so there the buttons share each line and stretch to fill it — which also
+        // survives translated labels that run longer than the English ones.
+        justifyContent: isCard ? 'flex-start' : 'flex-end',
+        '& > .MuiButton-root': {
+          // The brief's 44px minimum touch target; MUI's small button is ~31px tall.
+          minHeight: '44px',
+          ...(isCard ? { flex: '1 1 auto' } : {}),
+        },
+      }}
+    >
       {/* Options need the product page. Leaves the portal: anchors in the ThemeFrame iframe need _top. */}
       {showCartAction && row.requiresOptions && (
         <Button

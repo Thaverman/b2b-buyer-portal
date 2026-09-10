@@ -41,6 +41,7 @@ export default function FavoriteItemCard({
             row={row}
             productsFailed={productsFailed}
             disabled={disabled}
+            layout="card"
             onAddToCart={onAddToCart}
             onSaveToLists={onSaveToLists}
             onRemove={onRemove}

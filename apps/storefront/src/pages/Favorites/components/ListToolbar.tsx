@@ -25,7 +25,17 @@ export default function ListToolbar({
   const b3Lang = useB3Lang();
 
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 1,
+        mb: 2,
+        // The brief's 44px minimum touch target; MUI's small button is ~31px tall.
+        '& > .MuiButton-root': { minHeight: '44px' },
+      }}
+    >
       <Typography variant="h6" component="h2" sx={{ flex: 1, minWidth: '10rem' }}>
         {list.name}
       </Typography>

@@ -27,7 +27,8 @@ export default function ProductSummary({ row, productsFailed }: ProductSummaryPr
         alt=""
         sx={{ width: 60, height: 60, objectFit: 'contain', borderRadius: 1, flexShrink: 0 }}
       />
-      <Box>
+      {/* minWidth lets a long name wrap instead of forcing the flex line wider than the card. */}
+      <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography variant="body1">{label}</Typography>
         {showUnavailableChip && <Chip size="small" label={unavailableLabel} />}
       </Box>
