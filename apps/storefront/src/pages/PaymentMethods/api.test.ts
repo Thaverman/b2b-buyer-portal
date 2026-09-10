@@ -2,10 +2,13 @@ import { assertQueryParams, http, HttpResponse, startMockServer } from 'tests/te
 
 import {
   deleteStoredInstrument,
+  getBraintreeClientToken,
   listStoredInstruments,
   PaymentMethodsError,
   setDefaultStoredInstrument,
+  vaultBraintreeInstrument,
 } from './api';
+import { emptyBillingValues } from './billingPrefill';
 
 vi.mock('@/utils/b3Logger');
 
@@ -215,5 +218,118 @@ it('maps a 422 to the declined kind', async () => {
 
   await expect(setDefaultStoredInstrument('card-token')).rejects.toMatchObject({
     kind: 'declined',
+  });
+});
+
+describe('getBraintreeClientToken', () => {
+  it('returns the client token', async () => {
+    mockJwt();
+    server.use(
+      http.post(`${apiBase}/customers/Customer/BraintreeClientToken`, async ({ request }) => {
+        expect(await request.json()).toEqual({ Jwt: 'fresh-jwt' });
+
+        return HttpResponse.json({ clientToken: 'bt-client-token' });
+      }),
+    );
+
+    expect(await getBraintreeClientToken()).toBe('bt-client-token');
+  });
+
+  it('surfaces an upstream failure', async () => {
+    mockJwt();
+    server.use(
+      http.post(`${apiBase}/customers/Customer/BraintreeClientToken`, () =>
+        HttpResponse.json({}, { status: 502 }),
+      ),
+    );
+
+    await expect(getBraintreeClientToken()).rejects.toMatchObject({ kind: 'upstream' });
+  });
+});
+
+describe('vaultBraintreeInstrument', () => {
+  const billing = {
+    ...emptyBillingValues,
+    firstName: 'Ada',
+    lastName: 'Lovelace',
+    address1: '1 Analytical Way',
+    city: 'Austin',
+    stateOrProvinceCode: 'TX',
+    postalCode: '78701',
+    countryCode: 'US',
+  };
+
+  it('sends a PascalCase body with nested billing and returns the refreshed list', async () => {
+    mockJwt();
+    let received: unknown;
+
+    server.use(
+      http.post(`${apiBase}/customers/Customer/VaultBraintreeInstrument`, async ({ request }) => {
+        received = await request.json();
+
+        return HttpResponse.json({ CustomerId: 42, Instruments: [{ Last4: '4242' }] });
+      }),
+    );
+
+    const result = await vaultBraintreeInstrument({
+      nonce: 'fake-nonce',
+      deviceData: '{"d":1}',
+      billing,
+      email: 'ada@example.com',
+      makeDefault: true,
+    });
+
+    expect(received).toEqual({
+      Jwt: 'fresh-jwt',
+      Nonce: 'fake-nonce',
+      DeviceData: '{"d":1}',
+      MakeDefault: true,
+      Billing: {
+        FirstName: 'Ada',
+        LastName: 'Lovelace',
+        Company: null,
+        Address1: '1 Analytical Way',
+        Address2: null,
+        City: 'Austin',
+        StateOrProvinceCode: 'TX',
+        PostalCode: '78701',
+        CountryCode: 'US',
+        Phone: null,
+        Email: 'ada@example.com',
+      },
+    });
+    expect(result.customerId).toBe(42);
+    expect(result.instruments[0].last4).toBe('4242');
+  });
+
+  it('omits DeviceData entirely when collection failed', async () => {
+    mockJwt();
+    let received: Record<string, unknown> = {};
+
+    server.use(
+      http.post(`${apiBase}/customers/Customer/VaultBraintreeInstrument`, async ({ request }) => {
+        received = (await request.json()) as Record<string, unknown>;
+
+        return HttpResponse.json({ CustomerId: 42, Instruments: [] });
+      }),
+    );
+
+    await vaultBraintreeInstrument({ nonce: 'fake-nonce', billing, email: 'ada@example.com' });
+
+    expect(received).not.toHaveProperty('DeviceData');
+    expect(received.MakeDefault).toBe(false);
+  });
+
+  it('reports a declined card', async () => {
+    mockJwt();
+    server.use(
+      http.post(`${apiBase}/customers/Customer/VaultBraintreeInstrument`, () =>
+        HttpResponse.json({}, { status: 422 }),
+      ),
+    );
+
+    await expect(
+      vaultBraintreeInstrument({ nonce: 'fake-nonce', billing, email: 'ada@example.com' }),
+    ).rejects.toMatchObject({ kind: 'declined' });
   });
 });
