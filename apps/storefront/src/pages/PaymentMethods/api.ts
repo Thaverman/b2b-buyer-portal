@@ -87,7 +87,7 @@ const getPaymentMethodsConfig = () => window.BC_CONTEXT?.paymentMethods;
 export const isPaymentMethodsAvailable = () =>
   platform === 'bigcommerce' && Boolean(getPaymentMethodsConfig());
 
-const fetchJson = async (action: string, body: Record<string, string>) => {
+const fetchJson = async (action: string, body: Record<string, unknown>) => {
   const config = getPaymentMethodsConfig();
   if (!config) {
     throw new Error('Payment methods are not configured on this store');
@@ -141,7 +141,7 @@ const fetchJson = async (action: string, body: Record<string, string>) => {
 
 const post = async (
   action: string,
-  body: Record<string, string>,
+  body: Record<string, unknown>,
 ): Promise<StoredInstrumentsResponse> => normalize(await fetchJson(action, body));
 
 export const listStoredInstruments = () => post('StoredInstruments', {});
