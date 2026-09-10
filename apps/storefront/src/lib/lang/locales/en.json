@@ -777,6 +777,7 @@
   "paymentMethods.addCard.formError": "The card form couldn't be loaded. Please try again, or add your card on the payment methods page.",
   "paymentMethods.addCard.emptyList": "You have no saved cards. Add your first card and it will become your default.",
   "paymentMethods.addCard.billingTitle": "Billing address",
+  "paymentMethods.addCard.braintree.formError": "The card form couldn't be loaded. Please try again.",
   "paymentMethods.addCard.cardNumber": "Card number",
   "paymentMethods.addCard.expiry": "Expiration date",
   "paymentMethods.addCard.nameOnCard": "Name on card",
