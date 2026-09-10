@@ -37,7 +37,6 @@ const Loyalty = lazy(() => import('@/pages/Loyalty'));
 const OrderDetail = lazy(() => import('@/pages/OrderDetail'));
 const MyOrders = lazy(() => import('@/pages/MyOrders'));
 const PaymentMethods = lazy(() => import('@/pages/PaymentMethods'));
-const PaymentMethodsBraintree = lazy(() => import('@/pages/PaymentMethods/braintreeRoute'));
 const PDP = lazy(() => import('@/pages/PDP'));
 const QuickOrder = lazy(() => import('@/pages/QuickOrder'));
 const QuoteDetail = lazy(() => import('@/pages/QuoteDetail'));
@@ -70,7 +69,6 @@ const routesMap: Record<string, LazyExoticComponent<(props: PageProps) => ReactE
   '/company-hierarchy': CompanyHierarchy,
   '/manage-subscriptions': ManageSubscriptions,
   '/payment-methods': PaymentMethods,
-  '/payment-methods-braintree': PaymentMethodsBraintree,
   '/loyalty': Loyalty,
 };
 

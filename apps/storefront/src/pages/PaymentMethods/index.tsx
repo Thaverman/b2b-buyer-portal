@@ -24,7 +24,7 @@ import {
 import { hasActiveCart } from './cartPresence';
 import { getVaultAccess, NATIVE_ADD_PAYMENT_METHOD_PATH } from './vaultAccess';
 
-export type AddCardVariant = 'hostedForm' | 'braintree';
+type AddCardVariant = 'hostedForm' | 'braintree';
 
 // Intersected with PageProps because routesMap is typed as components taking PageProps,
 // and a props type with no properties in common trips TypeScript's weak-type check.
