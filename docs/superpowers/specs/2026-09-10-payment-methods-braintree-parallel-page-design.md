@@ -271,7 +271,7 @@ export const vaultBraintreeInstrument = ({
 }: {
   nonce: string;
   deviceData?: string;
-  billing: BillingValues;
+  billing: BillingFormValues;
   makeDefault?: boolean;
 }): Promise<StoredInstrumentsResponse> =>
   post('VaultBraintreeInstrument', {
