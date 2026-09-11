@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import createCache from '@emotion/cache';
+import { CacheProvider } from '@emotion/react';
 import {
   Alert,
   Box,
@@ -75,6 +77,19 @@ function AddPaymentMethodBraintreeDialog({
   const [isSaving, setIsSaving] = useState(false);
   const [submitErrorId, setSubmitErrorId] = useState<string | null>(null);
   const [missingFields, setMissingFields] = useState<string[]>([]);
+
+  // Braintree's SDK executes in the ThemeFrame realm, so this whole dialog — above all the
+  // Drop-in container — must live in that same document. MUI portals to the TOP-LEVEL
+  // document by default (which is exactly what the hosted-form dialog wants and why it does
+  // the opposite of this). Splitting the container from the SDK across realms lets Drop-in
+  // create its field iframes and then hang forever on a handshake that cannot cross.
+  const frameCache = useMemo(
+    () =>
+      themeFrame
+        ? createCache({ key: 'bpm-bt-card', container: themeFrame.head, prepend: true })
+        : null,
+    [themeFrame],
+  );
 
   useEffect(() => {
     if (!container || hasStartedInitRef.current) {
@@ -161,8 +176,14 @@ function AddPaymentMethodBraintreeDialog({
     }
   };
 
-  return (
-    <Dialog open fullWidth maxWidth="sm" onClose={isSaving ? undefined : onClose}>
+  const dialog = (
+    <Dialog
+      open
+      fullWidth
+      maxWidth="sm"
+      container={themeFrame?.body}
+      onClose={isSaving ? undefined : onClose}
+    >
       <DialogTitle>{b3Lang('paymentMethods.addCard.dialogTitle')}</DialogTitle>
       <DialogContent>
         {hasInitError ? (
@@ -213,6 +234,10 @@ function AddPaymentMethodBraintreeDialog({
       </DialogActions>
     </Dialog>
   );
+
+  // Without the frame-bound cache the dialog renders inside the frame but its styles are
+  // injected into the parent head, so it would come out unstyled.
+  return frameCache ? <CacheProvider value={frameCache}>{dialog}</CacheProvider> : dialog;
 }
 
 export default AddPaymentMethodBraintreeDialog;

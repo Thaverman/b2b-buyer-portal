@@ -1,4 +1,6 @@
-import { act, renderWithProviders, screen, waitFor } from 'tests/test-utils';
+import { act, renderWithProviders, waitFor, within } from 'tests/test-utils';
+
+import { themeFrameSelector } from '@/store/selectors';
 
 import { PaymentMethodsError, vaultBraintreeInstrument } from '../api';
 import { emptyBillingValues, getBillingCountries, getBillingPrefill } from '../billingPrefill';
@@ -22,8 +24,15 @@ vi.mock('../billingPrefill', async (importOriginal) => ({
   getBillingPrefill: vi.fn(),
 }));
 
-// A real jsdom Document in preloadedState makes RTK's immutableCheck blow the stack.
-const themeFrame = { body: { style: {} } } as unknown as Document;
+// The selector is mocked rather than seeding preloadedState, because a real jsdom Document
+// in the store makes RTK's immutableCheck walk it and blow the stack. Mocking it lets these
+// tests use a REAL iframe document, which is what makes the realm assertions meaningful.
+vi.mock('@/store/selectors', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/store/selectors')>()),
+  themeFrameSelector: vi.fn(),
+}));
+
+let themeFrame: Document;
 
 const filledBilling = {
   ...emptyBillingValues,
@@ -34,6 +43,10 @@ const filledBilling = {
   postalCode: '78701',
   countryCode: 'US',
 };
+
+// The dialog renders inside the ThemeFrame, so `screen` (which queries the top-level body)
+// would find nothing; every query is scoped to the frame document.
+const inFrame = () => within(themeFrame.body);
 
 const buildDropin = (payload = { nonce: 'fake-nonce', deviceData: '{"d":1}' }) => ({
   requestPaymentMethod: vi.fn().mockResolvedValue(payload),
@@ -48,10 +61,14 @@ const renderDialog = ({ onAdded = vi.fn(), onClose = vi.fn() } = {}) =>
       onAdded={onAdded}
       onClose={onClose}
     />,
-    { preloadedState: { theme: { themeFrame } } },
   );
 
 beforeEach(() => {
+  const iframe = document.createElement('iframe');
+  document.body.appendChild(iframe);
+  themeFrame = iframe.contentDocument as Document;
+  vi.mocked(themeFrameSelector).mockReturnValue(themeFrame);
+
   vi.mocked(getBillingCountries).mockResolvedValue([]);
   vi.mocked(getBillingPrefill).mockResolvedValue(filledBilling);
 });
@@ -65,8 +82,25 @@ it('mounts Drop-in into the ThemeFrame document, not the parent document', async
 
   const [passedDocument, container, token] = vi.mocked(createDropinWithTimeout).mock.calls[0];
   expect(passedDocument).toBe(themeFrame);
-  expect(container).toBeInstanceOf(HTMLElement);
   expect(token).toBe('bt-client-token');
+
+  // The assertion that matters, and the one whose absence let a realm split ship: the SDK
+  // runs in the ThemeFrame realm, so the container it is handed must belong to THAT
+  // document. When MUI portalled the dialog to the parent instead, Drop-in created its
+  // field iframes in the wrong realm and hung forever on a handshake that cannot cross.
+  expect(container.ownerDocument).toBe(themeFrame);
+  expect(themeFrame.body.contains(container)).toBe(true);
+});
+
+it('renders the dialog itself inside the ThemeFrame document', async () => {
+  vi.mocked(createDropinWithTimeout).mockResolvedValue(buildDropin());
+
+  renderDialog();
+
+  await waitFor(() => expect(createDropinWithTimeout).toHaveBeenCalled());
+
+  expect(themeFrame.querySelector('[role=dialog]')).not.toBeNull();
+  expect(document.querySelector('[role=dialog]')).toBeNull();
 });
 
 it('vaults the nonce and reports success', async () => {
@@ -76,7 +110,7 @@ it('vaults the nonce and reports success', async () => {
 
   const { user } = renderDialog({ onAdded });
 
-  await user.click(await screen.findByRole('button', { name: 'Save card' }));
+  await user.click(await inFrame().findByRole('button', { name: 'Save card' }));
 
   await waitFor(() =>
     expect(vaultBraintreeInstrument).toHaveBeenCalledWith({
@@ -97,10 +131,10 @@ it('shows the generic card failure copy on a decline and keeps the dialog open',
 
   const { user } = renderDialog({ onAdded });
 
-  await user.click(await screen.findByRole('button', { name: 'Save card' }));
+  await user.click(await inFrame().findByRole('button', { name: 'Save card' }));
 
   expect(
-    await screen.findByText(
+    await inFrame().findByText(
       "We couldn't save this card. Check the card details and billing address, or try a different card.",
     ),
   ).toBeInTheDocument();
@@ -113,10 +147,10 @@ it('shows the rate-limit copy when the endpoint throttles', async () => {
 
   const { user } = renderDialog();
 
-  await user.click(await screen.findByRole('button', { name: 'Save card' }));
+  await user.click(await inFrame().findByRole('button', { name: 'Save card' }));
 
   expect(
-    await screen.findByText('Too many requests — please try again in a minute.'),
+    await inFrame().findByText('Too many requests — please try again in a minute.'),
   ).toBeInTheDocument();
 });
 
@@ -126,9 +160,9 @@ it('shows the generic system copy when the vault call fails upstream', async () 
 
   const { user } = renderDialog();
 
-  await user.click(await screen.findByRole('button', { name: 'Save card' }));
+  await user.click(await inFrame().findByRole('button', { name: 'Save card' }));
 
-  expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument();
+  expect(await inFrame().findByText('Something went wrong. Please try again.')).toBeInTheDocument();
 });
 
 it('shows the form error when Drop-in cannot initialize', async () => {
@@ -137,9 +171,9 @@ it('shows the form error when Drop-in cannot initialize', async () => {
   renderDialog();
 
   expect(
-    await screen.findByText("The card form couldn't be loaded. Please try again."),
+    await inFrame().findByText("The card form couldn't be loaded. Please try again."),
   ).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Save card' })).not.toBeInTheDocument();
+  expect(inFrame().queryByRole('button', { name: 'Save card' })).not.toBeInTheDocument();
 });
 
 it('blocks submission and flags required fields when billing is incomplete', async () => {
@@ -148,9 +182,9 @@ it('blocks submission and flags required fields when billing is incomplete', asy
 
   const { user } = renderDialog();
 
-  await user.click(await screen.findByRole('button', { name: 'Save card' }));
+  await user.click(await inFrame().findByRole('button', { name: 'Save card' }));
 
-  expect(await screen.findAllByText('Required')).not.toHaveLength(0);
+  expect(await inFrame().findAllByText('Required')).not.toHaveLength(0);
   expect(vaultBraintreeInstrument).not.toHaveBeenCalled();
 });
 
@@ -160,7 +194,7 @@ it('tears Drop-in down on unmount', async () => {
 
   const { result } = renderDialog();
   await waitFor(() => expect(createDropinWithTimeout).toHaveBeenCalled());
-  await screen.findByRole('button', { name: 'Save card' });
+  await inFrame().findByRole('button', { name: 'Save card' });
 
   await act(async () => {
     result.unmount();
