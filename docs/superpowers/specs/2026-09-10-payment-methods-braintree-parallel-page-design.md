@@ -694,6 +694,36 @@ suites are full-suite-pollution-sensitive rather than newly broken.
    after any diagnostic that touches the index, verify with `git show <branch>:<path>` rather
    than trusting a green test run.
 
+### 16.1 Post-deploy defect: realm split (fixed 2026-09-11, `e013a95d`)
+
+The card fields did not load on the deployed sandbox. Drop-in's SDK ran in the ThemeFrame
+realm as designed, but **MUI portals a Dialog to the top-level document by default**, so the
+container handed to Drop-in belonged to the parent. Drop-in created its field iframes in the
+wrong realm and hung on a handshake that cannot cross, leaving a spinner until the 20s
+timeout. Diagnosis evidence: `scriptInjectedIntoThemeFrame: true`,
+`braintreeGlobalOnThemeWindow: true`, `dialogRenderedIn: parent`,
+`braintreeIframesInParent: 5`, `braintreeIframesInTheme: 0`. Not CSP: the store sends no CSP
+header and every Braintree asset returned 200.
+
+This is the split §4.1 and §15 said must never happen. What hid it: the shipped hosted-form
+dialog *depends* on that same MUI default, so "do nothing" is correct there and wrong here.
+
+Fix: the dialog passes `container={themeFrame.body}` and carries an emotion cache bound to
+the frame head, so dialog, container and SDK share one realm. **Amend §5.4 and §15 to say
+this explicitly**: rendering "in the frame" is not the default and must be requested.
+
+The unit test asserted which *document* was passed to `createDropinWithTimeout` but never
+that the container belonged to it, which is why it passed against a broken page. It now
+asserts `container.ownerDocument === themeFrame` and that the dialog renders inside the frame;
+removing the container prop fails both. Queries are scoped to the frame document, since the
+dialog is no longer in the top-level body.
+
+Verified live with a local build served into the deployed sandbox: dialog in the ThemeFrame,
+four hosted-field iframes (number, expiry, CVV, postal code), no spinner, no alert, Save card
+present, billing prefilled from the address book. **Also observed: `BraintreeClientToken` now
+returns 200 with a real client token**, so the backend endpoint went live between 2026-09-10
+and 2026-09-11. `VaultBraintreeInstrument` remains unexercised.
+
 **Not done, and why.** §13 live verification steps b-e need both a deployed build with
 `BC_CONTEXT.paymentMethodsBraintree = { enabled: true }` and the backend endpoints from
 `docs/handoffs/2026-09-10-braintree-account-vault-backend-prompt.md`, which has not been
