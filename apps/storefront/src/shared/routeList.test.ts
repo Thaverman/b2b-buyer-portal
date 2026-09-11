@@ -171,44 +171,19 @@ describe('/favorites', () => {
   });
 });
 
-describe('braintree payment-methods route', () => {
-  const paymentMethodsConfig = {
-    apiBase: 'https://api.example.com',
-    appClientId: 'app-client-id',
+// The parallel route was folded into /payment-methods, which now selects its add-card
+// mechanism from the same BC_CONTEXT flag. A surviving entry would expose a duplicate page.
+it('no longer carries a separate braintree payment-methods route', () => {
+  window.BC_CONTEXT = {
+    paymentMethods: { apiBase: 'https://api.example.com', appClientId: 'app-client-id' },
+    paymentMethodsBraintree: { enabled: true },
   };
+  primeCustomer(false);
 
-  const hasBraintreePaymentRoute = () =>
+  expect(routeList.some((route) => route.path === '/payment-methods-braintree')).toBe(false);
+  expect(
     getAllowedRoutesWithoutComponent(buildGlobalStateWith({})).some(
       (route) => route.path === '/payment-methods-braintree',
-    );
-
-  it('is offered when the flag is enabled alongside the payment-methods config', () => {
-    window.BC_CONTEXT = {
-      paymentMethods: paymentMethodsConfig,
-      paymentMethodsBraintree: { enabled: true },
-    };
-    primeCustomer(false);
-
-    expect(hasBraintreePaymentRoute()).toBe(true);
-  });
-
-  it('is withheld when the flag is absent', () => {
-    window.BC_CONTEXT = { paymentMethods: paymentMethodsConfig };
-    primeCustomer(false);
-
-    expect(hasBraintreePaymentRoute()).toBe(false);
-  });
-
-  it('is withheld when payment methods themselves are not configured', () => {
-    window.BC_CONTEXT = { paymentMethodsBraintree: { enabled: true } };
-    primeCustomer(false);
-
-    expect(hasBraintreePaymentRoute()).toBe(false);
-  });
-
-  it('is never a nav menu item', () => {
-    expect(routeList.find((route) => route.path === '/payment-methods-braintree')?.isMenuItem).toBe(
-      false,
-    );
-  });
+    ),
+  ).toBe(false);
 });

@@ -243,16 +243,6 @@ export const routeList: (BuyerPortalRoute | RouteItem)[] = [
     idLang: 'global.navMenu.paymentMethods',
   },
   {
-    path: '/payment-methods-braintree',
-    name: 'Payment methods (Braintree)',
-    wsKey: 'paymentMethodsBraintree',
-    // Reachable for side-by-side testing, deliberately never listed in the nav.
-    isMenuItem: false,
-    permissions: accountSettingPermissions,
-    isTokenLogin: true,
-    idLang: 'global.navMenu.paymentMethodsBraintree',
-  },
-  {
     path: '/loyalty',
     name: 'Smart Rewards',
     wsKey: 'loyalty',
@@ -316,18 +306,6 @@ export const getAllowedRoutesWithoutComponent = (globalState: GlobalState): Buye
     if (
       path === '/payment-methods' &&
       (platform !== 'bigcommerce' || !window.BC_CONTEXT?.paymentMethods || isAgenting)
-    ) {
-      return false;
-    }
-
-    // The Braintree variant needs everything /payment-methods needs, plus its own flag,
-    // so customers cannot reach it before the theme turns it on.
-    if (
-      path === '/payment-methods-braintree' &&
-      (platform !== 'bigcommerce' ||
-        !window.BC_CONTEXT?.paymentMethods ||
-        !window.BC_CONTEXT?.paymentMethodsBraintree?.enabled ||
-        isAgenting)
     ) {
       return false;
     }

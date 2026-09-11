@@ -875,3 +875,41 @@ describe('braintree variant', () => {
     expect(screen.queryByRole('button', { name: 'Add card' })).not.toBeInTheDocument();
   });
 });
+
+describe('default variant follows the theme flag', () => {
+  const mockBraintreeClientToken = () =>
+    server.use(
+      http.post(`${apiBase}/customers/Customer/BraintreeClientToken`, () =>
+        HttpResponse.json({ clientToken: 'bt-client-token' }),
+      ),
+    );
+
+  it('uses the Braintree flow, and no cart query, when the flag is on', async () => {
+    window.BC_CONTEXT = {
+      paymentMethods: { apiBase, appClientId },
+      paymentMethodsBraintree: { enabled: true },
+    };
+    mockJwt();
+    mockList([]);
+    mockBraintreeClientToken();
+
+    renderWithProviders(<PaymentMethods />);
+
+    expect(await screen.findByRole('button', { name: 'Add card' })).toBeInTheDocument();
+    expect(hasActiveCart).not.toHaveBeenCalled();
+  });
+
+  it('uses the cart-gated hosted form when the flag is absent', async () => {
+    mockJwt();
+    mockList([]);
+    mockNativePage(availableNativePage);
+    vi.mocked(hasActiveCart).mockResolvedValue(false);
+
+    renderWithProviders(<PaymentMethods />);
+
+    expect(
+      await screen.findByText(/To add a card here, add an item to your cart first/),
+    ).toBeInTheDocument();
+    expect(hasActiveCart).toHaveBeenCalled();
+  });
+});

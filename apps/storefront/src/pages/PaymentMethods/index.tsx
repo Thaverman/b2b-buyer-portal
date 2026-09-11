@@ -32,7 +32,14 @@ type PaymentMethodsProps = Partial<PageProps> & {
   variant?: AddCardVariant;
 };
 
-function PaymentMethods({ variant = 'hostedForm' }: PaymentMethodsProps) {
+// The theme flag chooses the add-card mechanism for this store. It originally exposed a
+// parallel evaluation route; now it selects the flow on /payment-methods itself, so a brand
+// rolls forward or back with a one-line theme change and no redeploy. Absent means today's
+// cart-gated hosted form, so a store that has not opted in is unchanged.
+const flaggedVariant = (): AddCardVariant =>
+  window.BC_CONTEXT?.paymentMethodsBraintree?.enabled ? 'braintree' : 'hostedForm';
+
+function PaymentMethods({ variant }: PaymentMethodsProps) {
   const b3Lang = useB3Lang();
   const queryClient = useQueryClient();
   const [pendingDelete, setPendingDelete] = useState<StoredInstrument | null>(null);
@@ -40,7 +47,8 @@ function PaymentMethods({ variant = 'hostedForm' }: PaymentMethodsProps) {
   const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
   // The JWT identifies the logged-in customer, so a masquerading rep must not manage cards here.
   const isAvailable = isPaymentMethodsAvailable() && !isAgenting;
-  const isBraintree = variant === 'braintree';
+  // An explicit prop wins so tests can drive either flow directly.
+  const isBraintree = (variant ?? flaggedVariant()) === 'braintree';
 
   const { data, isFetching, isError, error, refetch } = useQuery({
     queryKey: ['storedInstruments', customerId],
