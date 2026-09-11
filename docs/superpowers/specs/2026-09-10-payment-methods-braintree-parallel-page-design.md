@@ -724,6 +724,33 @@ present, billing prefilled from the address book. **Also observed: `BraintreeCli
 returns 200 with a real client token**, so the backend endpoint went live between 2026-09-10
 and 2026-09-11. `VaultBraintreeInstrument` remains unexercised.
 
+### 16.2 Folded in: Braintree is now the flag-selected flow (2026-09-11, `581a0ba8`)
+
+`/payment-methods` resolves its add-card mechanism from
+`BC_CONTEXT.paymentMethodsBraintree.enabled` rather than hard-coding the hosted form. Flag on
+gives Braintree with no cart query; flag absent gives today's cart-gated hosted form
+unchanged, so a store that has not opted in is byte-for-byte as before. The parallel
+`/payment-methods-braintree` route, its gate, `routesMap` entry, wrapper and nav key are
+removed: the flag selects the flow on the real page, so a second route would only duplicate
+it. **This supersedes §1's "flag-gated parallel route" shape and §14's fold-in item.**
+
+The flag's meaning changed with it, from "expose the parallel evaluation route" to "use
+Braintree as the add-card mechanism for this store".
+
+**Deliberately kept:** the hosted-form dialog, `hostedForm.ts`, `vaultAccess.ts` and
+`cartPresence.ts`. Until production's Braintree merchant is verified (§2.1) these are the
+rollback path, not dead code, and the flag keeps them reachable so knip stays quiet. Deleting
+them is the remaining fold-in step and should wait until production has run on Braintree.
+
+Verified live with a local build served into the deployed sandbox, on `/payment-methods`
+itself: dialog in the ThemeFrame, four hosted-field iframes, **zero Braintree iframes left in
+the parent**, no spinner, no alert, Save card present, billing prefilled. Rollback is setting
+the theme flag to false, no redeploy.
+
+**Still unproven:** `VaultBraintreeInstrument` has never been exercised in any verification
+run, so saving a card end to end, and §13 step 3 (paying for a sandbox order with the newly
+added card), remain open.
+
 **Not done, and why.** §13 live verification steps b-e need both a deployed build with
 `BC_CONTEXT.paymentMethodsBraintree = { enabled: true }` and the backend endpoints from
 `docs/handoffs/2026-09-10-braintree-account-vault-backend-prompt.md`, which has not been
