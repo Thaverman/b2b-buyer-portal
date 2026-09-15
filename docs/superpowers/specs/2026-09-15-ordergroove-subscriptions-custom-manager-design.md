@@ -155,12 +155,14 @@ error class with `kind`, PascalCase/camelCase-tolerant normalisers where a .NET 
 here only for the auth endpoint; Ordergroove itself is snake_case JSON).
 
 ```ts
-ogFetch<T>(path, init?)                 // adds Authorization, JSON, AbortSignal.timeout, 403 retry
-listAll<T>(path)                         // follows `next` until null
-listPayments(): Promise<OgPayment[]>
-listSubscriptions(): Promise<OgSubscription[]>
-getSubscriptionsUsingToken(token): Promise<OgSubscription[]>   // §5.4 mapping
-getProduct(externalId): Promise<OgProduct>                     // names for the Phase 1 warning
+// internal helpers (not exported until a page consumes them — knip fails on unused exports)
+ogFetch<T>(customerId, url)              // adds Authorization, JSON, 5s timeout, 403 re-mint + retry once
+listAll<T>(customerId, url)              // follows `next` until null
+listPayments / listSubscriptions         // used by the mapping below; exported in Phase 2
+// Phase 1 public surface (barrel `@/shared/service/ordergroove`)
+isSubscriptionsAvailable(): boolean
+getSubscriptionsUsingToken(customerId, token): Promise<OgSubscription[]>   // §5.4 mapping
+getProduct(customerId, externalId): Promise<OgProduct>                     // names for the Phase 1 warning
 // Phase 2+: listUpcomingOrders(), listItems(), listAddresses(), and the mutation functions of §8/§9.
 class OrdergrooveError extends Error { kind: 'unavailable' | 'sessionExpired' | 'rateLimited' | 'timeout' | 'upstream' }
 ```
@@ -254,7 +256,7 @@ in `src/lib/lang/locales/en.json`.
 | file | change |
 |---|---|
 | `src/index.d.ts` | `BC_CONTEXT.subscriptions` (§5.1) |
-| `src/shared/service/ordergroove/{auth,api,types,index}.ts` | new (§5.2–5.4), Phase-1 surface only |
+| `src/shared/service/ordergroove/{config,errors,types,auth,api,index}.ts` | new (§5.2–5.4), Phase-1 surface only |
 | `src/pages/PaymentMethods/hooks/useSubscriptionsUsingInstrument.ts` | new page hook |
 | `src/pages/PaymentMethods/components/DeleteSubscriptionWarning.tsx` | new presentational component (state → markup) |
 | `src/pages/PaymentMethods/index.tsx` | wire hook + component into the existing `B3Dialog`; disable confirm while checking |
