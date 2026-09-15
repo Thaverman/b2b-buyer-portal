@@ -95,13 +95,27 @@ real gateway tokens; otherwise last4/brand is a heuristic only.
 
 ## Open questions (checked against developer.ordergroove.com reference tree 2026-09-02)
 
-1. STILL OPEN — token mode of this store's BC integration: true gateway token
-   vs customer-id-as-token. No BigCommerce-specific developer pages exist in
-   the reference; `token_id` is undescribed everywhere. Ask OG, or probe
-   empirically: read an existing record's token_id via GET /payments/ once
-   keys are in hand.
-2. STILL OPEN — whether a BC stored-instrument token is a valid `token_id`
-   for POST /payments/create/. Not documented anywhere.
+1. CLOSED (spike 2026-09-15) — TRUE GATEWAY TOKENS, not customer-id-as-token.
+   GET /payments/ for customer 80591 returned 8 records; every `token_id` is a
+   64-char hex string (one legacy record is an 11-digit numeric); NONE equals
+   the customer id 80591. So the delete-warning and payment-change flows key on
+   a real gateway token, and last4-only matching is NOT required. (Actual token
+   and merchant-id values intentionally not stored here — read them live.)
+2. CLOSED (spike 2026-09-15) — BC stored-instrument `token` === OG payment
+   `token_id`, EXACT string match. Logged in as customer 80591, called the
+   middleware StoredInstruments (3 instruments, all 64-hex tokens) and OG
+   GET /payments/; the customer's DEFAULT BC instrument's token is byte-for-byte
+   the token_id all 14 active subs use. So: (a) the delete-warning can match a
+   BC instrument to its OG subscriptions EXACTLY on token; (b) add-card /
+   payment-change can hand the BC stored-instrument token straight to OG
+   POST /payments/create as token_id. ASYMMETRY: OG had 4 distinct token_ids
+   vs BC's 3 instruments — OG RETAINS payment records for cards the customer
+   already removed from BC (incl. a legacy 11-digit token). Implication: the
+   warning must be DATA-DRIVEN per token (2 of the 3 BC instruments have ZERO
+   subs — deleting those is safe, no warning), and deleting a BC instrument
+   does NOT delete the OG payment record, so subs keep pointing at a now-
+   unvaulted token and fail at next order unless repointed — which is exactly
+   the risk the warning exists to prevent.
 3. CLOSED (spike 2026-09-02) — CORS is wide open. OPTIONS preflight to
    restapi.ordergroove.com/{subscriptions,payments}/ from Origin
    sandbox.storesupply.com returns 204 with `access-control-allow-origin: *`,
@@ -121,11 +135,26 @@ real gateway tokens; otherwise last4/brand is a heuristic only.
   OG's storefront-auth sig_field|ts|sig format, 2h TTL. Confirmed with sandbox
   BC customer 80591.
 - CORS: closed (see Q3 above).
-- BLOCKED on the authenticated data call (GET /payments/, GET /subscriptions/):
-  OG's storefront-auth header ALSO needs the merchant `public_id`, which is not
-  exposed anonymously (no OG scripts on home/PDP/prod-subs pages without a
-  logged-in subscription context; static.ordergroove.com is not keyed by store
-  hash). Get it from https://rc3.ordergroove.com/keys/ (needs OG admin login),
-  or lift OG's own auth object (og.store.getState().auth) from a logged-in
-  sandbox browser session (needs sandbox customer credentials). Token mode
-  (Q1) and BC-token-as-token_id (Q2) can only be answered once that call runs.
+- Authenticated calls WORK (spike 2026-09-15). Header is JSON
+  `{public_id, sig_field, ts, sig}` where public_id = OG "Your Merchant ID"
+  (from rc3.ordergroove.com/keys) and sig_field/ts/sig come straight from the
+  middleware og-auth cookieValue split on `|`. GET /payments/ and
+  GET /subscriptions/ both returned 200 with live data for customer 80591.
+- DATA SHAPE observed (customer 80591, all real):
+  - Payments: 8 records, several sharing one token_id (OG mints a NEW payment
+    public_id per checkout even when the underlying card/token is identical —
+    5 of the 8 share the same token_id, last4 1111). `live` flag marks the
+    active record. Fields: customer, billing_address (id ref), cc_number_ending,
+    payment_method, public_id, token_id, cc_holder (often null), cc_type (int),
+    cc_exp_date ("M/YYYY"), live.
+  - Subscriptions: 18 total (14 active, 4 cancelled), paginated (`next`).
+    Each has customer, merchant, product ("9537_12118" = productId_variantId
+    style), `payment` (a payment public_id), shipping_address, offer,
+    subscription_type "replenishment", quantity, frequency_days, every/
+    every_period, start_date, cancelled, merchant_order_id, public_id, live.
+  - ALL 14 active subs point at ONE payment record (the live one) -> so "this
+    card is used by N subscriptions" is a real, non-trivial warning here
+    (N=14). Map: sub.payment -> payment.public_id -> payment.token_id.
+- REMAINING: compare OG token_id (64-hex) against the BC StoredInstruments
+  `token` for customer 80591 (needs a Current Customer JWT from a logged-in
+  storefront session; test creds were not on disk in .env).
