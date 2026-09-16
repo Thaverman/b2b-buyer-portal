@@ -179,6 +179,17 @@ real gateway tokens; otherwise last4/brand is a heuristic only.
   with real product names/frequencies, "and 9 more", consequence line, MANAGE
   SUBSCRIPTIONS; clean card -> dialog identical to today, auth not re-minted;
   gate off -> zero Ordergroove/auth requests. No card deleted.
+- Post-review fixes (2026-09-16, committed on dev after the merge): the 5 s bound now wraps
+  the WHOLE check (one `withTimeout` around the hook's queryFn, auth mint included) — before,
+  only each Ordergroove fetch was bounded, so a hung middleware left the confirm button
+  disabled indefinitely; the page and hook share one enable predicate
+  (`Boolean(pendingDelete?.token)`), because a disabled react-query v5 query with no data is
+  `pending` forever and an empty-token instrument showed "Checking…" with no request;
+  `deriveSubscriptionCheckStatus` moved next to the hook and reads `data`/`isError`, so a
+  stale result survives a failed re-check; `everyDays` is an ICU plural ("every day"); the
+  checking line carries `role="status"`; builder defaults are faker-driven (no real customer
+  id in the repo). Reviewer suggestions left open: in-flight auth-mint dedupe, host check on
+  the paginated `next` URL, `isAvailable` in the predicate for masquerade defense in depth.
 - Follow-up candidates (not in scope): group listed subscriptions by product
   with a count (the same product appears 4x for this customer); Phase 4 adds
   "move these subscriptions to another card" from this dialog.

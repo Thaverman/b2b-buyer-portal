@@ -209,7 +209,7 @@ Rules:
 | `unavailable` | no `BC_CONTEXT.subscriptions` / wrong platform | no OG call, dialog unchanged | route hidden |
 | `sessionExpired` | JWT 404, or OG 403 twice | disclosure line (§6.3) | existing "session expired" alert pattern |
 | `rateLimited` | OG 429 (6000 req/IP/min) | disclosure line | retry alert |
-| `timeout` | 5s `AbortSignal.timeout` | disclosure line | retry alert |
+| `timeout` | 5s deadline (`Promise.race`; Phase 1 puts one deadline around the whole check, auth mint included) | disclosure line | retry alert |
 | `upstream` | anything else | disclosure line | retry alert |
 
 ## 6. Phase 1 — subscription warning on card delete (full design)
@@ -228,9 +228,9 @@ affordance — but the confirm button is **disabled while the check is in flight
 ```
 setPendingDelete(instrument)
   → useSubscriptionsUsingInstrument(instrument.token)          // page hook, react-query
-      queryKey ['subscriptionsUsingToken', customerId, token], enabled: Boolean(pendingDelete), retry: 0
+      queryKey ['subscriptionsUsingToken', customerId, token], enabled: Boolean(pendingDelete?.token), retry: 0
       → getSubscriptionsUsingToken(token)                       // shared service, §5.4
-      → best-effort getProduct() for each distinct product id   // names for the list; failure ⇒ count-only
+      → best-effort getProduct() for each distinct product id   // names for the list; failure ⇒ unnamed line
   → <DeleteSubscriptionWarning state=… />                       // rendered inside the existing B3Dialog body
 ```
 
@@ -247,9 +247,9 @@ No cache writes on delete success (the page shows no subscription data). On dele
 | N subscriptions | `Alert severity="warning"`: **"This card is used by {count} active subscription(s):"** then up to 5 lines **"{product} — {frequency}"** (+ "and {n} more"), then **"If you delete it, these subscriptions can't be charged at their next order. Change their payment method first."** and a link **"Manage subscriptions"** → hash route `/manage-subscriptions` (internal router navigation; the portal is inside the ThemeFrame, so no plain `<a>`). | enabled |
 | check failed | `Alert severity="info"`: **"We couldn't check whether any subscriptions use this card."** | enabled |
 
-Product names are best-effort: if the product fetches fail, the alert shows the count and the
-frequency-less list is omitted. Locale keys under `paymentMethods.deleteDialog.subscriptions.*`
-in `src/lib/lang/locales/en.json`.
+Product names are best-effort: a subscription whose product fetch fails is still listed, as
+**"Subscription — {frequency}"**, so the count and the list stay consistent. Locale keys under
+`paymentMethods.deleteDialog.subscriptions.*` in `src/lib/lang/locales/en.json`.
 
 ### 6.4 Files
 
@@ -286,7 +286,7 @@ Cases:
 3. Token matched by a `live:false` payment record referenced by a live subscription → still warns.
 4. 14 subscriptions across two pages, 2 products → count 14, product names, "+ N more" rule,
    confirm disabled during the check and enabled after.
-5. Product fetch fails → count-only warning.
+5. Product fetch fails → the subscription is listed without a product name.
 6. Ordergroove `403` once → auth re-minted, second call succeeds; `403` twice → disclosure state,
    confirm enabled.
 7. Auth endpoint failure / JWT 404 / timeout → disclosure state, confirm enabled.
