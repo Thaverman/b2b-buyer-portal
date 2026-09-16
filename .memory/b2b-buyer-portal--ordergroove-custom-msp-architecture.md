@@ -2,8 +2,8 @@
 title: 'Ordergroove integration decoded for custom manage-subscriptions scoping: portal iframes theme /subscriptions hosting og.msi; og_auth is minted by the middleware ordergroove-auth endpoint; custom MSP = OG REST storefront-auth from the browser, payment change included (payments/create + use_for_all are Storefront-scope; no server-side component needed beyond signature minting)'
 type: concept
 created: 2026-09-02
-updated: 2026-09-02
-lastVerified: 2026-09-02
+updated: 2026-09-16
+lastVerified: 2026-09-16
 repo: b2b-buyer-portal
 storeHash: 24erkpw9h6
 website: SSW
@@ -155,6 +155,29 @@ real gateway tokens; otherwise last4/brand is a heuristic only.
   - ALL 14 active subs point at ONE payment record (the live one) -> so "this
     card is used by N subscriptions" is a real, non-trivial warning here
     (N=14). Map: sub.payment -> payment.public_id -> payment.token_id.
-- REMAINING: compare OG token_id (64-hex) against the BC StoredInstruments
-  `token` for customer 80591 (needs a Current Customer JWT from a logged-in
-  storefront session; test creds were not on disk in .env).
+- RESOLVED 2026-09-15: the BC StoredInstruments `token` and the OG `token_id`
+  are the same value (see Q2 above).
+
+## Phase 1 implemented and live-verified (2026-09-16)
+
+- Branch `worktree-ordergroove-phase1-delete-warning` (7 commits on dev 850b311b):
+  `BC_CONTEXT.subscriptions` gate, `src/shared/service/ordergroove/` (auth
+  mint + module-memory cache, API client with 5s Promise.race timeout and one
+  403 re-mint, recursive pagination, token->subscriptions mapping, getProduct),
+  `DeleteSubscriptionWarning` + 10 locale keys, `useSubscriptionsUsingInstrument`
+  hook, wiring through `B3Dialog disabledSaveBtn`. 37 new tests; PaymentMethods
+  suite 115 green; tsc/depcruise/eslint clean; knip only flags the pre-existing
+  `BillingStateOption`.
+- Live on sandbox (Playwright, local deploy-flavour build served over
+  `/content/b2bBuyerPortal/dist/**`, config injected with an init-script SETTER on
+  `window.BC_CONTEXT` because the theme assigns the whole object then sets
+  properties): default card -> "Checking your subscriptions…" with confirm
+  disabled, settled ~1.1s, then "This card is used by 14 active subscriptions:"
+  with real product names/frequencies, "and 9 more", consequence line, MANAGE
+  SUBSCRIPTIONS; clean card -> dialog identical to today, auth not re-minted;
+  gate off -> zero Ordergroove/auth requests. No card deleted.
+- Follow-up candidates (not in scope): group listed subscriptions by product
+  with a count (the same product appears 4x for this customer); Phase 4 adds
+  "move these subscriptions to another card" from this dialog.
+- Automation gotcha reconfirmed: MUI uppercases button labels via CSS and
+  `innerText` reflects `text-transform` — match on `textContent`.
