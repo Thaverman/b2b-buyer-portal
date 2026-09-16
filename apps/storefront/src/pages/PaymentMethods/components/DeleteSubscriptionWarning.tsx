@@ -2,9 +2,10 @@ import { Alert, Box, Button, Typography } from '@mui/material';
 
 import { useB3Lang } from '@/lib/lang';
 
-import { AffectedSubscription } from '../hooks/useSubscriptionsUsingInstrument';
-
-export type SubscriptionCheckStatus = 'checking' | 'clear' | 'failed' | 'affected';
+import {
+  AffectedSubscription,
+  SubscriptionCheckStatus,
+} from '../hooks/useSubscriptionsUsingInstrument';
 
 interface DeleteSubscriptionWarningProps {
   status: SubscriptionCheckStatus;
@@ -25,8 +26,9 @@ function DeleteSubscriptionWarning({
     return null;
   }
   if (status === 'checking') {
+    // A live region: the confirm button is disabled meanwhile, and assistive tech needs to know why.
     return (
-      <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+      <Typography role="status" variant="body2" color="text.secondary" sx={{ mt: 2 }}>
         {b3Lang('paymentMethods.deleteDialog.subscriptions.checking')}
       </Typography>
     );

@@ -248,7 +248,7 @@ it('lists the affected subscriptions across pages and disables confirm until the
   expect(confirmButton()).toBeEnabled();
 });
 
-it('falls back to a count-only list when a product lookup fails', async () => {
+it('lists a subscription without its product name when the lookup fails', async () => {
   const card = buildStoredInstrumentWith('WHATEVER_VALUES');
   const payment = buildOgPaymentWith({ token_id: card.token });
 
@@ -273,6 +273,21 @@ it('falls back to a count-only list when a product lookup fails', async () => {
     await screen.findByText('This card is used by 1 active subscription:'),
   ).toBeInTheDocument();
   expect(screen.getByText('Subscription — every 10 days')).toBeInTheDocument();
+});
+
+it('skips the check for an instrument without a token instead of checking forever', async () => {
+  configureSubscriptions();
+  mockJwt();
+  mockList([buildStoredInstrumentWith({ token: '' })]);
+  const mints = mockOgAuth();
+
+  const { user } = renderPage();
+  await openDeleteDialog(user);
+
+  // Synchronous on purpose: with the check wrongly enabled the "checking" line shows immediately.
+  expect(screen.queryByText('Checking your subscriptions…')).not.toBeInTheDocument();
+  expect(confirmButton()).toBeEnabled();
+  expect(mints).not.toHaveBeenCalled();
 });
 
 it('discloses a failed check and still allows deletion', async () => {

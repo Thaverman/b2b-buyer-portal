@@ -4,6 +4,7 @@ import {
   buildOgPaymentWith,
   buildOgProductWith,
   buildOgSubscriptionWith,
+  faker,
   http,
   HttpResponse,
   renderHook,
@@ -11,7 +12,11 @@ import {
   waitFor,
 } from 'tests/test-utils';
 
-import { useSubscriptionsUsingInstrument } from './useSubscriptionsUsingInstrument';
+import {
+  AffectedSubscription,
+  deriveSubscriptionCheckStatus,
+  useSubscriptionsUsingInstrument,
+} from './useSubscriptionsUsingInstrument';
 
 const { server } = startMockServer();
 
@@ -132,7 +137,11 @@ it('keeps the subscription with a null name when its product lookup fails', asyn
 
   await waitFor(() => expect(result.current.isSuccess).toBe(true));
   expect(result.current.data).toEqual([
-    { publicId: subscription.public_id, productName: null, frequencyDays: 28 },
+    {
+      publicId: subscription.public_id,
+      productName: null,
+      frequencyDays: subscription.frequency_days,
+    },
   ]);
 });
 
@@ -144,4 +153,39 @@ it('surfaces an Ordergroove failure as an error', async () => {
   });
 
   await waitFor(() => expect(result.current.isError).toBe(true));
+});
+
+describe('deriveSubscriptionCheckStatus', () => {
+  const affected = (): AffectedSubscription => ({
+    publicId: faker.string.uuid(),
+    productName: faker.commerce.productName(),
+    frequencyDays: 28,
+  });
+
+  it('is clear while the check is disabled, whatever the idle query reports', () => {
+    expect(deriveSubscriptionCheckStatus(false, { data: undefined, isError: false })).toBe('clear');
+  });
+
+  it('is checking until the first result arrives', () => {
+    expect(deriveSubscriptionCheckStatus(true, { data: undefined, isError: false })).toBe(
+      'checking',
+    );
+  });
+
+  it('is failed only when there is no result to show', () => {
+    expect(deriveSubscriptionCheckStatus(true, { data: undefined, isError: true })).toBe('failed');
+  });
+
+  it('reads clear or affected from the result', () => {
+    expect(deriveSubscriptionCheckStatus(true, { data: [], isError: false })).toBe('clear');
+    expect(deriveSubscriptionCheckStatus(true, { data: [affected()], isError: false })).toBe(
+      'affected',
+    );
+  });
+
+  it('keeps a known result when a later re-check fails', () => {
+    expect(deriveSubscriptionCheckStatus(true, { data: [affected()], isError: true })).toBe(
+      'affected',
+    );
+  });
 });

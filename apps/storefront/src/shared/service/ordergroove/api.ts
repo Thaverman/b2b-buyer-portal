@@ -15,9 +15,9 @@ interface OgPage<T> {
 
 // Promise.race rather than AbortSignal: nothing else in the portal passes signals to fetch, and
 // the jsdom/undici pairing in tests has historically disagreed about AbortSignal identity.
-const withTimeout = <T>(promise: Promise<T>): Promise<T> =>
+export const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> =>
   new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new OrdergrooveError('timeout')), REQUEST_TIMEOUT_MS);
+    const timer = setTimeout(() => reject(new OrdergrooveError('timeout')), ms);
     promise.then(resolve, reject).finally(() => clearTimeout(timer));
   });
 
@@ -32,6 +32,7 @@ const request = async (
   try {
     response = await withTimeout(
       fetch(url, { headers: { Authorization: authorization, 'Content-Type': 'application/json' } }),
+      REQUEST_TIMEOUT_MS,
     );
   } catch (error) {
     throw error instanceof OrdergrooveError ? error : new OrdergrooveError('upstream');

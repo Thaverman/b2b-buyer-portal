@@ -13,11 +13,12 @@ import { snackbar } from '@/utils/b3Tip';
 
 import AddPaymentMethodBraintreeDialog from './components/AddPaymentMethodBraintreeDialog';
 import AddPaymentMethodDialog from './components/AddPaymentMethodDialog';
-import DeleteSubscriptionWarning, {
-  SubscriptionCheckStatus,
-} from './components/DeleteSubscriptionWarning';
+import DeleteSubscriptionWarning from './components/DeleteSubscriptionWarning';
 import PaymentMethodRow from './components/PaymentMethodRow';
-import { useSubscriptionsUsingInstrument } from './hooks/useSubscriptionsUsingInstrument';
+import {
+  deriveSubscriptionCheckStatus,
+  useSubscriptionsUsingInstrument,
+} from './hooks/useSubscriptionsUsingInstrument';
 import {
   deleteStoredInstrument,
   getBraintreeClientToken,
@@ -51,24 +52,6 @@ const isFlagEnabled = (value: boolean | string | undefined) =>
 const flaggedVariant = (): AddCardVariant =>
   isFlagEnabled(window.BC_CONTEXT?.paymentMethodsBraintree?.enabled) ? 'braintree' : 'hostedForm';
 
-// Four dialog states (spec §6.3). `data` present means resolved even while a background refetch runs.
-const deriveSubscriptionCheckStatus = (
-  enabled: boolean,
-  query: ReturnType<typeof useSubscriptionsUsingInstrument>,
-): SubscriptionCheckStatus => {
-  if (!enabled) {
-    return 'clear';
-  }
-  if (query.isPending) {
-    return 'checking';
-  }
-  if (query.isError) {
-    return 'failed';
-  }
-
-  return query.data.length > 0 ? 'affected' : 'clear';
-};
-
 function PaymentMethods({ variant }: PaymentMethodsProps) {
   const b3Lang = useB3Lang();
   const queryClient = useQueryClient();
@@ -80,8 +63,9 @@ function PaymentMethods({ variant }: PaymentMethodsProps) {
   const isAvailable = isPaymentMethodsAvailable() && !isAgenting;
   // An explicit prop wins so tests can drive either flow directly.
   const isBraintree = (variant ?? flaggedVariant()) === 'braintree';
-  // Only while the dialog is open: the check is per card and the page shows no subscription data.
-  const isSubscriptionCheckEnabled = isSubscriptionsAvailable() && Boolean(pendingDelete);
+  // Only while the dialog is open, and only for a card with a token to look up: the check is per
+  // card and the page shows no subscription data. The same predicate feeds the hook's `enabled`.
+  const isSubscriptionCheckEnabled = isSubscriptionsAvailable() && Boolean(pendingDelete?.token);
   const affectedSubscriptions = useSubscriptionsUsingInstrument(
     customerId,
     pendingDelete?.token,
