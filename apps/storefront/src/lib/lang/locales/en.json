@@ -773,7 +773,7 @@
   "paymentMethods.deleteDialog.subscriptions.itemUnnamed": "Subscription — {frequency}",
   "paymentMethods.deleteDialog.subscriptions.more": "and {count} more",
   "paymentMethods.deleteDialog.subscriptions.everyWeeks": "every {count, plural, one {week} other {# weeks}}",
-  "paymentMethods.deleteDialog.subscriptions.everyDays": "every {count} days",
+  "paymentMethods.deleteDialog.subscriptions.everyDays": "every {count, plural, one {day} other {# days}}",
   "paymentMethods.deleteDialog.subscriptions.consequence": "If you delete it, these subscriptions can't be charged at their next order. Change their payment method first.",
   "paymentMethods.deleteDialog.subscriptions.manage": "Manage subscriptions",
   "paymentMethods.deleteDialog.subscriptions.checkFailed": "We couldn't check whether any subscriptions use this card.",
