@@ -42,8 +42,14 @@ type PaymentMethodsProps = Partial<PageProps> & {
 // parallel evaluation route; now it selects the flow on /payment-methods itself, so a brand
 // rolls forward or back with a one-line theme change and no redeploy. Absent means today's
 // cart-gated hosted form, so a store that has not opted in is unchanged.
+// Theme templates emit booleans as strings routinely, so accept "true" as well as true.
+// A plain truthiness check is wrong here: the string "false" is truthy too, and would switch
+// on a store the theme had explicitly switched off.
+const isFlagEnabled = (value: boolean | string | undefined) =>
+  value === true || (typeof value === 'string' && value.toLowerCase() === 'true');
+
 const flaggedVariant = (): AddCardVariant =>
-  window.BC_CONTEXT?.paymentMethodsBraintree?.enabled ? 'braintree' : 'hostedForm';
+  isFlagEnabled(window.BC_CONTEXT?.paymentMethodsBraintree?.enabled) ? 'braintree' : 'hostedForm';
 
 // Four dialog states (spec §6.3). `data` present means resolved even while a background refetch runs.
 const deriveSubscriptionCheckStatus = (

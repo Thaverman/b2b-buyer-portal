@@ -76,7 +76,7 @@ declare global {
         appClientId: string;
       };
       /** Gates the parallel Braintree add-card route; absent = the route does not exist. */
-      paymentMethodsBraintree?: { enabled: boolean };
+      paymentMethodsBraintree?: { enabled: boolean | string };
       /**
        * Gates every Ordergroove-backed feature (subscription warning on /payment-methods,
        * later the custom subscriptions page); absent = feature off.

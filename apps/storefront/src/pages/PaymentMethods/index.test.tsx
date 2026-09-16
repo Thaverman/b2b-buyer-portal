@@ -899,6 +899,40 @@ describe('default variant follows the theme flag', () => {
     expect(hasActiveCart).not.toHaveBeenCalled();
   });
 
+  it.each([true, 'true', 'True'])('treats %o as enabled', async (enabled) => {
+    window.BC_CONTEXT = {
+      paymentMethods: { apiBase, appClientId },
+      paymentMethodsBraintree: { enabled } as { enabled: boolean | string },
+    };
+    mockJwt();
+    mockList([]);
+    mockBraintreeClientToken();
+
+    renderWithProviders(<PaymentMethods />);
+
+    expect(await screen.findByRole('button', { name: 'Add card' })).toBeInTheDocument();
+    expect(hasActiveCart).not.toHaveBeenCalled();
+  });
+
+  // The string "false" is truthy, so a plain truthiness check would switch a store ON that
+  // the theme had explicitly turned OFF. Themes emit booleans as strings routinely.
+  it.each([false, 'false', 'False', ''])('treats %o as disabled', async (enabled) => {
+    window.BC_CONTEXT = {
+      paymentMethods: { apiBase, appClientId },
+      paymentMethodsBraintree: { enabled } as { enabled: boolean | string },
+    };
+    mockJwt();
+    mockList([]);
+    mockNativePage(availableNativePage);
+    vi.mocked(hasActiveCart).mockResolvedValue(false);
+
+    renderWithProviders(<PaymentMethods />);
+
+    expect(
+      await screen.findByText(/To add a card here, add an item to your cart first/),
+    ).toBeInTheDocument();
+  });
+
   it('uses the cart-gated hosted form when the flag is absent', async () => {
     mockJwt();
     mockList([]);
