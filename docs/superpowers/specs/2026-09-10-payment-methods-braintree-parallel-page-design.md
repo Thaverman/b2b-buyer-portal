@@ -39,6 +39,11 @@ page using that form. Braintree's own SDK has no such dependency.
 nav; the winner gets folded into the single `/payment-methods` page as a follow-up and the
 loser's dialog is deleted then.
 
+> **SUPERSEDED 2026-09-11 — see §16.2.** The fold-in has happened. There is no parallel route
+> any more: `/payment-methods` selects its add-card flow from the same flag, and
+> `/payment-methods-braintree` is deleted. The rest of this section, and §4.2, §5.1 and §5.2,
+> describe the evaluation shape as originally built; read §16.2 for what is actually deployed.
+
 ## 2. Go/no-go gate (must pass before any code)
 
 **The design is void if BigCommerce's configured Braintree gateway is a different Braintree
