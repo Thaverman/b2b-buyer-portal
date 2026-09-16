@@ -160,7 +160,10 @@ real gateway tokens; otherwise last4/brand is a heuristic only.
 
 ## Phase 1 implemented and live-verified (2026-09-16)
 
-- Branch `worktree-ordergroove-phase1-delete-warning` (7 commits on dev 850b311b):
+- Branch `worktree-ordergroove-phase1-delete-warning` (8 commits on dev 850b311b, merged into
+  local dev as adf1eee3 on 2026-09-16 and the branch deleted; re-verified on that commit the same
+  day: tsc clean, depcruise clean, eslint/knip only the pre-existing baseline findings, scoped
+  suites 17 files / 141 tests green):
   `BC_CONTEXT.subscriptions` gate, `src/shared/service/ordergroove/` (auth
   mint + module-memory cache, API client with 5s Promise.race timeout and one
   403 re-mint, recursive pagination, token->subscriptions mapping, getProduct),
