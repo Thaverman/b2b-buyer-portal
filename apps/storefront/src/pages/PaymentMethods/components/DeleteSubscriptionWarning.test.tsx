@@ -1,6 +1,7 @@
 import { faker, renderWithProviders, screen } from 'tests/test-utils';
 
 import { AffectedSubscription } from '../hooks/useSubscriptionsUsingInstrument';
+
 import DeleteSubscriptionWarning from './DeleteSubscriptionWarning';
 
 const affected = (overrides: Partial<AffectedSubscription> = {}): AffectedSubscription => ({
@@ -20,7 +21,11 @@ it('renders nothing when the card is clear', () => {
 
 it('says it is checking', () => {
   renderWithProviders(
-    <DeleteSubscriptionWarning status="checking" subscriptions={[]} onManageSubscriptions={vi.fn()} />,
+    <DeleteSubscriptionWarning
+      status="checking"
+      subscriptions={[]}
+      onManageSubscriptions={vi.fn()}
+    />,
   );
 
   expect(screen.getByText('Checking your subscriptions…')).toBeInTheDocument();
@@ -28,7 +33,11 @@ it('says it is checking', () => {
 
 it('discloses when the check failed', () => {
   renderWithProviders(
-    <DeleteSubscriptionWarning status="failed" subscriptions={[]} onManageSubscriptions={vi.fn()} />,
+    <DeleteSubscriptionWarning
+      status="failed"
+      subscriptions={[]}
+      onManageSubscriptions={vi.fn()}
+    />,
   );
 
   expect(

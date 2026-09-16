@@ -1,6 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { getProduct, getSubscriptionsUsingToken, OgSubscription } from '@/shared/service/ordergroove';
+import {
+  getProduct,
+  getSubscriptionsUsingToken,
+  OgSubscription,
+} from '@/shared/service/ordergroove';
 
 /** One active subscription charged to the card being deleted, ready for display. */
 export interface AffectedSubscription {

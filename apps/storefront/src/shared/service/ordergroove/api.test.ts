@@ -44,7 +44,11 @@ const mockSubscriptions = (subscriptions: ReturnType<typeof buildOgSubscriptionW
 
 beforeEach(() => {
   window.BC_CONTEXT = {
-    subscriptions: { merchantId: 'merchant-public-id', authEndpoint, appClientId: 'ssw-app-client-id' },
+    subscriptions: {
+      merchantId: 'merchant-public-id',
+      authEndpoint,
+      appClientId: 'ssw-app-client-id',
+    },
   };
   invalidateAuthorization();
   mockAuth();

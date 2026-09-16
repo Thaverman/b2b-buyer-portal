@@ -65,7 +65,12 @@ const mint = async (customerId: string): Promise<CachedAuthorization> => {
   return {
     customerId,
     // Ordergroove's storefront-auth header is this JSON object as a string.
-    header: JSON.stringify({ public_id: config.merchantId, sig_field: sigField, ts: Number(ts), sig }),
+    header: JSON.stringify({
+      public_id: config.merchantId,
+      sig_field: sigField,
+      ts: Number(ts),
+      sig,
+    }),
     expiresAt: Date.now() + (body.expiresIn ?? DEFAULT_TTL_SECONDS) * 1000,
   };
 };

@@ -1,4 +1,9 @@
-type OrdergrooveErrorKind = 'unavailable' | 'sessionExpired' | 'rateLimited' | 'timeout' | 'upstream';
+type OrdergrooveErrorKind =
+  | 'unavailable'
+  | 'sessionExpired'
+  | 'rateLimited'
+  | 'timeout'
+  | 'upstream';
 
 export class OrdergrooveError extends Error {
   kind: OrdergrooveErrorKind;

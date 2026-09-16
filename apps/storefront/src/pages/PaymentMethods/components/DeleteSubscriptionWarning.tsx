@@ -1,4 +1,4 @@
-import { Alert, Box, Link, Typography } from '@mui/material';
+import { Alert, Box, Button, Typography } from '@mui/material';
 
 import { useB3Lang } from '@/lib/lang';
 
@@ -74,16 +74,10 @@ function DeleteSubscriptionWarning({
       <Typography variant="body2">
         {b3Lang('paymentMethods.deleteDialog.subscriptions.consequence')}
       </Typography>
-      {/* A button-styled link: internal router navigation, never a plain anchor inside the ThemeFrame. */}
-      <Link
-        component="button"
-        type="button"
-        variant="body2"
-        onClick={onManageSubscriptions}
-        sx={{ mt: 1 }}
-      >
+      {/* A button, not an anchor: internal router navigation inside the ThemeFrame. */}
+      <Button variant="text" size="small" onClick={onManageSubscriptions} sx={{ mt: 1, px: 0 }}>
         {b3Lang('paymentMethods.deleteDialog.subscriptions.manage')}
-      </Link>
+      </Button>
     </Alert>
   );
 }

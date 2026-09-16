@@ -14,7 +14,11 @@ const mockJwt = () => server.use(http.get(currentJwtUrl, () => HttpResponse.text
 
 beforeEach(() => {
   window.BC_CONTEXT = {
-    subscriptions: { merchantId: 'merchant-public-id', authEndpoint, appClientId: 'ssw-app-client-id' },
+    subscriptions: {
+      merchantId: 'merchant-public-id',
+      authEndpoint,
+      appClientId: 'ssw-app-client-id',
+    },
   };
   invalidateAuthorization();
 });
@@ -64,7 +68,11 @@ it('reuses the header for the same customer instead of minting again', async () 
     http.post(authEndpoint, () => {
       mints();
 
-      return HttpResponse.json({ success: true, cookieValue: `${customerId}|1|sig`, expiresIn: 7200 });
+      return HttpResponse.json({
+        success: true,
+        cookieValue: `${customerId}|1|sig`,
+        expiresIn: 7200,
+      });
     }),
   );
 
@@ -84,7 +92,11 @@ it('mints again after the cache is invalidated', async () => {
     http.post(authEndpoint, () => {
       mints();
 
-      return HttpResponse.json({ success: true, cookieValue: `${customerId}|1|sig`, expiresIn: 7200 });
+      return HttpResponse.json({
+        success: true,
+        cookieValue: `${customerId}|1|sig`,
+        expiresIn: 7200,
+      });
     }),
   );
 
@@ -115,16 +127,24 @@ it('reports an expired session when the middleware rejects the JWT', async () =>
 it('reports upstream when the middleware fails or returns a malformed triplet', async () => {
   mockJwt();
   server.use(http.post(authEndpoint, () => new HttpResponse(null, { status: 500 })));
-  await expect(getAuthorizationHeader(someCustomerId())).rejects.toMatchObject({ kind: 'upstream' });
+  await expect(getAuthorizationHeader(someCustomerId())).rejects.toMatchObject({
+    kind: 'upstream',
+  });
 
   server.use(
-    http.post(authEndpoint, () => HttpResponse.json({ success: true, cookieValue: 'not-a-triplet' })),
+    http.post(authEndpoint, () =>
+      HttpResponse.json({ success: true, cookieValue: 'not-a-triplet' }),
+    ),
   );
-  await expect(getAuthorizationHeader(someCustomerId())).rejects.toMatchObject({ kind: 'upstream' });
+  await expect(getAuthorizationHeader(someCustomerId())).rejects.toMatchObject({
+    kind: 'upstream',
+  });
 });
 
 it('reports unavailable when the host config is missing', async () => {
   delete window.BC_CONTEXT;
 
-  await expect(getAuthorizationHeader(someCustomerId())).rejects.toMatchObject({ kind: 'unavailable' });
+  await expect(getAuthorizationHeader(someCustomerId())).rejects.toMatchObject({
+    kind: 'unavailable',
+  });
 });

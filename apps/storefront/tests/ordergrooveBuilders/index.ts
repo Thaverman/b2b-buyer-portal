@@ -1,7 +1,7 @@
 import { faker } from '@faker-js/faker';
+import { builder } from 'tests/builder';
 
 import { OgPayment, OgProduct, OgSubscription } from '@/shared/service/ordergroove';
-import { builder } from 'tests/builder';
 
 const hex = (length: number) => faker.string.hexadecimal({ length, prefix: '' }).toLowerCase();
 

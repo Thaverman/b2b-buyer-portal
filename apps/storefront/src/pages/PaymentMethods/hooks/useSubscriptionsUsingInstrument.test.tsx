@@ -1,6 +1,5 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PropsWithChildren } from 'react';
-
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   buildOgPaymentWith,
   buildOgProductWith,
@@ -40,7 +39,11 @@ const wrapper = Wrapper;
 
 beforeEach(() => {
   window.BC_CONTEXT = {
-    subscriptions: { merchantId: 'merchant-public-id', authEndpoint, appClientId: 'ssw-app-client-id' },
+    subscriptions: {
+      merchantId: 'merchant-public-id',
+      authEndpoint,
+      appClientId: 'ssw-app-client-id',
+    },
   };
   server.use(
     http.get(currentJwtUrl, () => HttpResponse.text('fresh-jwt')),
@@ -64,13 +67,17 @@ it('does nothing while disabled or without a token', () => {
     }),
   );
 
-  const disabled = renderHook(() => useSubscriptionsUsingInstrument(1, 'tok', false), { wrapper });
-  const noToken = renderHook(() => useSubscriptionsUsingInstrument(1, undefined, true), {
-    wrapper,
-  });
+  const { result: whenDisabled } = renderHook(
+    () => useSubscriptionsUsingInstrument(1, 'tok', false),
+    { wrapper },
+  );
+  const { result: withoutToken } = renderHook(
+    () => useSubscriptionsUsingInstrument(1, undefined, true),
+    { wrapper },
+  );
 
-  expect(disabled.result.current.fetchStatus).toBe('idle');
-  expect(noToken.result.current.fetchStatus).toBe('idle');
+  expect(whenDisabled.current.fetchStatus).toBe('idle');
+  expect(withoutToken.current.fetchStatus).toBe('idle');
   expect(requests).not.toHaveBeenCalled();
 });
 
