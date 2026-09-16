@@ -67,6 +67,18 @@ declare global {
       };
       /** Gates the parallel Braintree add-card route; absent = the route does not exist. */
       paymentMethodsBraintree?: { enabled: boolean };
+      /**
+       * Gates every Ordergroove-backed feature (subscription warning on /payment-methods,
+       * later the custom subscriptions page); absent = feature off.
+       */
+      subscriptions?: {
+        /** Ordergroove "Your Merchant ID" — the REST API `public_id`. Public, not a secret. */
+        merchantId: string;
+        /** SSW middleware endpoint that mints the storefront-auth triplet (customerId|ts|sig). */
+        authEndpoint: string;
+        /** SSW app client id used to mint the Current Customer JWT sent to authEndpoint. */
+        appClientId: string;
+      };
       /** Gates the /loyalty page; absent (or any field missing) = feature off. */
       loyalty?: {
         /** Influence.io shop key (public). */
