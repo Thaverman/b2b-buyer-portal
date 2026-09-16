@@ -190,7 +190,20 @@ const getCompanyUserInfo = async () => {
   return undefined;
 };
 
+/**
+ * BigCommerce answers /customer/current.jwt with a 404 for a signed-out shopper, which the browser
+ * logs as a console error — and Noibu records as a failed request — on every guest page view. The
+ * platform's data layer already carries the session's customer id inline, ahead of the portal
+ * loader, so a guest can be recognised without the round trip.
+ *
+ * Deliberately fails open: an absent data layer must still attempt the login, because skipping the
+ * call for a shopper who IS signed in silently breaks portal login.
+ */
+const isSignedOutShopper = () => Boolean(window.bodl) && !window.bodl?.shopper?.customer_id;
+
 const loginWithCurrentCustomerJWT = async () => {
+  if (isSignedOutShopper()) return undefined;
+
   const prevCurrentCustomerJWT = store.getState().company.tokens.currentCustomerJWT;
   const currentCustomerJWT = await getCurrentCustomerJWT(getAppClientId()).catch((error) => {
     // eslint-disable-next-line no-console

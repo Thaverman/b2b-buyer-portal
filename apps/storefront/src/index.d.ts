@@ -57,6 +57,16 @@ declare global {
     tipDispatch: DispatchProps;
     globalTipDispatch: any;
     dataLayer?: Record<string, unknown>[];
+    /**
+     * BigCommerce Open Data Layer, emitted inline by the platform from the storefront session
+     * ahead of the portal loader. `shopper.customer_id` is null for a signed-out shopper.
+     * Absent on stores with the data layer turned off, so every read must fail open.
+     */
+    bodl?: {
+      shopper?: {
+        customer_id?: number | string | null;
+      };
+    };
     /** BigCommerce storefront context set by the host project; `storeSuffix` gates order-id obfuscation. */
     BC_CONTEXT?: {
       storeSuffix?: string;

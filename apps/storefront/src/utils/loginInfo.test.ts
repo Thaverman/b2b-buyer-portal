@@ -2,6 +2,7 @@ import { http, HttpResponse, startMockServer } from 'tests/test-utils';
 
 import { RawTierAttribute, resolveLoyaltyEntitlement } from '@/pages/Loyalty/api';
 import { getCustomerInfo } from '@/shared/service/bc';
+import { getCurrentCustomerInfo } from '@/utils/loginInfo';
 
 // Nothing else asserts that the `loyaltyTier` alias src/shared/service/bc/graphql/user.ts
 // builds into the query and the `attributes?.loyaltyTier` property access this module's
@@ -81,4 +82,60 @@ it('resolves to not-entitled from the exact attributes.loyaltyTier shape the que
   expect(resolveLoyaltyEntitlement(attributes?.loyaltyTier as RawTierAttribute | undefined)).toBe(
     false,
   );
+});
+
+describe('getCurrentCustomerJWT is skipped for shoppers BigCommerce already reports as signed out', () => {
+  // BigCommerce answers /customer/current.jwt with a 404 for signed-out shoppers, which the
+  // browser logs as a console error on every guest page view. These tests pin the gate that
+  // avoids the round trip, and — just as important — the two cases where it must NOT engage:
+  // skipping the call for a shopper who IS signed in silently breaks portal login.
+  const currentJwtUrl = 'http://localhost:3000/customer/current.jwt';
+
+  // Verbatim prod response body, so the assertions run against what BigCommerce really returns.
+  const guestJwtResponse = () =>
+    HttpResponse.text(
+      '{"errors":[{"detail":"Customer was not logged in so JWT token for current customer could not be generated."}]}',
+      { status: 404 },
+    );
+
+  afterEach(() => {
+    delete window.bodl;
+  });
+
+  const trackJwtRequests = () => {
+    const jwtRequested = vi.fn();
+    server.use(
+      http.get(currentJwtUrl, () => {
+        jwtRequested();
+        return guestJwtResponse();
+      }),
+    );
+    return jwtRequested;
+  };
+
+  it('does not request the JWT when the data layer reports no customer', async () => {
+    const jwtRequested = trackJwtRequests();
+    window.bodl = { shopper: { customer_id: null } };
+
+    await getCurrentCustomerInfo();
+
+    expect(jwtRequested).not.toHaveBeenCalled();
+  });
+
+  it('still requests the JWT when the data layer reports a customer', async () => {
+    const jwtRequested = trackJwtRequests();
+    window.bodl = { shopper: { customer_id: 12345 } };
+
+    await getCurrentCustomerInfo();
+
+    expect(jwtRequested).toHaveBeenCalled();
+  });
+
+  it('still requests the JWT when the store emits no data layer at all', async () => {
+    const jwtRequested = trackJwtRequests();
+
+    await getCurrentCustomerInfo();
+
+    expect(jwtRequested).toHaveBeenCalled();
+  });
 });
