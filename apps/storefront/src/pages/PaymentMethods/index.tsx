@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Alert, Box, Button, Link, Typography } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -6,12 +7,17 @@ import B3Dialog from '@/components/B3Dialog';
 import B3Spin from '@/components/spin/B3Spin';
 import { useB3Lang } from '@/lib/lang';
 import { PageProps } from '@/pages/PageProps';
+import { isSubscriptionsAvailable } from '@/shared/service/ordergroove';
 import { useAppSelector } from '@/store';
 import { snackbar } from '@/utils/b3Tip';
 
 import AddPaymentMethodBraintreeDialog from './components/AddPaymentMethodBraintreeDialog';
 import AddPaymentMethodDialog from './components/AddPaymentMethodDialog';
+import DeleteSubscriptionWarning, {
+  SubscriptionCheckStatus,
+} from './components/DeleteSubscriptionWarning';
 import PaymentMethodRow from './components/PaymentMethodRow';
+import { useSubscriptionsUsingInstrument } from './hooks/useSubscriptionsUsingInstrument';
 import {
   deleteStoredInstrument,
   getBraintreeClientToken,
@@ -39,9 +45,28 @@ type PaymentMethodsProps = Partial<PageProps> & {
 const flaggedVariant = (): AddCardVariant =>
   window.BC_CONTEXT?.paymentMethodsBraintree?.enabled ? 'braintree' : 'hostedForm';
 
+// Four dialog states (spec §6.3). `data` present means resolved even while a background refetch runs.
+const deriveSubscriptionCheckStatus = (
+  enabled: boolean,
+  query: ReturnType<typeof useSubscriptionsUsingInstrument>,
+): SubscriptionCheckStatus => {
+  if (!enabled) {
+    return 'clear';
+  }
+  if (query.isPending) {
+    return 'checking';
+  }
+  if (query.isError) {
+    return 'failed';
+  }
+
+  return query.data.length > 0 ? 'affected' : 'clear';
+};
+
 function PaymentMethods({ variant }: PaymentMethodsProps) {
   const b3Lang = useB3Lang();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [pendingDelete, setPendingDelete] = useState<StoredInstrument | null>(null);
   const customerId = useAppSelector(({ company }) => company.customer.id);
   const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);
@@ -49,6 +74,17 @@ function PaymentMethods({ variant }: PaymentMethodsProps) {
   const isAvailable = isPaymentMethodsAvailable() && !isAgenting;
   // An explicit prop wins so tests can drive either flow directly.
   const isBraintree = (variant ?? flaggedVariant()) === 'braintree';
+  // Only while the dialog is open: the check is per card and the page shows no subscription data.
+  const isSubscriptionCheckEnabled = isSubscriptionsAvailable() && Boolean(pendingDelete);
+  const affectedSubscriptions = useSubscriptionsUsingInstrument(
+    customerId,
+    pendingDelete?.token,
+    isSubscriptionCheckEnabled,
+  );
+  const subscriptionCheckStatus = deriveSubscriptionCheckStatus(
+    isSubscriptionCheckEnabled,
+    affectedSubscriptions,
+  );
 
   const { data, isFetching, isError, error, refetch } = useQuery({
     queryKey: ['storedInstruments', customerId],
@@ -222,6 +258,7 @@ function PaymentMethods({ variant }: PaymentMethodsProps) {
           leftSizeBtn={b3Lang('paymentMethods.deleteDialog.cancel')}
           rightSizeBtn={b3Lang('paymentMethods.deleteDialog.confirm')}
           loading={deleteMutation.isPending}
+          disabledSaveBtn={subscriptionCheckStatus === 'checking'}
           handleLeftClick={() => {
             if (!deleteMutation.isPending) {
               setPendingDelete(null);
@@ -241,6 +278,11 @@ function PaymentMethods({ variant }: PaymentMethodsProps) {
                   last4: pendingDelete.last4,
                 }),
               })}
+            <DeleteSubscriptionWarning
+              status={subscriptionCheckStatus}
+              subscriptions={affectedSubscriptions.data ?? []}
+              onManageSubscriptions={() => navigate('/manage-subscriptions')}
+            />
           </Box>
         </B3Dialog>
       </Box>
