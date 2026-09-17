@@ -88,6 +88,8 @@ declare global {
         authEndpoint: string;
         /** SSW app client id used to mint the Current Customer JWT sent to authEndpoint. */
         appClientId: string;
+        /** Phase 2: when true (or "true"), /manage-subscriptions renders the portal page, not the hosted iframe. */
+        customManager?: boolean | string;
       };
       /** Gates the /loyalty page; absent (or any field missing) = feature off. */
       loyalty?: {
