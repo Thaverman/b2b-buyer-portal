@@ -48,6 +48,13 @@ the stencil fix lands every Ordergroove call from sandbox fails at the CORS laye
 warning degrades to "couldn't check" there. The live check injected the known-good merchant id
 to verify the page itself.
 
+Resolved later the same day: by ~11:10 CDT the sandbox theme emitted
+`{ enabled: true, customManager: true, merchantId, authEndpoint, appClientId }` with a full
+merchant id, and a bundle containing Phase 2 was on `/content/b2bBuyerPortal/dist/`. Checked as a
+customer with no injection: the portal page renders with 14 fully populated cards, the cancelled
+toggle, the escape link and ten recent-order rows, and the Phase 1 dialog lists the 14
+subscriptions again.
+
 ### 2.2 Route and switch
 
 - `routeList.ts` entry for `/manage-subscriptions` is **unchanged**: same permissions, same menu

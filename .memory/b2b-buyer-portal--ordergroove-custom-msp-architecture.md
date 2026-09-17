@@ -233,3 +233,12 @@ real gateway tokens; otherwise last4/brand is a heuristic only.
   fixed. The portal now honours `enabled` (false/"false" = every Ordergroove feature off).
   Injecting a `BC_CONTEXT` block in Playwright must now guard the `subscriptions` PROPERTY too,
   not just the whole-object assignment.
+- RESOLVED the same day (observed 2026-09-17 ~11:10 CDT, deployed bundle, no injection): the
+  sandbox theme now emits `{ enabled: true, customManager: true, merchantId (32 chars),
+  authEndpoint, appClientId }`, and the portal bundle on
+  `/content/b2bBuyerPortal/dist/` (Last-Modified 14:57 UTC, from a local build — origin/dev does
+  not carry the merge) contains Phase 2. Live as a customer sees it: `/manage-subscriptions`
+  renders the portal page with 14 cards (all with a next-order date, no fallbacks), "4 cancelled
+  subscriptions", the escape link, 10 recent-order rows (8 Placed with web order numbers, 2
+  Failed), no alerts, no failed requests, ONE auth mint per page load; the Phase 1 delete dialog
+  lists the 14 subscriptions again (settled in 1.3 s). Phase 2 is effectively live on sandbox.
