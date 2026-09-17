@@ -66,7 +66,7 @@
 **Interfaces:**
 - Produces: four recorded findings (below) that Tasks 1, 2 and 5 read.
 
-- [ ] **Step 1: Write the probe script** to `<scratch>/og-write-probe.mjs`
+- [x] **Step 1: Write the probe script** to `<scratch>/og-write-probe.mjs` (as run, the script reads `OG_PUBLIC_ID` from a sibling `og.env` when the variable is unset — the worktree guard refuses shell sourcing)
 
 ```js
 // Reversible write probe of Ordergroove for customer 80591 (Phase 3a Task 0). Run with OG_PUBLIC_ID set.
@@ -169,19 +169,20 @@ const restored = snap.nextFor(s.public_id);
 console.log('C restore after skip ->', restoreB.status, '| next now', restored?.date, '(expected', original, ') | back on the original order:', restored?.order === orderBefore, '| upcoming orders dated', original + ':', snap.orders.filter((o) => o.place.slice(0, 10) === original).length);
 ```
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 Run: `OG_PUBLIC_ID=<merchant id> node <scratch>/og-write-probe.mjs`
 Expected: every `->` status `200`; both "next now" values match their "expected"; the final line shows the subscription back on `original`. If any restore line does not read `original`, run the script's restore by hand (`change_next_order_date` with `{ order_date: <original> }`) before anything else.
 
-- [ ] **Step 3: Record the findings here** (edit this file; later tasks read these lines)
+- [x] **Step 3: Record the findings here** (edit this file; later tasks read these lines)
 
-- Finding A — path form for `change_next_order_date`: `[ ] with trailing slash` / `[ ] without trailing slash` (status seen for the other form: ___). Task 1's `subscriptionUrl()` appends the slash; if the bare form is the one that works, drop it there **and** in the Task 1 test URL.
-- Finding B — skip arithmetic: new date `___` vs expected `___` (`addIntervals` with calendar months/weeks/days). Did the old, now-empty order stay in `/orders/?status=1`? `[ ] yes` / `[ ] no`. If yes, the Phase 2 join already ignores orders without items, so no code change; note it for the Send now dialog copy only if an empty order could be sent.
-- Finding C — restoring the date after a skip: back on the original order id `[ ] yes` / `[ ] no — a second order dated the same day`. Either is fine for 3a (the card shows the earliest date); record it for 3b.
-- Finding D — `every` / `every_period` present on the list record and on the write response: `[ ] yes` (values seen: every ___, every_period ___). If no, stop and re-plan Task 1's type change.
+- Finding A — path form for `change_next_order_date`: `[x] with trailing slash` (200 on the first try, so the bare form was never sent). Task 1 keeps `subscriptionUrl()` with the slash, as the reference documents.
+- Finding B — skip arithmetic: subject was a 12-month subscription (`every: 12, every_period: 3, frequency_days: 360`) due 2026-11-20; after `skip_subscription` its item sat on an order dated **2027-11-20**, exactly `addIntervals(+1)` with calendar months (a `frequency_days` sum would have said 2027-11-15). The old, now-empty order **stayed** in `/orders/?status=1` (status 1, no items). The Phase 2 join derives dates from items, so an empty order never surfaces on a card; nothing to change. The skip response is the order object with `status: 1`.
+- Finding C — restoring the date after a skip: `change_next_order_date` back to 2026-11-20 put the item **back on the original order id** (Ordergroove merges into the existing order on that date); exactly one upcoming order carried that date afterwards. Recorded for 3b.
+- Finding D — `every` / `every_period` present on the list record **and** on the write response: `[x] yes` (every 12, every_period 3). The list record also carries `cancel_reason`, `cancel_reason_code`, `offer`, `subscription_type`, `price`, `reminder_days` — useful for 3b, unused here.
+- Probe run 2026-09-17: every write returned 200 and the subject ended exactly where it started (2026-11-20, same order id). Log in the session scratchpad `og-write-probe.log` (ids redacted).
 
-- [ ] **Step 4: Delete nothing, commit nothing.** The script stays in scratch.
+- [x] **Step 4: Delete nothing, commit nothing.** The script stays in scratch.
 
 ---
 
