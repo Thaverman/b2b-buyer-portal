@@ -22,6 +22,36 @@ it('is available on Stencil when the host configures subscriptions', () => {
   expect(isSubscriptionsAvailable()).toBe(true);
 });
 
+describe('the enabled switch the theme emits alongside the config', () => {
+  const configure = (enabled: boolean | string) => {
+    window.BC_CONTEXT = {
+      subscriptions: {
+        enabled,
+        merchantId: 'merchant-public-id',
+        authEndpoint: 'https://api.example.com/products/productclient/ordergroove-auth',
+        appClientId: 'ssw-app-client-id',
+        customManager: true,
+      },
+    };
+  };
+
+  it('turns every Ordergroove feature off when false or the string "false"', () => {
+    configure(false);
+    expect(isSubscriptionsAvailable()).toBe(false);
+    expect(isCustomManagerAvailable()).toBe(false);
+    configure('false');
+    expect(isSubscriptionsAvailable()).toBe(false);
+  });
+
+  it('leaves them on for true or the string "true"', () => {
+    configure(true);
+    expect(isSubscriptionsAvailable()).toBe(true);
+    expect(isCustomManagerAvailable()).toBe(true);
+    configure('true');
+    expect(isSubscriptionsAvailable()).toBe(true);
+  });
+});
+
 describe('isCustomManagerAvailable', () => {
   const configure = (customManager?: boolean | string) => {
     window.BC_CONTEXT = {

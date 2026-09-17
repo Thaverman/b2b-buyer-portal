@@ -82,6 +82,8 @@ declare global {
        * later the custom subscriptions page); absent = feature off.
        */
       subscriptions?: {
+        /** The theme's on/off switch for every Ordergroove feature (boolean or "true"/"false"); absent = on. */
+        enabled?: boolean | string;
         /** Ordergroove "Your Merchant ID" — the REST API `public_id`. Public, not a secret. */
         merchantId: string;
         /** SSW middleware endpoint that mints the storefront-auth triplet (customerId|ts|sig). */
