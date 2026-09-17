@@ -271,3 +271,34 @@ real gateway tokens; otherwise last4/brand is a heuristic only.
   trailing slash on `change_next_order_date` (docs include it) — Task 0 settles it live.
 - Reference confirmed Storefront scope for every mutation used. `/placement_logs/responses/`
   (failed-order attempts) is x-api-key only → retry stays out of scope.
+
+## Phase 3a implemented (2026-09-17)
+
+- Cards on `/manage-subscriptions` carry Skip, Send now and Change date (presets at 1x/2x/3x the
+  frequency plus a native `<input type="date">`, min tomorrow — not B3Picker: no repo test drives
+  the MUI picker and the native input is reliably testable). Service: `ogMutate` beside `ogFetch`
+  in `src/shared/service/ordergroove/api.ts` (10 s write deadline, one 403 re-mint, 400/423 →
+  `upstream`), `skipSubscription` / `sendOrderNow` / `changeNextOrderDate`; `OgSubscription` gained
+  `every` / `every_period` (`FrequencyPeriod` 1 day, 2 week, 3 month). View model: card carries
+  `every`, `everyPeriod`, `shippingAddressId`, `nextOrder { orderId, otherProducts }`;
+  `addIntervals()` does CALENDAR arithmetic with dayjs (Sep 19 + 10 months = Jul 19, which
+  frequency_days would miss); `changeDatePresets()`. Hook `hooks/useSubscriptionActions.ts`
+  awaits invalidation of subscriptions + upcoming (+ orderHistory for send now) inside onSuccess so
+  the dialog spinner runs until the card is current, then a snackbar. Row
+  `components/actions/SubscriptionActions.tsx` keeps its three B3Dialogs MOUNTED and toggles
+  `isOpen` — B3Dialog only opens on a re-render after its container ref exists, so dialog tests
+  render closed then `rerender` open. Skip success copy reads "Next order skipped.".
+- Task 0 probe (reversible, customer 80591, 12-month subscription due 2026-11-20): (A)
+  `change_next_order_date/` WITH the trailing slash → 200 (docs form; the manager omits it);
+  response carries every/every_period. (B) `skip_subscription` moved the item exactly one calendar
+  interval (→ 2027-11-20); the emptied order STAYED in `/orders/?status=1` (no items) — harmless,
+  the join derives dates from items. (C) changing the date back re-attached the item to the
+  ORIGINAL order id (Ordergroove merges into the existing order on that date). (D) list records also
+  carry cancel_reason, cancel_reason_code, offer, subscription_type, price, reminder_days.
+- Quality gate: tsc, eslint (project-wide), depcruise clean; knip = pre-existing BillingStateOption
+  only. Scoped suites: 12 files / 65 tests in ManageSubscriptions + 4 files / 35 in the service.
+  Full suite: 23 failing files vs the 21-file dev baseline — the set SHUFFLES with load (2 baseline
+  files now pass, Dashboard/Login newly time out), and all four "new" names pass in isolation,
+  including the two new action files (each had ONE test cross the 5 s per-test limit under load
+  while the whole file runs in ~2.1-2.4 s alone). Dialog tests that drive several userEvent clicks
+  are the first to cross that limit — expect them in the timeout set, not as regressions.

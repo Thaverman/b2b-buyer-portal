@@ -204,7 +204,7 @@ Expected: every `->` status `200`; both "next now" values match their "expected"
   - `changeNextOrderDate(customerId: string, subscriptionId: string, orderDate: string): Promise<OgSubscription>`;
   - `buildOgSubscriptionWith` defaults `every: 4, every_period: 2, frequency_days: 28`.
 
-- [ ] **Step 1: Write the failing tests** — append to `api.test.ts`, and add `changeNextOrderDate`, `sendOrderNow`, `skipSubscription` to the existing `from './api'` import list (keep it alphabetical).
+- [x] **Step 1: Write the failing tests** — append to `api.test.ts`, and add `changeNextOrderDate`, `sendOrderNow`, `skipSubscription` to the existing `from './api'` import list (keep it alphabetical).
 
 ```ts
 describe('writes', () => {
@@ -333,12 +333,12 @@ describe('writes', () => {
 });
 ```
 
-- [ ] **Step 2: Run the file to verify the new tests fail**
+- [x] **Step 2: Run the file to verify the new tests fail**
 
 Run: `yarn vitest run src/shared/service/ordergroove/api.test.ts`
 Expected: the file fails to compile — `skipSubscription`, `sendOrderNow`, `changeNextOrderDate` are not exported from `./api` (TypeScript error, or "is not a function" at runtime). The existing tests stay untouched.
 
-- [ ] **Step 3: Add the schedule fields to the types**
+- [x] **Step 3: Add the schedule fields to the types**
 
 In `types.ts`, add before `OgSubscription`:
 
@@ -355,7 +355,7 @@ and inside `OgSubscription`, after `frequency_days: number;`:
   every_period: FrequencyPeriod;
 ```
 
-- [ ] **Step 4: Implement the write helper and the three functions** — replace the block from `const REQUEST_TIMEOUT_MS` through the end of `ogFetch` in `api.ts` with:
+- [x] **Step 4: Implement the write helper and the three functions** — replace the block from `const REQUEST_TIMEOUT_MS` through the end of `ogFetch` in `api.ts` with:
 
 ```ts
 // The warning is advisory; past this the dialog falls back to "we couldn't check" (spec §6.3).
@@ -465,9 +465,9 @@ export const changeNextOrderDate = (customerId: string, subscriptionId: string, 
 
 If Task 0 finding A says **without** slash: make `subscriptionUrl` take a third parameter `trailingSlash: boolean` … no — simpler: give `changeNextOrderDate` its own literal URL without the slash, `${API_BASE}/subscriptions/${encodeURIComponent(subscriptionId)}/change_next_order_date`, delete `subscriptionUrl`, and drop the slash in the Step 1 test path.
 
-- [ ] **Step 5: Export from the barrel** — in `index.ts` add `changeNextOrderDate`, `sendOrderNow`, `skipSubscription` to the `from './api'` list (alphabetical) and `FrequencyPeriod` to the `export type` list.
+- [x] **Step 5: Export from the barrel** — in `index.ts` add `changeNextOrderDate`, `sendOrderNow`, `skipSubscription` to the `from './api'` list (alphabetical) and `FrequencyPeriod` to the `export type` list.
 
-- [ ] **Step 6: Builder defaults** — in `tests/ordergrooveBuilders/index.ts` replace the `frequency_days` line of `buildOgSubscriptionWith` with three consistent lines:
+- [x] **Step 6: Builder defaults** — in `tests/ordergrooveBuilders/index.ts` replace the `frequency_days` line of `buildOgSubscriptionWith` with three consistent lines:
 
 ```ts
   frequency_days: 28,
@@ -475,14 +475,14 @@ If Task 0 finding A says **without** slash: make `subscriptionUrl` take a third 
   every_period: 2,
 ```
 
-- [ ] **Step 7: Run the file to verify everything passes**
+- [x] **Step 7: Run the file to verify everything passes**
 
 Run: `yarn vitest run src/shared/service/ordergroove/api.test.ts`
 Expected: all tests pass, including the pre-existing "gives up after five seconds" (reads keep their deadline).
 
-- [ ] **Step 8: Type-check the whole tree** — `yarn tsc --noEmit`. Expected: exit 0 (every `OgSubscription` literal in tests comes from the builder, so the two new required fields need no other edits; if a hand-written literal fails, add `every: 4, every_period: 2` to it).
+- [x] **Step 8: Type-check the whole tree** — `yarn tsc --noEmit`. Expected: exit 0 (every `OgSubscription` literal in tests comes from the builder, so the two new required fields need no other edits; if a hand-written literal fails, add `every: 4, every_period: 2` to it).
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/shared/service/ordergroove/types.ts src/shared/service/ordergroove/api.ts src/shared/service/ordergroove/index.ts src/shared/service/ordergroove/api.test.ts tests/ordergrooveBuilders/index.ts
@@ -507,7 +507,7 @@ git commit -m "feat: B2B-0000 Add Ordergroove write helper and the skip, send-no
   - `export interface DatePreset { every: number; period: FrequencyPeriod; date: string }`;
   - `changeDatePresets(card: SubscriptionCard): DatePreset[]` — three presets, or `[]` without a next order.
 
-- [ ] **Step 1: Write the failing tests** — append to `viewModel.test.ts` (add `OgItem` to the `@/shared/service/ordergroove` type imports if you use the annotation; add `addIntervals`, `changeDatePresets` to the `./viewModel` import):
+- [x] **Step 1: Write the failing tests** — append to `viewModel.test.ts` (add `OgItem` to the `@/shared/service/ordergroove` type imports if you use the annotation; add `addIntervals`, `changeDatePresets` to the `./viewModel` import):
 
 ```ts
 describe('upcoming order and schedule on a card', () => {
@@ -621,12 +621,12 @@ describe('date arithmetic', () => {
 });
 ```
 
-- [ ] **Step 2: Run the file to verify the new tests fail**
+- [x] **Step 2: Run the file to verify the new tests fail**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/viewModel.test.ts`
 Expected: compile errors — `addIntervals` and `changeDatePresets` are not exported; `nextOrder`, `every`, `everyPeriod`, `shippingAddressId` do not exist on `SubscriptionCard`.
 
-- [ ] **Step 3: Implement** — in `viewModel.ts`:
+- [x] **Step 3: Implement** — in `viewModel.ts`:
 
 1. Imports: add `import dayjs from 'dayjs';` as the first (external) import group, and add `FrequencyPeriod` to the `@/shared/service/ordergroove` import list.
 
@@ -816,7 +816,7 @@ export const changeDatePresets = (card: SubscriptionCard): DatePreset[] => {
 };
 ```
 
-- [ ] **Step 4: Update the card builder in `components/SubscriptionCard.test.tsx`** — add to the `buildCardWith` defaults, after `frequencyDays: 28,`:
+- [x] **Step 4: Update the card builder in `components/SubscriptionCard.test.tsx`** — add to the `buildCardWith` defaults, after `frequencyDays: 28,`:
 
 ```ts
   every: 4,
@@ -825,14 +825,14 @@ export const changeDatePresets = (card: SubscriptionCard): DatePreset[] => {
   shippingAddressId: faker.string.hexadecimal({ length: 32, prefix: '' }),
 ```
 
-- [ ] **Step 5: Run the view-model and card tests**
+- [x] **Step 5: Run the view-model and card tests**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/viewModel.test.ts src/pages/ManageSubscriptions/components/SubscriptionCard.test.tsx`
 Expected: all pass (the existing view-model tests are unaffected: they assert `nextOrderDate`, which keeps its value).
 
-- [ ] **Step 6: Type-check** — `yarn tsc --noEmit`. Expected: exit 0.
+- [x] **Step 6: Type-check** — `yarn tsc --noEmit`. Expected: exit 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/pages/ManageSubscriptions/viewModel.ts src/pages/ManageSubscriptions/viewModel.test.ts src/pages/ManageSubscriptions/components/SubscriptionCard.test.tsx
@@ -853,7 +853,7 @@ git commit -m "feat: B2B-0000 Carry the upcoming order, sibling products and cal
 - Produces: `useSubscriptionActions(customerId: number)` returning
   `{ skip: UseMutationResult<OgOrder, Error, { orderId: string; subscriptionId: string }>, sendNow: UseMutationResult<OgOrder, Error, { orderId: string }>, changeDate: UseMutationResult<OgSubscription, Error, { subscriptionId: string; orderDate: string }> }`.
 
-- [ ] **Step 1: Add the copy** — in `en.json`, directly after the `"subscriptions.cancelled.toggle": …,` line:
+- [x] **Step 1: Add the copy** — in `en.json`, directly after the `"subscriptions.cancelled.toggle": …,` line:
 
 ```json
   "subscriptions.actions.skip": "Skip",
@@ -884,7 +884,7 @@ git commit -m "feat: B2B-0000 Carry the upcoming order, sibling products and cal
 
 (Do not lint `en.json` directly with eslint — it reports a bogus error on JSON; `yarn lint:eslint` skips it.)
 
-- [ ] **Step 2: Write the failing test** — `hooks/useSubscriptionActions.test.tsx`. The hook needs react-intl (via `useB3Lang`), so it renders through `renderWithProviders` with a probe component; invalidation is observed on `QueryClient.prototype`, which every client instance shares.
+- [x] **Step 2: Write the failing test** — `hooks/useSubscriptionActions.test.tsx`. The hook needs react-intl (via `useB3Lang`), so it renders through `renderWithProviders` with a probe component; invalidation is observed on `QueryClient.prototype`, which every client instance shares.
 
 ```tsx
 import { QueryClient } from '@tanstack/react-query';
@@ -1063,12 +1063,12 @@ it('uses the session copy when Ordergroove rejects the signature twice', async (
 });
 ```
 
-- [ ] **Step 3: Run it to verify it fails**
+- [x] **Step 3: Run it to verify it fails**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/hooks/useSubscriptionActions.test.tsx`
 Expected: fails — cannot resolve `./useSubscriptionActions`.
 
-- [ ] **Step 4: Implement the hook** — `hooks/useSubscriptionActions.ts`:
+- [x] **Step 4: Implement the hook** — `hooks/useSubscriptionActions.ts`:
 
 ```ts
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -1143,12 +1143,12 @@ export const useSubscriptionActions = (customerId: number) => {
 };
 ```
 
-- [ ] **Step 5: Run it to verify it passes**
+- [x] **Step 5: Run it to verify it passes**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/hooks/useSubscriptionActions.test.tsx`
 Expected: 5 passed.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/pages/ManageSubscriptions/hooks/useSubscriptionActions.ts src/pages/ManageSubscriptions/hooks/useSubscriptionActions.test.tsx src/lib/lang/locales/en.json
@@ -1176,7 +1176,7 @@ git commit -m "feat: B2B-0000 Add the subscription actions hook with refresh and
   - `ChangeDateDialog` props `{ card; isOpen; isPending; onClose; onConfirm: (orderDate: string) => void }`;
   - `SubscriptionCard` prop `actions?: ReactNode` rendered at the end of the details group.
 
-- [ ] **Step 1: Write the failing dialog tests.** Each test file renders the dialog **closed, then open** (see Global Constraints on `B3Dialog`). Shared shape, in `SkipDialog.test.tsx`:
+- [x] **Step 1: Write the failing dialog tests.** Each test file renders the dialog **closed, then open** (see Global Constraints on `B3Dialog`). Shared shape, in `SkipDialog.test.tsx`:
 
 ```tsx
 import { ReactElement } from 'react';
@@ -1220,10 +1220,11 @@ const withDateFormat = {
 
 // B3Dialog opens only on a re-render after its container ref exists: render closed, then open.
 const renderOpen = (dialog: (isOpen: boolean) => ReactElement) => {
-  const rendered = renderWithProviders(dialog(false), withDateFormat);
-  rendered.result.rerender(dialog(true));
+  // `view`, not `rendered`: the testing-library lint rule names render results.
+  const view = renderWithProviders(dialog(false), withDateFormat);
+  view.result.rerender(dialog(true));
 
-  return rendered;
+  return view;
 };
 
 it('says what leaves which order and when it comes back, then confirms', async () => {
@@ -1454,12 +1455,12 @@ it('forgets the previous choice when reopened', async () => {
 });
 ```
 
-- [ ] **Step 2: Run the three files to verify they fail**
+- [x] **Step 2: Run the three files to verify they fail**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/components/actions`
 Expected: three files fail to resolve their dialog module.
 
-- [ ] **Step 3: Create `format.ts`**
+- [x] **Step 3: Create `format.ts`**
 
 ```ts
 import { LangFormatFunction } from '@/lib/lang';
@@ -1484,7 +1485,7 @@ export const describePayment = (payment: PaymentSummary, b3Lang: LangFormatFunct
       });
 ```
 
-- [ ] **Step 4: Point the card at `format.ts` and add the `actions` slot** — in `SubscriptionCard.tsx`:
+- [x] **Step 4: Point the card at `format.ts` and add the `actions` slot** — in `SubscriptionCard.tsx`:
 
 1. Replace `import { displayFormat } from '@/utils/b3DateFormat';` with nothing, and add after the `viewModel` import: `import { describePayment, formatDate } from '../format';`. Add `ReactNode` to the imports: `import { ReactNode } from 'react';` as the first import.
 2. Delete the local `const formatDate = …` line.
@@ -1496,7 +1497,7 @@ export const describePayment = (payment: PaymentSummary, b3Lang: LangFormatFunct
 
 4. Add `actions?: ReactNode;` to `SubscriptionCardProps` (with a doc comment: `/** the actions row (Phase 3); rendered at the end of the details group */`), destructure it in the component signature, and render `{actions}` as the last child of the `role="group"` box, after the "Paid with" `Typography`.
 
-- [ ] **Step 5: Create `SkipDialog.tsx`**
+- [x] **Step 5: Create `SkipDialog.tsx`**
 
 ```tsx
 import { Typography } from '@mui/material';
@@ -1551,7 +1552,7 @@ function SkipDialog({ card, isOpen, isPending, onClose, onConfirm }: SkipDialogP
 export default SkipDialog;
 ```
 
-- [ ] **Step 6: Create `SendNowDialog.tsx`**
+- [x] **Step 6: Create `SendNowDialog.tsx`**
 
 ```tsx
 import { Box, Typography } from '@mui/material';
@@ -1615,7 +1616,7 @@ function SendNowDialog({ card, isOpen, isPending, onClose, onConfirm }: SendNowD
 export default SendNowDialog;
 ```
 
-- [ ] **Step 7: Create `ChangeDateDialog.tsx`**
+- [x] **Step 7: Create `ChangeDateDialog.tsx`**
 
 ```tsx
 import { useEffect, useState } from 'react';
@@ -1744,12 +1745,12 @@ function ChangeDateDialog({ card, isOpen, isPending, onClose, onConfirm }: Chang
 export default ChangeDateDialog;
 ```
 
-- [ ] **Step 8: Run the dialog tests and the card test**
+- [x] **Step 8: Run the dialog tests and the card test**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/components`
 Expected: all pass. If a `RadioGroup` label lookup fails, check the label text against the ICU output (`In 10 months (19 Jul 2027)` needs the date format from `withDateFormat`).
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/pages/ManageSubscriptions/format.ts src/pages/ManageSubscriptions/components/SubscriptionCard.tsx src/pages/ManageSubscriptions/components/actions/SkipDialog.tsx src/pages/ManageSubscriptions/components/actions/SkipDialog.test.tsx src/pages/ManageSubscriptions/components/actions/SendNowDialog.tsx src/pages/ManageSubscriptions/components/actions/SendNowDialog.test.tsx src/pages/ManageSubscriptions/components/actions/ChangeDateDialog.tsx src/pages/ManageSubscriptions/components/actions/ChangeDateDialog.test.tsx
@@ -1770,7 +1771,7 @@ git commit -m "feat: B2B-0000 Add the skip, send-now and change-date dialogs" -m
 - Consumes: `useSubscriptionActions` (Task 3); the three dialogs (Task 4); `SubscriptionCard.actions` slot (Task 4).
 - Produces: `SubscriptionActions` props `{ card: SubscriptionCard; customerId: number }`; renders `null` when `card.nextOrder` is null.
 
-- [ ] **Step 1: Write the failing row test** — `SubscriptionActions.test.tsx`:
+- [x] **Step 1: Write the failing row test** — `SubscriptionActions.test.tsx`:
 
 ```tsx
 import {
@@ -1907,7 +1908,7 @@ it('keeps the dialog open after a failed write so the customer can retry or leav
 });
 ```
 
-- [ ] **Step 2: Write the failing page tests** — in `SubscriptionsManager.test.tsx`: add `within` to the `tests/test-utils` import, add `import { snackbar } from '@/utils/b3Tip';` in the `@/` group, add the `vi.mock('@/utils/b3Tip', …)` block (same as the row test) right after the imports, then append:
+- [x] **Step 2: Write the failing page tests** — in `SubscriptionsManager.test.tsx`: add `within` to the `tests/test-utils` import, add `import { snackbar } from '@/utils/b3Tip';` in the `@/` group, add the `vi.mock('@/utils/b3Tip', …)` block (same as the row test) right after the imports, then append:
 
 ```tsx
 it('skips a subscription from its card and shows the moved date', async () => {
@@ -1992,12 +1993,12 @@ it('offers actions only on active cards with an upcoming order', async () => {
 });
 ```
 
-- [ ] **Step 3: Run both files to verify they fail**
+- [x] **Step 3: Run both files to verify they fail**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/components/actions/SubscriptionActions.test.tsx src/pages/ManageSubscriptions/SubscriptionsManager.test.tsx`
 Expected: the row test cannot resolve `./SubscriptionActions`; the two new page tests fail on `getByRole('button', { name: 'Skip' })` (no such button yet). The seven existing page tests still pass.
 
-- [ ] **Step 4: Create `SubscriptionActions.tsx`**
+- [x] **Step 4: Create `SubscriptionActions.tsx`**
 
 ```tsx
 import { useState } from 'react';
@@ -2092,7 +2093,7 @@ function SubscriptionActions({ card, customerId }: SubscriptionActionsProps) {
 export default SubscriptionActions;
 ```
 
-- [ ] **Step 5: Wire the row into the page** — in `SubscriptionsManager.tsx`, add `import SubscriptionActions from './components/actions/SubscriptionActions';` (relative group, alphabetical among the `./components` imports) and replace the active-cards map with:
+- [x] **Step 5: Wire the row into the page** — in `SubscriptionsManager.tsx`, add `import SubscriptionActions from './components/actions/SubscriptionActions';` (relative group, alphabetical among the `./components` imports) and replace the active-cards map with:
 
 ```tsx
         {active.map((card) => (
@@ -2108,12 +2109,12 @@ export default SubscriptionActions;
 
 Cancelled cards (`CancelledSubscriptions`) get no `actions` in 3a.
 
-- [ ] **Step 6: Run the row, page and mobile tests**
+- [x] **Step 6: Run the row, page and mobile tests**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions`
 Expected: everything passes. There is no new phone-layout test in 3a: the row only wraps (`flexWrap`), which jsdom cannot observe, and nothing structural differs between layouts; 3b adds one when the selects go full width.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/pages/ManageSubscriptions/components/actions/SubscriptionActions.tsx src/pages/ManageSubscriptions/components/actions/SubscriptionActions.test.tsx src/pages/ManageSubscriptions/SubscriptionsManager.tsx src/pages/ManageSubscriptions/SubscriptionsManager.test.tsx
@@ -2129,7 +2130,7 @@ git commit -m "feat: B2B-0000 Add skip, send-now and change-date actions to subs
 - Modify: `.memory/b2b-buyer-portal--ordergroove-custom-msp-architecture.md`
 - Modify: this plan (tick the boxes; record the Task 0 findings if not done)
 
-- [ ] **Step 1: Type-check and lint everything**
+- [x] **Step 1: Type-check and lint everything**
 
 ```bash
 yarn tsc --noEmit
@@ -2140,7 +2141,7 @@ yarn lint:knip
 
 Expected: `tsc` exit 0; dependency-cruiser "no dependency violations"; `lint:eslint` exit 0 (run `yarn eslint --fix` on the files you touched for prettier reflow, never on `en.json`); knip reports only the pre-existing `BillingStateOption` in `src/pages/PaymentMethods/billingPrefill.ts`. Anything else is yours: an export nothing in `src` consumes (`DatePreset`, `PaymentSummary`, `addIntervals`, `changeDatePresets`, `formatDate`, `describePayment` are each consumed by a component — check before un-exporting) or a file nothing imports.
 
-- [ ] **Step 2: Run the scoped suites, then the full suite against the baseline**
+- [x] **Step 2: Run the scoped suites, then the full suite against the baseline**
 
 ```bash
 yarn vitest run src/pages/ManageSubscriptions src/shared/service/ordergroove
@@ -2155,7 +2156,17 @@ comm -13 /tmp/baseline-failing.txt /tmp/after-failing.txt
 
 Expected: the `comm` output is empty, or lists only files that pass when run alone — run each listed file by itself; a file that also fails alone is a real regression to fix before continuing.
 
-- [ ] **Step 3: Align the spec with what shipped** — edit the Phase 3 spec:
+**Recorded 2026-09-17:** scoped suites green (ManageSubscriptions 12 files / 65 tests; ordergroove
+service 4 files / 35 tests). Full suite: 23 failing files against the 21-file baseline. Two baseline
+files now pass (`Invoice/index.mobile`, `PaymentMethods/index`) and four names are new:
+`Dashboard/index`, `Login/index` and the two new action files. Every one of the four passes in
+isolation — `ChangeDateDialog` 4 tests in 2099 ms, `SubscriptionActions` 4 tests in 2350 ms,
+`Dashboard` 6130 ms, `Login` 5681 ms — and each action file lost exactly one test to the 5 s
+per-test limit under full-suite load (the two cases that drive several `userEvent` clicks). That is
+the documented load behaviour of this branch, not a regression: the timing-out set shuffles run to
+run.
+
+- [x] **Step 3: Align the spec with what shipped** — edit the Phase 3 spec:
 
 1. §3.2: record Task 0 finding A next to the `change_next_order_date` row (slash or no slash) and delete the sentence deferring it.
 2. §6.2 Change date row: the custom date is a native `TextField type="date"` with `min` = tomorrow and the hint "Choose a date after today." — not `B3Picker` — with the reason from Global Constraints.
@@ -2163,7 +2174,7 @@ Expected: the `comm` output is empty, or lists only files that pass when run alo
 4. §10.2: the 3a phone-layout case is dropped (nothing structural differs); 3b keeps one for the full-width selects.
 5. §10.1: replace the tick boxes of steps 1–3 with the recorded Task 0 findings A–D.
 
-- [ ] **Step 4: Record the outcome in the memory note** — append to the Ordergroove note in `.memory/`, after the "Phase 3 designed" section:
+- [x] **Step 4: Record the outcome in the memory note** — append to the Ordergroove note in `.memory/`, after the "Phase 3 designed" section:
 
 ```
 ## Phase 3a implemented (YYYY-MM-DD)
@@ -2180,7 +2191,7 @@ Expected: the `comm` output is empty, or lists only files that pass when run alo
 
 Replace `YYYY-MM-DD` and the two placeholders with the real values before committing. Mirror the note to the Obsidian vault copy (same path under `/mnt/c/Users/thaverman/Documents/Obsidian/Programing/Platform/Memory/`, keeping its trailing `Related board:` line) and append the same section to the Mongo entry `memory.entries` `_id 6a982e6f24e380927044ba89` (`body` field) as the Phase 3 design record was.
 
-- [ ] **Step 5: Commit the docs**
+- [x] **Step 5: Commit the docs**
 
 ```bash
 git add docs/superpowers/specs/2026-09-17-ordergroove-phase3-subscription-actions-design.md docs/superpowers/plans/2026-09-17-ordergroove-phase3a-order-actions.md .memory/b2b-buyer-portal--ordergroove-custom-msp-architecture.md
