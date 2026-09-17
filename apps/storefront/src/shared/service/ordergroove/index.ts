@@ -1,4 +1,5 @@
 export {
+  changeNextOrderDate,
   getProduct,
   getSubscriptionsUsingToken,
   listAddresses,
@@ -7,8 +8,18 @@ export {
   listSubscriptions,
   listUpcomingOrders,
   orderHistoryUrl,
+  sendOrderNow,
+  skipSubscription,
   withTimeout,
 } from './api';
 export { isCustomManagerAvailable, isSubscriptionsAvailable } from './config';
 export { OrdergrooveError } from './errors';
-export type { OgAddress, OgItem, OgOrder, OgPayment, OgProduct, OgSubscription } from './types';
+export type {
+  FrequencyPeriod,
+  OgAddress,
+  OgItem,
+  OgOrder,
+  OgPayment,
+  OgProduct,
+  OgSubscription,
+} from './types';
