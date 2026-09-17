@@ -325,3 +325,14 @@ real gateway tokens; otherwise last4/brand is a heuristic only.
   followed by a refetch of subscriptions + orders?status=1 + items?status=1 only. A read-only pass
   afterwards showed all 14 dates identical to before the run. Recipe note: the store's display
   format is "M jS Y", so a scraper must strip the ordinal ("Nov 20th 2026") before Date.parse.
+- DEPLOYED-BUNDLE CHECK (2026-09-17 13:55 CDT, no interception, no injection): sandbox serves a
+  bundle uploaded 18:51:49 UTC (13:51 CDT) that CONTAINS Phase 3a and the calendar-date fix. Theme
+  emits `{enabled: true, customManager: true, merchantId (32)}`. 14 cards, each with Skip / Send now
+  / Change date, and the next-order dates match the REST API exactly (Sep 19, 19, 20, 22, 23, 23,
+  29, 30, Oct 1, 5, 7, 13, Nov 10, 20). Opening each dialog read-only: Skip "… will leave your order
+  on Nov 20th 2026. Your next order will be on Nov 20th 2027."; Send now "… charged to Visa ending
+  in 1111 · exp 3/2028." with no sibling list (that subscription ships alone); Change date presets
+  "In 12 months (Nov 20th 2027)" / 24 / 36 + "Pick a date". Phase 1 UNAFFECTED by the `request()`
+  write refactor: the delete dialog still lists "14 active subscriptions" with names and
+  frequencies, settled in 1274 ms. Zero mutating requests, zero failed requests, ONE auth mint per
+  page load.
