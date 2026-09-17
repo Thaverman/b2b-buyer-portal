@@ -322,7 +322,16 @@ retry or close. Inline selects fall back to the query value (they render from it
 
 All on `B3Dialog` (`maxWidth="sm"`, `fullScreen` on phones by the component itself). The right
 button carries the verb and uses `loading={isPending}` (spinner + disabled); the left button is
-`global.dialog.cancel` unless stated. Dates render with `displayFormat(date, true)` like the card.
+`global.dialog.cancel` unless stated. Dates render with `formatDate` from `format.ts` like the card.
+
+**Calendar dates (found in 3a, fixes a Phase 2 defect).** `displayFormat` converts an instant into
+the store's wall clock, so it shifts its argument by the store's timezone offset. Ordergroove's
+`place` is a calendar day, not an instant, and on this store (offset `-21600`) every date on the
+page rendered **one day early** — the live page showed "Nov 19th 2026" for an order Ordergroove
+places on 2026-11-20, across all fourteen cards and the order history. The page now formats
+calendar dates with `displayCalendarDate` (`src/utils/b3DateFormat`), which formats local midnight
+of the given day and so cannot move it. Anything rendering an Ordergroove date — card, dialogs,
+order rows — goes through `format.ts`'s `formatDate`.
 
 | Dialog | Body | Right button | Notes |
 |---|---|---|---|

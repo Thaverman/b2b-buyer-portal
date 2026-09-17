@@ -295,6 +295,18 @@ real gateway tokens; otherwise last4/brand is a heuristic only.
   the join derives dates from items. (C) changing the date back re-attached the item to the
   ORIGINAL order id (Ordergroove merges into the existing order on that date). (D) list records also
   carry cancel_reason, cancel_reason_code, offer, subscription_type, price, reminder_days.
+- DEFECT FOUND AND FIXED during the 3a live check (it shipped in Phase 2): `displayFormat(date,
+  true)` converts an INSTANT to the store's wall clock, so it shifts its argument by
+  `storeInfo.timeFormat.offset`. Ordergroove's `place` is a CALENDAR DAY, and on this store
+  (offset -21600) every date on `/manage-subscriptions` rendered ONE DAY EARLY — the live page
+  showed "Nov 19th 2026" for an order Ordergroove places 2026-11-20, on all 14 cards and in order
+  history. The hosted manager showed the true dates, so the two pages disagreed. Fix: new
+  `displayCalendarDate()` in `src/utils/b3DateFormat` formats LOCAL MIDNIGHT of the given day (the
+  php formatter reads local getters), and `pages/ManageSubscriptions/format.ts` re-exports it as
+  `formatDate` for the card, the dialogs and the order rows. Rule: never route a "YYYY-MM-DD" through
+  `displayFormat` — it is for unix timestamps. Reproduce in a test by seeding
+  `buildStoreInfoStateWith({ timeFormat: { display: 'M jS Y', offset: -21600 } })`; with offset 0 the
+  bug hides.
 - Quality gate: tsc, eslint (project-wide), depcruise clean; knip = pre-existing BillingStateOption
   only. Scoped suites: 12 files / 65 tests in ManageSubscriptions + 4 files / 35 in the service.
   Full suite: 23 failing files vs the 21-file dev baseline — the set SHUFFLES with load (2 baseline
@@ -302,3 +314,14 @@ real gateway tokens; otherwise last4/brand is a heuristic only.
   including the two new action files (each had ONE test cross the 5 s per-test limit under load
   while the whole file runs in ~2.1-2.4 s alone). Dialog tests that drive several userEvent clicks
   are the first to cross that limit — expect them in the timeout set, not as regressions.
+- Live check (sandbox, customer 80591, deploy-flavour build routed over
+  `/content/b2bBuyerPortal/dist/`, no BC_CONTEXT injection — the theme already emits customManager):
+  subject was the 360-day subscription due 2026-11-20, alone on its order. Skip dialog read
+  "… will leave your order on Nov 20th 2026. Your next order will be on Nov 20th 2027."; after
+  confirming, the card showed Nov 20th 2027 + snackbar "Next order skipped."; the change-date dialog
+  offered "In 12 months (Nov 20th 2028)" / 24 / 36 months + "Pick a date", and the typed date
+  restored 2026-11-20 with "Next order date updated.". EXACTLY two writes reached Ordergroove
+  (skip_subscription, change_next_order_date), ZERO send_now, no failed requests, and each write was
+  followed by a refetch of subscriptions + orders?status=1 + items?status=1 only. A read-only pass
+  afterwards showed all 14 dates identical to before the run. Recipe note: the store's display
+  format is "M jS Y", so a scraper must strip the ordinal ("Nov 20th 2026") before Date.parse.

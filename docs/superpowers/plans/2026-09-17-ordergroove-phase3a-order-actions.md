@@ -2207,12 +2207,12 @@ git commit -m "docs: B2B-0000 Record the Ordergroove Phase 3a implementation" -m
 **Interfaces:**
 - Consumes: a deploy-flavour build of this branch; the Phase 2 recipe (request-level login, route interception of the deployed bundle path, `portalEval` into the ThemeFrame); `playwright` with the system Chrome. The sandbox theme already emits `customManager: true`, so **no `BC_CONTEXT` injection**.
 
-- [ ] **Step 1: Build the deploy flavour**
+- [x] **Step 1: Build the deploy flavour**
 
 Run: `VITE_ASSETS_ABSOLUTE_PATH='https://sandbox.storesupply.com/content/b2bBuyerPortal/dist/' yarn build`
 Expected: `apps/storefront/dist/` with hashed root entries; the script aliases the loader's unhashed names.
 
-- [ ] **Step 2: Write the script** to `<scratch>/pw/phase3a-live.mjs`
+- [x] **Step 2: Write the script** to `<scratch>/pw/phase3a-live.mjs`
 
 ```js
 // Live check of Phase 3a on sandbox as customer 80591, through the real UI. REVERSIBLE ONLY:
@@ -2368,7 +2368,7 @@ summary.ok = summary.sendNowRequests === 0 && summary.failedRequests.length === 
 console.log(JSON.stringify(summary, null, 2));
 ```
 
-- [ ] **Step 3: Run it**
+- [x] **Step 3: Run it**
 
 Run: `DIST=<abs path to apps/storefront/dist> ENV_FILE=<abs path to apps/storefront/.env> node <scratch>/pw/phase3a-live.mjs`
 
@@ -2383,7 +2383,30 @@ Expected, for customer 80591:
 
 If the run aborts after the skip and before the restore, restore by hand: run the Task 0 probe's `change_next_order_date` step with `{ order_date: <subject.originalDate> }` for that subscription (its id is in `writes`).
 
-- [ ] **Step 4: Record**
+**Recorded 2026-09-17.** The first run aborted *before any write* on its own guard: the card date
+could not be parsed. That was two real findings, not a script bug alone.
+
+1. The store's display format is `M jS Y` ("Nov 20th 2026") and `Date.parse` cannot read the
+   ordinal — the script now strips it.
+2. Every date on the page was **one day early**. The read-only diagnostic showed cards at Sep 18,
+   19, 21, 22, 28, 29, 30, Oct 4, 6, 12, Nov 9, 19 while the hosted manager and the REST API said
+   Sep 19, 20, 22, 23, 29, 30, Oct 1, 5, 7, 13, Nov 10, 20. Cause and fix: see the spec §6.2
+   calendar-date note; `displayCalendarDate` now formats local midnight. After the fix the fourteen
+   cards match the API exactly.
+
+The write run then passed: subject was the 360-day subscription due 2026-11-20, alone on its order.
+The skip dialog read "20 x 30 inch Tissue Paper - 480 Sheets - Kraft will leave your order on
+Nov 20th 2026. Your next order will be on Nov 20th 2027."; after confirming, the card showed
+Nov 20th 2027 and the snackbar "Next order skipped."; the change-date dialog offered
+"In 12 months (Nov 20th 2028)", "In 24 months (Nov 20th 2029)", "In 36 months (Nov 20th 2030)" and
+"Pick a date"; the typed date restored 2026-11-20 with "Next order date updated.". Exactly two
+writes reached Ordergroove — `PATCH /orders/<id>/skip_subscription/ {"subscription":"<id>"}` and
+`PATCH /subscriptions/<id>/change_next_order_date/ {"order_date":"2026-11-20"}` — **zero**
+`send_now` requests, no failed requests, and each write was followed by a refetch of subscriptions,
+`orders?status=1` and `items?status=1` only (no products, payments or addresses re-read). A
+read-only pass afterwards showed all fourteen dates identical to before the run.
+
+- [x] **Step 4: Record**
 
 Paste the summary (product name, dates, request lines — never tokens or the merchant id) into the memory note section from Task 6 Step 4, mirror to the vault and Mongo as there, and commit the note as `docs: B2B-0000 Record the Phase 3a live check` if the Task 6 docs commit has already been made.
 
