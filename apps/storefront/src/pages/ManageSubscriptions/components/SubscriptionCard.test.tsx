@@ -22,7 +22,11 @@ const buildCardWith = builder<SubscriptionCardModel>(() => ({
   },
   quantity: faker.number.int({ min: 1, max: 9 }),
   frequencyDays: 28,
+  every: 4,
+  everyPeriod: 2,
   nextOrderDate: '2026-10-03',
+  nextOrder: null,
+  shippingAddressId: faker.string.hexadecimal({ length: 32, prefix: '' }),
   shippingAddress: {
     name: 'Jane Doe',
     company: 'Acme Co',
