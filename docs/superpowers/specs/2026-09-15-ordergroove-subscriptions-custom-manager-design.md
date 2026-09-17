@@ -122,6 +122,8 @@ subscriptions?: {
   authEndpoint: string;
   /** SSW app client id used to mint the Current Customer JWT sent to authEndpoint. */
   appClientId: string;
+  /** Phase 2: when true, /manage-subscriptions renders the portal page instead of the hosted iframe. */
+  customManager?: boolean;
 };
 ```
 
@@ -300,10 +302,13 @@ in one session). Live check on sandbox as customer 80591: deleting the default c
 
 ## 7. Phase 2 — read-only custom subscriptions page (scoped design)
 
-- **Switch:** the `/manage-subscriptions` route component renders the new `SubscriptionsManager`
-  when `isSubscriptionsAvailable() && !isAgenting`, else today's iframe. The route entry gains
-  the same three-part gate as `/payment-methods` **only for the new implementation**; the iframe
-  fallback keeps today's (ungated) behaviour until Phase 4.
+- **Full design:** [2026-09-17-ordergroove-phase2-subscriptions-page-design.md](2026-09-17-ordergroove-phase2-subscriptions-page-design.md).
+- **Switch (revised 2026-09-17):** the `/manage-subscriptions` route component renders the new
+  `SubscriptionsManager` when `isCustomManagerAvailable() && !isAgenting` — a second host flag,
+  `BC_CONTEXT.subscriptions.customManager`, so the Phase 1 warning can reach prod while the page
+  is still sandbox-only — else today's iframe. The route entry is unchanged; the iframe fallback
+  keeps today's (ungated) behaviour until Phase 4. Until Phase 3 the page links to the hosted
+  manager for actions.
 - **Data:** `listSubscriptions()`, `listUpcomingOrders()` (`status=1`), `listItems()` to join
   order ↔ subscription, `getProduct()` per distinct `product`, `listPayments()`, `listAddresses()`.
   One `useQuery` per resource, joined in a page hook.
