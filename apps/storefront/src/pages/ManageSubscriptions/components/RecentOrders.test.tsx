@@ -24,6 +24,28 @@ const buildRecentOrderWith = builder<RecentOrder>(() => ({
   message: null,
 }));
 
+it('renders the calendar date the store sent, whatever the store timezone offset', () => {
+  // Same calendar-date rule as the cards: the store offset must not move the day (spec §4.2).
+  renderWithProviders(
+    createElement(RecentOrders, {
+      orders: [buildRecentOrderWith({ placedOn: '2026-11-20' })],
+      isPending: false,
+      isError: false,
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      onShowMore: vi.fn(),
+      onRetry: vi.fn(),
+    }),
+    {
+      preloadedState: {
+        storeInfo: buildStoreInfoStateWith({ timeFormat: { display: 'M jS Y', offset: -21600 } }),
+      },
+    },
+  );
+
+  expect(screen.getByText('Nov 20th 2026')).toBeInTheDocument();
+});
+
 type Props = ComponentProps<typeof RecentOrders>;
 
 // createElement with a merged props object: the project does not add JSX prop spreading.

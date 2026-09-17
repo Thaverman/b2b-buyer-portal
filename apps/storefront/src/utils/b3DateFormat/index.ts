@@ -50,6 +50,27 @@ export const displayFormat = formatCreator('display', 'formatDate');
 export const displayExtendedFormat = formatCreator('extendedDisplay', 'formatDate');
 
 /**
+ * Formats a calendar date ("YYYY-MM-DD", or a timestamp whose first ten characters are one) in the
+ * store's display format.
+ *
+ * `displayFormat` converts an instant into the store's wall clock, so it shifts its argument by the
+ * store's timezone offset. A calendar date has no instant to convert — the day is the day — and
+ * that shift renders the previous day on any store west of UTC (observed on a store at -21600).
+ */
+export const displayCalendarDate = (date: string) => {
+  const [year, month, day] = date.slice(0, 10).split('-').map(Number);
+
+  if (!year || !month || !day) {
+    return '';
+  }
+
+  const { display } = merge({ display: 'j M Y' }, store.getState().storeInfo.timeFormat);
+
+  // Local midnight: the formatter reads local getters, so this always prints the day it was given.
+  return fmt.formatDate(new Date(year, month - 1, day), display) || '';
+};
+
+/**
  * Formats a Unix timestamp (seconds) as a locale-aware date (e.g. "August 16, 2018").
  * Uses dayjs `LL` format. Locale is set in setDayjsLocale.tsx.
  *

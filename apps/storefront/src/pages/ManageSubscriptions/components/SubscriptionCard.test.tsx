@@ -85,6 +85,20 @@ it('renders every field of a loaded active card', () => {
   ).not.toBeInTheDocument();
 });
 
+it('renders the calendar date the store sent, whatever the store timezone offset', () => {
+  // SSW's offset is US Central (-21600). A next-order date is a calendar day, not an instant:
+  // shifting it by the store offset renders the day before (observed live 2026-09-17).
+  const card = buildCardWith({ nextOrderDate: '2026-11-20' });
+
+  renderWithProviders(<SubscriptionCard card={card} variant="active" loading={settled} />, {
+    preloadedState: {
+      storeInfo: buildStoreInfoStateWith({ timeFormat: { display: 'M jS Y', offset: -21600 } }),
+    },
+  });
+
+  expect(screen.getByText('Next order Nov 20th 2026')).toBeInTheDocument();
+});
+
 it('shows neither values nor fallbacks while the lookups are still loading', () => {
   const card = buildCardWith({
     product: null,
