@@ -1,17 +1,10 @@
 import { getAuthorizationHeader, invalidateAuthorization } from './auth';
 import { OrdergrooveError } from './errors';
-import { OgPayment, OgProduct, OgSubscription } from './types';
+import { OgAddress, OgItem, OgOrder, OgPage, OgPayment, OgProduct, OgSubscription } from './types';
 
 const API_BASE = 'https://restapi.ordergroove.com';
 // The warning is advisory; past this the dialog falls back to "we couldn't check" (spec §6.3).
 const REQUEST_TIMEOUT_MS = 5000;
-
-interface OgPage<T> {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: T[];
-}
 
 // Promise.race rather than AbortSignal: nothing else in the portal passes signals to fetch, and
 // the jsdom/undici pairing in tests has historically disagreed about AbortSignal identity.
@@ -77,6 +70,39 @@ const listAll = async <T>(customerId: string, url: string | null, acc: T[] = [])
 const isActive = (subscription: OgSubscription) =>
   subscription.cancelled === null && subscription.live;
 
+export const listSubscriptions = (customerId: string) =>
+  listAll<OgSubscription>(customerId, `${API_BASE}/subscriptions/`);
+
+export const listPayments = (customerId: string) =>
+  listAll<OgPayment>(customerId, `${API_BASE}/payments/`);
+
+export const listAddresses = (customerId: string) =>
+  listAll<OgAddress>(customerId, `${API_BASE}/addresses/`);
+
+/**
+ * Future orders (status 1, UNSENT) and their lines. Subscriptions carry no next-order date; the
+ * lines are the only link from a subscription to the order that will charge it next.
+ */
+export const listUpcomingOrders = async (customerId: string) => {
+  const [orders, items] = await Promise.all([
+    listAll<OgOrder>(customerId, `${API_BASE}/orders/?status=1`),
+    listAll<OgItem>(customerId, `${API_BASE}/items/?status=1`),
+  ]);
+
+  return { orders, items };
+};
+
+/**
+ * First-page URL for order history: everything due for placement up to and including the date,
+ * newest first. The API's default order is not by place (verified live 2026-09-17).
+ */
+export const orderHistoryUrl = (throughDate: string) =>
+  `${API_BASE}/orders/?place_end=${throughDate}&ordering=-place`;
+
+/** One page of orders — the first-page URL above, or the `next` cursor of a previous page. */
+export const listOrdersPage = (customerId: string, url: string) =>
+  ogFetch<OgPage<OgOrder>>(customerId, url);
+
 /**
  * Active subscriptions charged to a BigCommerce stored instrument. Ordergroove's payment
  * `token_id` IS the instrument token (verified live, spec §2). Several payment records can carry
@@ -87,7 +113,7 @@ export const getSubscriptionsUsingToken = async (
   customerId: string,
   token: string,
 ): Promise<OgSubscription[]> => {
-  const payments = await listAll<OgPayment>(customerId, `${API_BASE}/payments/`);
+  const payments = await listPayments(customerId);
   const paymentIds = new Set(
     payments.filter((payment) => payment.token_id === token).map((payment) => payment.public_id),
   );
@@ -95,7 +121,7 @@ export const getSubscriptionsUsingToken = async (
     return [];
   }
 
-  const subscriptions = await listAll<OgSubscription>(customerId, `${API_BASE}/subscriptions/`);
+  const subscriptions = await listSubscriptions(customerId);
 
   return subscriptions.filter(
     (subscription) => isActive(subscription) && paymentIds.has(subscription.payment),

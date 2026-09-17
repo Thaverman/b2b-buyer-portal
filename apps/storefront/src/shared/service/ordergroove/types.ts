@@ -43,3 +43,61 @@ export interface OgProduct {
   sku: string;
   price: string;
 }
+
+/** One page of any Ordergroove list. `next` is an absolute URL or null. */
+export interface OgPage<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
+/**
+ * One Ordergroove order: a future placement (status 1) or a past attempt. Money fields are
+ * decimal strings. Status codes are mapped in `pages/ManageSubscriptions/viewModel.ts`.
+ */
+export interface OgOrder {
+  public_id: string;
+  customer: string;
+  /** payment public_id */
+  payment: string;
+  /** address public_id */
+  shipping_address: string;
+  currency_code: string;
+  sub_total: string;
+  total: string;
+  /** "YYYY-MM-DD HH:mm:ss" — the day (and time) the order is or was due for placement */
+  place: string;
+  status: number;
+  /** BigCommerce order id once placed, null before */
+  order_merchant_id: string | null;
+  rejected_message: string | null;
+  tries: number;
+  cancelled: string | null;
+}
+
+/** One line of an order; `subscription` links it to the subscription that generated it. */
+export interface OgItem {
+  public_id: string;
+  /** order public_id */
+  order: string;
+  /** subscription public_id; null for one-time upsell items */
+  subscription: string | null;
+  product: string;
+  quantity: number;
+  price: string;
+}
+
+export interface OgAddress {
+  public_id: string;
+  first_name: string;
+  last_name: string;
+  company_name: string | null;
+  address: string;
+  address2: string | null;
+  city: string;
+  state_province_code: string;
+  zip_postal_code: string;
+  country_code: string;
+  live: boolean;
+}

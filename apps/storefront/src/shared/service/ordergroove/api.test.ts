@@ -1,4 +1,7 @@
 import {
+  buildOgAddressWith,
+  buildOgItemWith,
+  buildOgOrderWith,
   buildOgPaymentWith,
   buildOgProductWith,
   buildOgSubscriptionWith,
@@ -9,7 +12,16 @@ import {
   startMockServer,
 } from 'tests/test-utils';
 
-import { getProduct, getSubscriptionsUsingToken } from './api';
+import {
+  getProduct,
+  getSubscriptionsUsingToken,
+  listAddresses,
+  listOrdersPage,
+  listPayments,
+  listSubscriptions,
+  listUpcomingOrders,
+  orderHistoryUrl,
+} from './api';
 import { invalidateAuthorization } from './auth';
 
 const { server } = startMockServer();
@@ -226,4 +238,69 @@ it('fetches a product by its Ordergroove external id', async () => {
   server.use(http.get(`${ogBase}/products/9537_12118/`, () => HttpResponse.json(product)));
 
   expect(await getProduct(someCustomerId(), '9537_12118')).toEqual(product);
+});
+
+it('lists every page of subscriptions, payments and addresses', async () => {
+  const customerId = someCustomerId();
+  const first = buildOgSubscriptionWith('WHATEVER_VALUES');
+  const second = buildOgSubscriptionWith('WHATEVER_VALUES');
+  server.use(
+    http.get(`${ogBase}/subscriptions/`, ({ request }) =>
+      new URL(request.url).searchParams.get('page') === '2'
+        ? HttpResponse.json(page([second]))
+        : HttpResponse.json(page([first], `${ogBase}/subscriptions/?page=2`)),
+    ),
+    http.get(`${ogBase}/payments/`, () =>
+      HttpResponse.json(page([buildOgPaymentWith('WHATEVER_VALUES')])),
+    ),
+    http.get(`${ogBase}/addresses/`, () =>
+      HttpResponse.json(page([buildOgAddressWith('WHATEVER_VALUES')])),
+    ),
+  );
+
+  expect(await listSubscriptions(customerId)).toEqual([first, second]);
+  expect(await listPayments(customerId)).toHaveLength(1);
+  expect(await listAddresses(customerId)).toHaveLength(1);
+});
+
+it('lists upcoming orders together with their items, both filtered to status 1', async () => {
+  const requested = vi.fn();
+  const order = buildOgOrderWith({ status: 1 });
+  const item = buildOgItemWith({ order: order.public_id });
+  server.use(
+    http.get(`${ogBase}/orders/`, ({ request }) => {
+      requested(`orders:${new URL(request.url).searchParams.get('status')}`);
+
+      return HttpResponse.json(page([order]));
+    }),
+    http.get(`${ogBase}/items/`, ({ request }) => {
+      requested(`items:${new URL(request.url).searchParams.get('status')}`);
+
+      return HttpResponse.json(page([item]));
+    }),
+  );
+
+  expect(await listUpcomingOrders(someCustomerId())).toEqual({ orders: [order], items: [item] });
+  expect(requested.mock.calls.map(([call]) => call).sort()).toEqual(['items:1', 'orders:1']);
+});
+
+it('fetches one page of order history, newest first, at exactly the URL it is given', async () => {
+  const requestedUrl = vi.fn();
+  const order = buildOgOrderWith('WHATEVER_VALUES');
+  server.use(
+    http.get(`${ogBase}/orders/`, ({ request }) => {
+      requestedUrl(request.url);
+
+      return HttpResponse.json(page([order], `${ogBase}/orders/?place_end=2026-09-17&page=2`));
+    }),
+  );
+
+  const result = await listOrdersPage(someCustomerId(), orderHistoryUrl('2026-09-17'));
+
+  // Task 0 finding C: the API's default order is not by place, but ordering=-place is honoured.
+  expect(requestedUrl).toHaveBeenCalledWith(
+    `${ogBase}/orders/?place_end=2026-09-17&ordering=-place`,
+  );
+  expect(result.results).toEqual([order]);
+  expect(result.next).toBe(`${ogBase}/orders/?place_end=2026-09-17&page=2`);
 });
