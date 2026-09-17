@@ -327,9 +327,17 @@ in one session). Live check on sandbox as customer 80591: deleting the default c
 
 ## 8. Phase 3 — self-service mutations (scoped design)
 
-Candidate parity set = Ordergroove's documented Subscription Manager features. **Kickoff task:**
-capture the live manager as customer 80591 (screenshots per action) to confirm which are enabled
-for SSW — `curl` cannot render it (client-side gate), so this needs a browser session.
+- **Full design (2026-09-17):** [2026-09-17-ordergroove-phase3-subscription-actions-design.md](2026-09-17-ordergroove-phase3-subscription-actions-design.md).
+  Scope settled there: full parity with the hosted manager minus swap product and add-new-address,
+  delivered as 3a (skip, send now, change next-order date — pause is a preset date shift) and 3b
+  (frequency, quantity, cancel with reasons, reactivate, change shipping address). Actions live on
+  each subscription card; live verification uses reversible writes only.
+- **Kickoff task done 2026-09-17:** the live manager was captured read-only as customer 80591
+  (Phase 3 spec §12). Enabled for SSW: change order date, skip order, send now, quantity,
+  frequency, skip product, pause, cancel with reasons, swap-product search, address change with
+  add/edit/delete, reactivate. No change-payment control, no cancel-flow discount.
+
+Candidate parity set as originally scoped (superseded by the Phase 3 spec §1):
 
 | manager action | Ordergroove REST (per developer reference; verify exact path/body at implementation) | destructive confirm |
 |---|---|---|

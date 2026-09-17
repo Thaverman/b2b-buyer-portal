@@ -426,6 +426,8 @@ no request reaches `restapi.ordergroove.com` from the page. No mutation is attem
 
 - Every action (skip, frequency, quantity, address, cancel, reactivate, payment change) — Phase 3
   and Phase 4. The escape link is their interim home and is removed with Phase 3.
+  *Revised in the Phase 3 design (2026-09-17): the link stays until the Phase 4 cutover, because
+  swap product and add-new-address remain hosted-only.*
 - Theme work: emitting `customManager`; later the `/subscriptions` redirect and cutover (Phase 4).
 - Grouping duplicate products, per-card order history, a named analytics event.
 - Order placement attempts (`/order-placement-attempts/`) for retry — Phase 3.

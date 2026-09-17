@@ -242,3 +242,32 @@ real gateway tokens; otherwise last4/brand is a heuristic only.
   subscriptions", the escape link, 10 recent-order rows (8 Placed with web order numbers, 2
   Failed), no alerts, no failed requests, ONE auth mint per page load; the Phase 1 delete dialog
   lists the 14 subscriptions again (settled in 1.3 s). Phase 2 is effectively live on sandbox.
+
+## Phase 3 designed (2026-09-17)
+
+- Spec: `docs/superpowers/specs/2026-09-17-ordergroove-phase3-subscription-actions-design.md`
+  (approved section by section; awaiting written review, then two plans: 3a order actions —
+  skip / send now / change next-order date — and 3b subscription edits — frequency, quantity,
+  cancel with reasons, reactivate, change shipping address).
+- Decisions: full parity with the hosted manager MINUS swap product and add-new-address; actions
+  on each subscription card (only send now is order-scoped; its confirm lists the other products
+  in the order); quantity/frequency are inline selects that save on change, everything else a
+  B3Dialog; pause = change_next_order_date with presets at 1x/2x/3x the frequency; skip = the
+  order's `skip_subscription` for one subscription (the manager's "skip order" and "skip product"
+  both call it); escape link stays until Phase 4; cancel reason optional (no selection sends the
+  manager's `114|Cancelled without exit survey response`); live verification = REVERSIBLE writes
+  only, send_now never fired against 80591 (sandbox talks to Ordergroove PRODUCTION).
+- Hosted-manager capture (read-only, Playwright, `/subscriptions` as 80591): order-grouped
+  layout; change order date, skip order, send now per order; quantity 1–20 (+ current), frequency
+  select, More Options → skip product / pause / cancel; shipping dropdown of 10 deduped addresses
+  (+ add/edit/delete); NO change-payment control; inactive list with Reactivate; cancel flow
+  offers only "skip product" as retention (no discount configured); swap search present but
+  unverified for SSW.
+- Merchant bundle `static.ordergroove.com/<merchant>/msi.js` (1.9 MB) hardcodes SSW's frequency
+  list as literal `{every, period}` pairs: 2,4,6,8,10,12 days; 1 day; 2,4,6,8,10,12 weeks (period
+  1 = days, 2 = weeks, 3 = months). Not readable from the REST API → constant in `viewModel.ts`.
+  Cancel reason codes the manager sends: 2, 8, 31, 70, 3, 22, 15, Other = 1 (+ free text), body
+  `"{code} | {label}"`. Bundle endpoint map recorded in spec §12.3; notable: the manager omits the
+  trailing slash on `change_next_order_date` (docs include it) — Task 0 settles it live.
+- Reference confirmed Storefront scope for every mutation used. `/placement_logs/responses/`
+  (failed-order attempts) is x-api-key only → retry stays out of scope.
