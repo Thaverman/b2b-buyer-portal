@@ -24,6 +24,9 @@ interface AuthResponse {
 
 // Module memory only (spec §5.2): never storage, never Redux.
 let cached: CachedAuthorization | undefined;
+// The mint in progress, so concurrent callers (the subscriptions page starts six queries at once)
+// share one JWT fetch and one middleware call instead of minting six signatures.
+let inFlight: { customerId: string; promise: Promise<CachedAuthorization> } | undefined;
 
 const mint = async (customerId: string): Promise<CachedAuthorization> => {
   const config = getSubscriptionsConfig();
@@ -75,17 +78,30 @@ const mint = async (customerId: string): Promise<CachedAuthorization> => {
   };
 };
 
+const startMint = (customerId: string) => {
+  const promise = mint(customerId).finally(() => {
+    if (inFlight?.promise === promise) {
+      inFlight = undefined;
+    }
+  });
+  inFlight = { customerId, promise };
+
+  return promise;
+};
+
 export const getAuthorizationHeader = async (customerId: string): Promise<string> => {
   const isFresh =
     cached?.customerId === customerId && cached.expiresAt - Date.now() > REFRESH_MARGIN_MS;
   if (cached && isFresh) {
     return cached.header;
   }
-  cached = await mint(customerId);
+  const pending = inFlight?.customerId === customerId ? inFlight.promise : startMint(customerId);
+  cached = await pending;
 
   return cached.header;
 };
 
 export const invalidateAuthorization = () => {
   cached = undefined;
+  inFlight = undefined;
 };

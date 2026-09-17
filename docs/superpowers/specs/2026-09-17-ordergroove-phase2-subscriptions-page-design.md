@@ -24,18 +24,29 @@ recipe.
 
 ```ts
 // apps/storefront/src/index.d.ts — inside BC_CONTEXT.subscriptions
-/** When true, /manage-subscriptions renders the portal's own page instead of the hosted iframe. */
-customManager?: boolean;
+/** Phase 2: when true (or "true"), /manage-subscriptions renders the portal page, not the hosted iframe. */
+customManager?: boolean | string;
 ```
 
 ```ts
 // src/shared/service/ordergroove/config.ts
 export const isCustomManagerAvailable = () =>
-  isSubscriptionsAvailable() && window.BC_CONTEXT?.subscriptions?.customManager === true;
+  isSubscriptionsAvailable() && isHostFlagEnabled(getSubscriptionsConfig()?.customManager);
 ```
 
 The theme emits `customManager: true` from a new theme setting next to `ordergroove_merchant_id`
-(stencil repo; not in this plan). Absent, `false`, or the string `"false"` all mean the iframe.
+(stencil repo; not in this plan). Theme templates emit booleans as strings routinely, so the flag
+is on for `true` or `"true"` in any case and off for everything else — the rule the Braintree
+add-card flag already followed, now shared as `isHostFlagEnabled` in `src/utils/hostFlag.ts`.
+
+Found on sandbox during the live check (2026-09-17): the theme now emits the whole
+`subscriptions` block itself, with an extra `enabled` boolean beside the three Phase 1 keys, and
+— a theme bug — an **empty `merchantId`** on the test store (it reads the production setting,
+not the `_test` one). Two consequences: `isSubscriptionsAvailable()` honours `enabled` (absent =
+on; `false` or `"false"` = every Ordergroove feature off, Phase 1's warning included), and until
+the stencil fix lands every Ordergroove call from sandbox fails at the CORS layer, so the Phase 1
+warning degrades to "couldn't check" there. The live check injected the known-good merchant id
+to verify the page itself.
 
 ### 2.2 Route and switch
 
@@ -161,29 +172,32 @@ All keys start `['ordergroove', customerId, …]`; all use `retry: false` (the p
 | `addresses` | `listAddresses` | always | shipping summary |
 | `upcoming` | `listUpcomingOrders` | always | next order date |
 | `products` | `getProduct` per distinct `subscription.product`, `Promise.all`, each `.catch(() => null)` | subscriptions loaded and at least one id; key includes the sorted id list | name, image, SKU, detail link |
-| `orderHistory` | `useInfiniteQuery`, `listOrdersPage`; `initialPageParam` = `/orders/?place_end=<today>`; `getNextPageParam = (page) => page.next ?? undefined` | always | recent orders |
+| `orderHistory` | `useInfiniteQuery`, `listOrdersPage`; `initialPageParam` = `/orders/?place_end=<today>&ordering=-place`; `getNextPageParam = (page) => page.next ?? undefined` | always | recent orders |
 
 `place_end=<today>` excludes future (UNSENT) orders, which belong on the cards, while keeping
-anything placed or attempted up to today. `<today>` is the local date as `YYYY-MM-DD`, computed
-once per mount.
+anything placed or attempted up to today (inclusive). `ordering=-place` makes the API return
+newest first; its default order is not by place (probe, §3.3). `<today>` is the local date as
+`YYYY-MM-DD`, computed once per mount.
 
 The hook returns the raw query results; `viewModel.ts` turns them into the render model. Nothing
 here touches Redux, Context, or storage.
 
 ### 3.3 Task 0 — live probe before implementation (GET only, throwaway)
 
-Reusing the spike recipe (middleware-minted header, Node `fetch`, customer 80591):
+Run 2026-09-17 with the spike recipe (middleware-minted header, Node `fetch`, customer 80591).
+Findings:
 
-1. `GET /items/?status=1` — confirm `subscription` and `order` fields join to the upcoming orders
-   and that every active subscription appears in exactly one upcoming order.
-2. `GET /orders/?status=1` — confirm `place` is `YYYY-MM-DD` (adjust the formatter if it carries a time).
-3. `GET /orders/?place_end=<today>` — record the default ordering. If it is not newest-first, try
-   `ordering=-place`; if that is honoured, the first-page URL gains it. If neither, each fetched
-   page is sorted by `place` descending client-side and the spec's "newest first" holds only within
-   the loaded pages (state this in the section's test).
-4. Record the page size (the spike saw ten per page on `/subscriptions/`).
+1. `GET /items/?status=1` — 14 items for the 14 active subscriptions; each carries `subscription`,
+   `order`, `product`, `quantity`, `price`. The join works as designed.
+2. `place` is `"YYYY-MM-DD HH:mm:ss"` — upcoming orders at `00:00:00`, placed ones with the real
+   placement time (e.g. `2026-09-17 01:37:45`). The view model keeps the first ten characters.
+3. `GET /orders/?place_end=<today>` is **not** newest-first by default (page 1 came back 09-17,
+   09-16, 09-03, 09-02, 09-01, 09-09, …). `ordering=-place` **is** honoured and strictly
+   descending, so the first-page URL carries it. `place_end` is inclusive of today and excludes the
+   future UNSENT orders.
+4. Page size 10; this customer has 155 past orders (statuses 5 and 3 on page 1).
 
-Findings go into the plan as concrete values; no code is kept.
+No code was kept from the probe.
 
 ## 4. View model (`viewModel.ts`, pure)
 
@@ -249,7 +263,8 @@ Order outcome (`status`, Ordergroove reference "Order Status Codes"):
 | 17 MERGED | dropped from the list |
 | unknown | `processing` |
 
-Recent orders are sorted by `place` descending within the loaded pages (see §3.3 item 3).
+The API returns recent orders newest first (`ordering=-place`); the view model also sorts each
+loaded page by `place` descending so the order never depends on the transport.
 
 ## 5. UX
 
@@ -274,8 +289,11 @@ Aug 8, 2026   —              $81.50   Failed · Card declined (rejected_messag
 ```
 
 - Cards: MUI `Card`/`Paper` in the visual family of `/payment-methods`' `PaymentMethodRow`;
-  image 80 px, falls back to nothing when `imageUrl` is null. "View product" is a plain anchor to
-  `detailUrl` with `target="_top"` (storefront page, outside the SPA).
+  image 80 px with the product name as alt text, falls back to nothing when `imageUrl` is null.
+  The details column is a `group` named by the product (or the "Product {id}" fallback), which
+  names the card for assistive tech and lets the phone-layout test tell the two layouts apart.
+  "View product" is a plain anchor to `detailUrl` with `target="_top"` (storefront page, outside
+  the SPA).
 - Mobile (`useMobile`): cards stack full-width, the next-order date moves under the title, recent
   order rows wrap to two lines.
 - Cancelled section: an MUI `Accordion` (or `Collapse` with a toggle button) headed by the plural
@@ -291,7 +309,7 @@ Aug 8, 2026   —              $81.50   Failed · Card declined (rejected_messag
 | subscriptions loading | `B3Spin` over the page body |
 | no active subscriptions | "You don't have any active subscriptions." in the list area; cancelled section and recent orders still render |
 | secondary query loading | skeleton text in that card cell (product line, address, payment, next date) |
-| secondary query failed | that cell reads "Unavailable" (product cell: "Product {id}"); the page-level Retry also re-runs it |
+| secondary query failed while subscriptions loaded | that cell reads "Unavailable" (product cell: "Product {id}"), and the page-level `Alert severity="error"` reads "Some subscription details couldn't be loaded." with a **Try again** button that refetches every errored query |
 | `sessionExpired` on any query | `Alert severity="warning"` with the session-expired copy, nothing else changes |
 | subscriptions query failed (other kinds) | `Alert severity="error"` "We couldn't load your subscriptions." with a **Try again** button that refetches every errored query; list area empty |
 | recent orders failed | inline "We couldn't load your orders." with its own Try again; cards unaffected |
@@ -303,10 +321,10 @@ renders the iframe.
 ## 6. Copy (`en.json`, all new)
 
 ```
-subscriptions.title                       Manage Subscriptions
 subscriptions.hostedManagerLink           Manage in the subscription manager
 subscriptions.empty                       You don't have any active subscriptions.
 subscriptions.loadError                   We couldn't load your subscriptions.
+subscriptions.partialLoadError            Some subscription details couldn't be loaded.
 subscriptions.retry                       Try again
 subscriptions.sessionExpired              Your session has expired — please sign in again.
 subscriptions.card.quantity               Qty {count}
@@ -336,9 +354,11 @@ subscriptions.orders.outcome.cancelled    Cancelled
 subscriptions.orders.outcome.processing   Processing
 ```
 
-Dates render through `displayFormat` from `@/utils/b3DateFormat` (the store's display format);
-totals through `ordersCurrencyFormat` from `@/utils/b3CurrencyFormat` with the order's
-`currency_code`, the same pair the order pages use.
+The page title is the route name the layout already renders, so there is no `subscriptions.title`
+key. Dates render through `displayFormat` from `@/utils/b3DateFormat` (the store's display
+format); totals through `currencyFormat` from `@/utils/b3CurrencyFormat` (the store's active
+currency — `ordersCurrencyFormat` needs a per-order money format the Ordergroove record does not
+carry).
 
 ## 7. Error handling
 

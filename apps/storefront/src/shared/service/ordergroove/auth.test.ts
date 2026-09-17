@@ -1,4 +1,4 @@
-import { faker, http, HttpResponse, startMockServer } from 'tests/test-utils';
+import { delay, faker, http, HttpResponse, startMockServer } from 'tests/test-utils';
 
 import { getAuthorizationHeader, invalidateAuthorization } from './auth';
 
@@ -80,6 +80,35 @@ it('reuses the header for the same customer instead of minting again', async () 
   const second = await getAuthorizationHeader(customerId);
 
   expect(second).toBe(first);
+  expect(mints).toHaveBeenCalledTimes(1);
+});
+
+it('shares one in-flight mint between concurrent callers', async () => {
+  const mints = vi.fn();
+  const customerId = someCustomerId();
+
+  mockJwt();
+  server.use(
+    http.post(authEndpoint, async () => {
+      mints();
+      await delay(50);
+
+      return HttpResponse.json({
+        success: true,
+        cookieValue: `${customerId}|1|sig`,
+        expiresIn: 7200,
+      });
+    }),
+  );
+
+  // Six page queries start before the first mint resolves; they must not each mint their own.
+  const headers = await Promise.all([
+    getAuthorizationHeader(customerId),
+    getAuthorizationHeader(customerId),
+    getAuthorizationHeader(customerId),
+  ]);
+
+  expect(new Set(headers).size).toBe(1);
   expect(mints).toHaveBeenCalledTimes(1);
 });
 

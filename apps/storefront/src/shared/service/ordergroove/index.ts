@@ -1,3 +1,14 @@
-export { getProduct, getSubscriptionsUsingToken, withTimeout } from './api';
-export { isSubscriptionsAvailable } from './config';
-export type { OgPayment, OgProduct, OgSubscription } from './types';
+export {
+  getProduct,
+  getSubscriptionsUsingToken,
+  listAddresses,
+  listOrdersPage,
+  listPayments,
+  listSubscriptions,
+  listUpcomingOrders,
+  orderHistoryUrl,
+  withTimeout,
+} from './api';
+export { isCustomManagerAvailable, isSubscriptionsAvailable } from './config';
+export { OrdergrooveError } from './errors';
+export type { OgAddress, OgItem, OgOrder, OgPayment, OgProduct, OgSubscription } from './types';

@@ -82,12 +82,16 @@ declare global {
        * later the custom subscriptions page); absent = feature off.
        */
       subscriptions?: {
+        /** The theme's on/off switch for every Ordergroove feature (boolean or "true"/"false"); absent = on. */
+        enabled?: boolean | string;
         /** Ordergroove "Your Merchant ID" — the REST API `public_id`. Public, not a secret. */
         merchantId: string;
         /** SSW middleware endpoint that mints the storefront-auth triplet (customerId|ts|sig). */
         authEndpoint: string;
         /** SSW app client id used to mint the Current Customer JWT sent to authEndpoint. */
         appClientId: string;
+        /** Phase 2: when true (or "true"), /manage-subscriptions renders the portal page, not the hosted iframe. */
+        customManager?: boolean | string;
       };
       /** Gates the /loyalty page; absent (or any field missing) = feature off. */
       loyalty?: {
