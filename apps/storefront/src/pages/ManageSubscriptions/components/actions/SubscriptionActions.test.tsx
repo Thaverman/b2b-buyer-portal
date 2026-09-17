@@ -72,22 +72,28 @@ it('renders nothing for a card with no upcoming order', () => {
   expect(screen.queryByRole('button')).not.toBeInTheDocument();
 });
 
-it('opens one dialog per button and closes it again', async () => {
+// One dialog per case: opening and closing MUI dialogs costs real time, and a case that cycles
+// through all three crosses the 5 s per-test limit whenever the suite runs under load.
+it.each([
+  ['Skip', 'Skip next order'],
+  ['Send now', 'Send order now'],
+  ['Change date', 'Change next order date'],
+])('opens only the %s dialog from the row', async (button, title) => {
+  const { user } = renderRow(buildCardWith('WHATEVER_VALUES'));
+
+  await user.click(screen.getByRole('button', { name: button }));
+
+  expect(screen.getByRole('dialog')).toHaveTextContent(title);
+  expect(screen.getAllByRole('dialog')).toHaveLength(1);
+});
+
+it('closes the dialog again on Cancel', async () => {
   const { user } = renderRow(buildCardWith('WHATEVER_VALUES'));
 
   await user.click(screen.getByRole('button', { name: 'Skip' }));
-  expect(screen.getByRole('dialog')).toHaveTextContent('Skip next order');
   await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }));
-  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
-  await user.click(screen.getByRole('button', { name: 'Send now' }));
-  expect(screen.getByRole('dialog')).toHaveTextContent('Send order now');
-  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-
-  await user.click(screen.getByRole('button', { name: 'Change date' }));
-  expect(screen.getByRole('dialog')).toHaveTextContent('Change next order date');
-  expect(screen.getAllByRole('dialog')).toHaveLength(1);
 });
 
 it('disables every action while a write is in flight, then closes the dialog on success', async () => {
