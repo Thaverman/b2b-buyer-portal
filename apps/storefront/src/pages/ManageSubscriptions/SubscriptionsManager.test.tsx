@@ -14,6 +14,7 @@ import {
   screen,
   startMockServer,
   waitFor,
+  within,
 } from 'tests/test-utils';
 
 import {
@@ -25,10 +26,15 @@ import {
   OgSubscription,
 } from '@/shared/service/ordergroove';
 import { currencyFormat } from '@/utils/b3CurrencyFormat';
+import { snackbar } from '@/utils/b3Tip';
 import { BigCommerceStorefrontAPIBaseURL } from '@/utils/basicConfig';
 import { formatOrderId } from '@/utils/orderId';
 
 import SubscriptionsManager from './SubscriptionsManager';
+
+vi.mock('@/utils/b3Tip', () => ({
+  snackbar: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
+}));
 
 const { server } = startMockServer();
 
@@ -312,6 +318,102 @@ it('lists recent orders with web order links and failure messages, and pages wit
   await waitFor(() =>
     expect(screen.queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument(),
   );
+});
+
+it('skips a subscription from its card and shows the moved date', async () => {
+  const subscription = buildOgSubscriptionWith({
+    product: '9537_12118',
+    every: 4,
+    every_period: 2,
+  });
+  const before = buildOgOrderWith({ status: 1, place: '2026-10-03 00:00:00' });
+  const after = buildOgOrderWith({ status: 1, place: '2026-10-31 00:00:00' });
+  const skipRequests = vi.fn();
+  let skipped = false;
+  mockResources({
+    subscriptions: [subscription],
+    products: { '9537_12118': buildOgProductWith({ name: 'Kraft Paper Shopping Bags' }) },
+  });
+  // Later handlers win in MSW: the upcoming order moves once the skip has landed.
+  server.use(
+    http.get(`${ogBase}/orders/`, ({ request }) =>
+      new URL(request.url).searchParams.get('status') === '1'
+        ? HttpResponse.json(page([skipped ? after : before]))
+        : HttpResponse.json(page([])),
+    ),
+    http.get(`${ogBase}/items/`, () =>
+      HttpResponse.json(
+        page([
+          buildOgItemWith({
+            order: (skipped ? after : before).public_id,
+            subscription: subscription.public_id,
+            product: '9537_12118',
+          }),
+        ]),
+      ),
+    ),
+    http.patch(`${ogBase}/orders/${before.public_id}/skip_subscription/`, async ({ request }) => {
+      skipRequests(await request.json());
+      skipped = true;
+
+      return HttpResponse.json(after);
+    }),
+  );
+
+  const { user } = renderPage();
+
+  expect(await screen.findByText('Next order 3 Oct 2026')).toBeInTheDocument();
+  // The dialog names the product, so wait for the lookup rather than its "Product {id}" fallback.
+  expect(await screen.findByText('Kraft Paper Shopping Bags')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Skip' }));
+  expect(screen.getByRole('dialog')).toHaveTextContent(
+    'Kraft Paper Shopping Bags will leave your order on 3 Oct 2026. Your next order will be on 31 Oct 2026.',
+  );
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Skip' }));
+
+  expect(await screen.findByText('Next order 31 Oct 2026')).toBeInTheDocument();
+  expect(skipRequests).toHaveBeenCalledWith({ subscription: subscription.public_id });
+  expect(snackbar.success).toHaveBeenCalledWith('Next order skipped.');
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+});
+
+it('offers actions only on active cards with an upcoming order', async () => {
+  const scheduled = buildOgSubscriptionWith({ product: '9537_12118' });
+  const unscheduled = buildOgSubscriptionWith({ product: '7674_9534' });
+  const cancelled = buildOgSubscriptionWith({
+    product: '9492_11808',
+    cancelled: '2026-08-01 10:00:00',
+    live: false,
+  });
+  const order = buildOgOrderWith({ status: 1, place: '2026-10-03 00:00:00' });
+  mockResources({
+    subscriptions: [scheduled, unscheduled, cancelled],
+    upcomingOrders: [order],
+    items: [buildOgItemWith({ order: order.public_id, subscription: scheduled.public_id })],
+    products: {
+      '9537_12118': buildOgProductWith({ name: 'Scheduled' }),
+      '7674_9534': buildOgProductWith({ name: 'Unscheduled' }),
+      '9492_11808': buildOgProductWith({ name: 'Cancelled one' }),
+    },
+  });
+
+  const { user } = renderPage();
+
+  expect(await screen.findByText('Next order 3 Oct 2026')).toBeInTheDocument();
+  // Groups are named by product once the lookup resolves; wait for it before querying by name.
+  expect(
+    within(await screen.findByRole('group', { name: 'Scheduled' })).getByRole('button', {
+      name: 'Skip',
+    }),
+  ).toBeInTheDocument();
+  expect(
+    within(screen.getByRole('group', { name: 'Unscheduled' })).queryByRole('button'),
+  ).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: '1 cancelled subscription' }));
+  expect(
+    within(screen.getByRole('group', { name: 'Cancelled one' })).queryByRole('button'),
+  ).not.toBeInTheDocument();
 });
 
 it('links back to the hosted manager in the top window', async () => {
