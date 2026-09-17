@@ -14,7 +14,7 @@ function CompanyCredit() {
   const [isCloseCompanyCredit, setIsCloseCompanyCredit] = useStorageState<boolean>(
     'sf-isCloseCompanyCredit',
     false,
-    sessionStorage,
+    'session',
   );
   const role = useAppSelector(({ company }) => company.customer.role);
   const isAgenting = useAppSelector(({ b2bFeatures }) => b2bFeatures.masqueradeCompany.isAgenting);

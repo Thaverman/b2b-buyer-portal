@@ -1,3 +1,5 @@
+import { KeyValueStorage, safeLocalStorage, safeSessionStorage } from './safeStorage';
+
 // If you change one of this types, bear in mind the stored data
 // will still be the old one, and you will need to handle it.
 interface StorageStore {
@@ -20,7 +22,7 @@ interface StorageStore {
 class MyStorage {
   prefix: string;
 
-  constructor(private readonly storage: Storage) {
+  constructor(private readonly storage: KeyValueStorage) {
     this.prefix = 'sf-';
   }
 
@@ -49,7 +51,7 @@ class MyStorage {
   }
 }
 
-const B3LStorage = new MyStorage(window.localStorage);
-const B3SStorage = new MyStorage(window.sessionStorage);
+const B3LStorage = new MyStorage(safeLocalStorage);
+const B3SStorage = new MyStorage(safeSessionStorage);
 
 export { B3LStorage, B3SStorage };

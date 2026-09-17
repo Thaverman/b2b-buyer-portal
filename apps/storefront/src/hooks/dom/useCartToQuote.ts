@@ -51,7 +51,7 @@ const useCartToQuote = ({ setOpenPage, cartQuoteEnabled }: MutationObserverProps
     useStorageState<IsShowBlockPendingAccountOrderCreationTipProps>(
       'sf-isShowBlockPendingAccountOrderCreationTip',
       isShowBlockPendingAccountOrderCreationTipInit,
-      sessionStorage,
+      'session',
     );
 
   const {

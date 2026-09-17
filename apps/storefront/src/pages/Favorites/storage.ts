@@ -27,9 +27,9 @@ const isWrapped = (parsed: unknown): parsed is Wrapped =>
   typeof parsed === 'object' && parsed !== null && 'value' in parsed;
 
 // Storage can throw (private windows, blocked site data); a throw reads as "nothing there".
-const readWrappedValue = (storage: Storage, key: string): unknown => {
+const readWrappedValue = (getStorage: () => Storage, key: string): unknown => {
   try {
-    const raw = storage.getItem(key);
+    const raw = getStorage().getItem(key);
 
     if (!raw) {
       return undefined;
@@ -80,7 +80,7 @@ const toGuestFavorite = (row: unknown): GuestFavorite[] => {
 };
 
 export const readGuestFavorites = (): GuestFavorite[] => {
-  const value = readWrappedValue(window.localStorage, GUEST_KEY);
+  const value = readWrappedValue(() => window.localStorage, GUEST_KEY);
 
   return Array.isArray(value) ? value.flatMap(toGuestFavorite) : [];
 };

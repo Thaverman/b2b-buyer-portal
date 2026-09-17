@@ -103,7 +103,7 @@ export default function B3MasqueradeGlobalTip(props: B3MasqueradeGlobalTipProps)
   const [isExpansion, setExpansion] = useStorageState<boolean>(
     'sf-isMasqueradeTipExpansion',
     true,
-    sessionStorage,
+    'session',
   );
   const [isMobile] = useMobile();
 

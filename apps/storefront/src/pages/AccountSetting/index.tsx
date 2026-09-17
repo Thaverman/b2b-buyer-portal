@@ -113,7 +113,7 @@ function AccountSetting() {
   const [isFinishUpdate, setIsFinishUpdate] = useStorageState<boolean>(
     'sf-isFinishUpdate',
     false,
-    sessionStorage,
+    'session',
   );
 
   const {

@@ -131,3 +131,22 @@ describe('invalidateListsCache', () => {
     expect(window.sessionStorage.getItem('favorites_lists')).toBeNull();
   });
 });
+
+describe('when the browser denies access to storage', () => {
+  // Safari set to block all cookies throws on the `window.localStorage` getter itself. The
+  // access used to sit in the argument list of the guarded reader, so it threw before the
+  // guard was entered.
+  beforeEach(() => {
+    vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new DOMException('The operation is insecure.', 'SecurityError');
+    });
+  });
+
+  it('reads guest favorites as empty rather than throwing', () => {
+    expect(readGuestFavorites()).toEqual([]);
+  });
+
+  it('swallows the write when the default list id is set', () => {
+    expect(() => setDefaultListId(faker.number.int({ min: 1 }))).not.toThrow();
+  });
+});
