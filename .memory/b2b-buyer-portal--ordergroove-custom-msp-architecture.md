@@ -195,3 +195,41 @@ real gateway tokens; otherwise last4/brand is a heuristic only.
   "move these subscriptions to another card" from this dialog.
 - Automation gotcha reconfirmed: MUI uppercases button labels via CSS and
   `innerText` reflects `text-transform` — match on `textContent`.
+
+## Phase 2 implemented (2026-09-17)
+
+- `/manage-subscriptions` renders the portal page when `BC_CONTEXT.subscriptions.customManager`
+  is `true`/`"true"` (`isHostFlagEnabled`, lifted from the payment-methods page into
+  `src/utils/hostFlag.ts`) and the shopper is not masquerading; otherwise the hosted iframe
+  (`components/HostedManagerFrame.tsx`). Page `SubscriptionsManager.tsx`; six queries in
+  `hooks/useSubscriptionsData.ts`; pure join in `viewModel.ts`; card, cancelled-toggle and
+  recent-orders components. 48 new tests. Full-project eslint is green for the first time (the
+  old index.tsx findings went with the move); knip only the pre-existing `BillingStateOption`.
+- Service additions: `listSubscriptions/Payments/Addresses`, `listUpcomingOrders`
+  (`/orders/?status=1` + `/items/?status=1` — items are the only subscription→order link),
+  `listOrdersPage` + `orderHistoryUrl` (`/orders/?place_end=<today>&ordering=-place`, paged by
+  `next`).
+- Probe findings (customer 80591): 14 upcoming items for 14 active subscriptions; `place` is
+  "YYYY-MM-DD HH:mm:ss" (upcoming orders at 00:00:00); `/orders/` default order is not by place
+  but `ordering=-place` is honoured; page size 10; 155 past orders.
+- Test gotchas hit: the test store's date display format is blank, so pass
+  `storeInfo: buildStoreInfoStateWith({ timeFormat: { display: 'j M Y' } })` and assert literal
+  dates; a random customer id inside a `renderHook` callback re-keys every query per render.
+- Live check (2026-09-17, sandbox, customer 80591, Playwright with the local deploy-flavour build
+  and `customManager: true` injected): 14 cards with real product names, SKUs, "View product"
+  links, quantities, frequencies (every 2/4/6/8 weeks, every 60/300/360 days), shipping
+  summaries, "Paid with Visa ending in 1111 · exp 3/2028" and a "Next order …" date on every card;
+  "4 cancelled subscriptions" toggle; escape link `https://sandbox.storesupply.com/subscriptions`
+  with `target="_top"`; recent orders 10 rows (8 Placed with web order numbers linking to
+  `#/orderDetail/<id>`, 2 Failed); no alerts; no failed requests; 9 distinct product lookups; ONE
+  auth mint after the dedupe (six before). Gate-off control: the hosted iframe renders and the
+  portal itself makes no Ordergroove request.
+- Theme findings from the live check (stencil, outside this repo): the sandbox theme now emits
+  `BC_CONTEXT.subscriptions` itself (Phase 1's theme change landed) as
+  `{ enabled: true, merchantId, authEndpoint, appClientId }` — but `merchantId` is EMPTY on the
+  test store (it reads the prod setting `subscriptions_merchant_id`, not
+  `subscriptions_merchant_id_test`), so every Ordergroove call from sandbox fails at the CORS
+  layer and the Phase 1 delete warning degrades to "couldn't check" there until the theme is
+  fixed. The portal now honours `enabled` (false/"false" = every Ordergroove feature off).
+  Injecting a `BC_CONTEXT` block in Playwright must now guard the `subscriptions` PROPERTY too,
+  not just the whole-object assignment.

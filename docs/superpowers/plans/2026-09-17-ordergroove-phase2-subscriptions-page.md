@@ -23,6 +23,13 @@
 - Ordergroove: base `https://restapi.ordergroove.com`; lists return `{ count, next, previous, results }` with `next` an absolute URL or `null`; per-request timeout 5 s; status codes and card-type codes are the tables in spec §4.3.
 - Host flags may arrive as strings: `customManager` is on for `true` and `"true"` (any case), off for everything else — the same rule the Braintree flag already follows.
 - Every planned test must be seen **failing** before its implementation step (the plan's "verify it fails" steps are the negative control — do not skip them).
+- **Learned in execution (2026-09-17), applies to the test code in Tasks 5–7 and 9:** the test
+  store's date display format is blank, so `displayFormat()` returns `''` unless the render passes
+  `storeInfo: buildStoreInfoStateWith({ timeFormat: { display: 'j M Y' } })` in `preloadedState`;
+  the committed tests do that and assert literal strings such as `Next order 3 Oct 2026`. Fixtures
+  that share a builder default (a date, a web order number) collide in `getBy*` queries — give
+  each row its own. And never draw a random id inside a `renderHook` callback (Task 4's code below
+  was corrected for this).
 
 ## Before you start
 
@@ -61,7 +68,7 @@
 **Interfaces:**
 - Produces: four recorded findings (below) that Tasks 2, 3 and 6 read.
 
-- [ ] **Step 1: Write the probe script** to `<scratch>/og-probe.mjs`
+- [x] **Step 1: Write the probe script** to `<scratch>/og-probe.mjs`
 
 ```js
 // GET-only probe of Ordergroove for customer 80591. Never writes. Run with OG_PUBLIC_ID set.
@@ -107,19 +114,19 @@ console.log('  statuses seen:', [...new Set(results(history).map((o) => o.status
 console.log('  sample', redact(results(history)[0] ?? null).slice(0, 500));
 ```
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 Run: `OG_PUBLIC_ID=<merchant id> node <scratch>/og-probe.mjs`
 Expected: every status `200`; A lists `subscription`, `order`, `product`, `quantity`, `price` among the keys; B places are future dates.
 
-- [ ] **Step 3: Record the findings here** (edit this file; these lines are read by later tasks)
+- [x] **Step 3: Record the findings here** (edit this file; these lines are read by later tasks)
 
-- Finding A — every active subscription on page 1 has an upcoming item: `[ ] yes  [ ] no (N of M)`. Either way no code changes: a subscription without one renders "No upcoming order" (spec §4.2).
-- Finding B — `place` format: `[ ] YYYY-MM-DD  [ ] YYYY-MM-DD HH:mm:ss`. If it carries a time, Task 3's `placeDate()` keeps `slice(0, 10)`; if not, Task 3 still keeps it (harmless) — the finding decides only the test fixture format.
-- Finding C — `/orders/?place_end` ordering: `[ ] newest first by default  [ ] ordering=-place honoured  [ ] neither`. Task 2's `orderHistoryUrl` appends `&ordering=-place` **only** when the second box is ticked and the first is not. With "neither", spec §4.3's per-page client sort is the whole story and Task 6's test wording "newest first within the loaded pages" stands.
-- Finding D — page size: `__` (the tests use ten; informational).
+- Finding A — every active subscription on page 1 has an upcoming item: `[x] yes` (2026-09-17: `/items/?status=1` returned 14 items for the 14 active subscriptions; the script's page-1-only comparison read "5 of 9" because items paginate at ten, and `listAll` fetches every page). No code change: a subscription without one renders "No upcoming order" (spec §4.2).
+- Finding B — `place` format: `[x] YYYY-MM-DD HH:mm:ss` (upcoming orders carry `00:00:00`, placed ones the real placement time, e.g. `2026-09-17 01:37:45`). Task 3's `placeDate()` keeps `slice(0, 10)`; fixtures in later tasks use the datetime form where the slice matters.
+- Finding C — `/orders/?place_end` ordering: `[x] ordering=-place honoured` (the default order is not by `place`: page 1 came back 09-17, 09-16, 09-03, 09-02, 09-01, 09-09, …; with `ordering=-place` it is strictly descending). Task 2's `orderHistoryUrl` appends `&ordering=-place` and its test expects that URL. `place_end=<today>` is inclusive of today and excludes the future UNSENT orders.
+- Finding D — page size: 10 (155 past orders for customer 80591, so the history section has 16 pages; statuses on page 1 were 5 and 3).
 
-- [ ] **Step 4: Delete nothing, commit nothing.** The script stays in scratch.
+- [x] **Step 4: Delete nothing, commit nothing.** The script stays in scratch.
 
 ---
 
@@ -135,7 +142,7 @@ Expected: every status `200`; A lists `subscription`, `order`, `product`, `quant
 **Interfaces:**
 - Produces: `isHostFlagEnabled(value: boolean | string | undefined): boolean`; `isCustomManagerAvailable(): boolean` (exported from the `@/shared/service/ordergroove` barrel).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `src/utils/hostFlag.test.ts`:
 
@@ -195,12 +202,12 @@ describe('isCustomManagerAvailable', () => {
 });
 ```
 
-- [ ] **Step 2: Run them to verify they fail**
+- [x] **Step 2: Run them to verify they fail**
 
 Run: `yarn vitest run src/utils/hostFlag.test.ts src/shared/service/ordergroove/config.test.ts`
 Expected: FAIL — `Failed to resolve import "./hostFlag"` and `isCustomManagerAvailable is not a function`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/utils/hostFlag.ts`:
 
@@ -249,12 +256,12 @@ above it that begin "Theme templates emit booleans as strings routinely" (they n
 `hostFlag.ts`); add `import { isHostFlagEnabled } from '@/utils/hostFlag';` to the `@/` import
 group (alphabetical: after `@/utils/b3Tip`); change `flaggedVariant` to call `isHostFlagEnabled(…)`.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `yarn vitest run src/utils/hostFlag.test.ts src/shared/service/ordergroove src/pages/PaymentMethods/index.test.tsx`
 Expected: PASS (the Braintree "accepts a string true" tests in `PaymentMethods/index.test.tsx` still pass through the shared helper).
 
-- [ ] **Step 5: Type-check and commit**
+- [x] **Step 5: Type-check and commit**
 
 Run: `yarn tsc --noEmit` — exit 0.
 
@@ -276,7 +283,7 @@ git commit -m "feat: B2B-0000 Add the custom subscription manager host flag" -m 
 - Consumes: `listAll<T>(customerId, url)`, `ogFetch<T>(customerId, url)`, `API_BASE` (all already in `api.ts`).
 - Produces (all exported from the barrel): types `OgOrder`, `OgItem`, `OgAddress`, `OgPage<T>`; `listSubscriptions(customerId: string): Promise<OgSubscription[]>`; `listPayments(customerId): Promise<OgPayment[]>`; `listAddresses(customerId): Promise<OgAddress[]>`; `listUpcomingOrders(customerId): Promise<{ orders: OgOrder[]; items: OgItem[] }>`; `listOrdersPage(customerId, url: string): Promise<OgPage<OgOrder>>`; `orderHistoryUrl(throughDate: string): string`; class `OrdergrooveError` (already exists in `errors.ts`, now re-exported). Builders `buildOgOrderWith`, `buildOgItemWith`, `buildOgAddressWith` via `tests/test-utils`.
 
-- [ ] **Step 1: Write the failing tests** — append to `src/shared/service/ordergroove/api.test.ts`. Widen its imports: from `tests/test-utils` add `buildOgAddressWith`, `buildOgItemWith`, `buildOgOrderWith`; from `./api` add `listAddresses`, `listOrdersPage`, `listPayments`, `listSubscriptions`, `listUpcomingOrders`, `orderHistoryUrl`.
+- [x] **Step 1: Write the failing tests** — append to `src/shared/service/ordergroove/api.test.ts`. Widen its imports: from `tests/test-utils` add `buildOgAddressWith`, `buildOgItemWith`, `buildOgOrderWith`; from `./api` add `listAddresses`, `listOrdersPage`, `listPayments`, `listSubscriptions`, `listUpcomingOrders`, `orderHistoryUrl`.
 
 ```ts
 it('lists every page of subscriptions, payments and addresses', async () => {
@@ -345,12 +352,12 @@ it('fetches one page of order history at exactly the URL it is given', async () 
 If Task 0 Finding C ticked "ordering=-place honoured" (and not "newest first by default"), the
 expected URL in the last test is `${ogBase}/orders/?place_end=2026-09-17&ordering=-place`.
 
-- [ ] **Step 2: Run them to verify they fail**
+- [x] **Step 2: Run them to verify they fail**
 
 Run: `yarn vitest run src/shared/service/ordergroove/api.test.ts`
 Expected: FAIL — `buildOgOrderWith`/`listSubscriptions` are not exported (module has no exported member).
 
-- [ ] **Step 3: Implement the types** — append to `src/shared/service/ordergroove/types.ts`:
+- [x] **Step 3: Implement the types** — append to `src/shared/service/ordergroove/types.ts`:
 
 ```ts
 /** One page of any Ordergroove list. `next` is an absolute URL or null. */
@@ -412,7 +419,7 @@ export interface OgAddress {
 }
 ```
 
-- [ ] **Step 4: Implement the list functions** in `src/shared/service/ordergroove/api.ts`
+- [x] **Step 4: Implement the list functions** in `src/shared/service/ordergroove/api.ts`
 
 Replace the import line `import { OgPayment, OgProduct, OgSubscription } from './types';` with
 `import { OgAddress, OgItem, OgOrder, OgPage, OgPayment, OgProduct, OgSubscription } from './types';`
@@ -484,7 +491,7 @@ export type {
 } from './types';
 ```
 
-- [ ] **Step 5: Add the builders** — append to `tests/ordergrooveBuilders/index.ts` (widen the type
+- [x] **Step 5: Add the builders** — append to `tests/ordergrooveBuilders/index.ts` (widen the type
 import to `OgAddress, OgItem, OgOrder, OgPayment, OgProduct, OgSubscription`):
 
 ```ts
@@ -528,12 +535,12 @@ export const buildOgAddressWith = builder<OgAddress>(() => ({
 }));
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `yarn vitest run src/shared/service/ordergroove src/pages/PaymentMethods`
 Expected: PASS, including Phase 1's `getSubscriptionsUsingToken` tests (its behaviour is unchanged).
 
-- [ ] **Step 7: Type-check and commit**
+- [x] **Step 7: Type-check and commit**
 
 Run: `yarn tsc --noEmit` — exit 0.
 
@@ -554,7 +561,7 @@ git commit -m "feat: B2B-0000 List Ordergroove orders, items and addresses" -m "
 - Consumes: the `Og*` types and `formatOrderId(id: number | string): string` from `@/utils/orderId`.
 - Produces: `buildSubscriptionCards(subscriptions: OgSubscription[], lookups: SubscriptionLookups): { active: SubscriptionCard[]; cancelled: SubscriptionCard[] }`; `buildRecentOrders(orders: OgOrder[]): RecentOrder[]`; types `SubscriptionCard`, `SubscriptionLookups`, `RecentOrder`, `OrderOutcome`, `ProductSummary`, `AddressSummary`, `PaymentSummary`. A lookup that is `undefined` (still loading, or failed) yields `null` cells; the *component* decides skeleton vs fallback from the query state.
 
-- [ ] **Step 1: Write the failing tests** — `src/pages/ManageSubscriptions/viewModel.test.ts`
+- [x] **Step 1: Write the failing tests** — `src/pages/ManageSubscriptions/viewModel.test.ts`
 
 ```ts
 import {
@@ -740,12 +747,12 @@ describe('buildRecentOrders', () => {
 });
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/viewModel.test.ts`
 Expected: FAIL — `Failed to resolve import "./viewModel"`.
 
-- [ ] **Step 3: Implement** — `src/pages/ManageSubscriptions/viewModel.ts`
+- [x] **Step 3: Implement** — `src/pages/ManageSubscriptions/viewModel.ts`
 
 ```ts
 import {
@@ -971,12 +978,12 @@ export const buildRecentOrders = (orders: OgOrder[]): RecentOrder[] =>
     .sort((a, b) => b.placedOn.localeCompare(a.placedOn));
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/viewModel.test.ts`
 Expected: PASS (12 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/pages/ManageSubscriptions/viewModel.ts src/pages/ManageSubscriptions/viewModel.test.ts
@@ -995,7 +1002,7 @@ git commit -m "feat: B2B-0000 Build subscription cards and recent orders from Or
 - Consumes: Task 2's list functions, `getProduct`, `orderHistoryUrl`.
 - Produces: `useSubscriptionsData(customerId: number)` returning `{ subscriptions, payments, addresses, upcoming, products, orderHistory }` — the first five are `UseQueryResult`s (`products.data` is `Map<string, OgProduct | null>`), `orderHistory` is a `UseInfiniteQueryResult` whose pages are `OgPage<OgOrder>`.
 
-- [ ] **Step 1: Write the failing tests** — `src/pages/ManageSubscriptions/hooks/useSubscriptionsData.test.tsx`
+- [x] **Step 1: Write the failing tests** — `src/pages/ManageSubscriptions/hooks/useSubscriptionsData.test.tsx`
 
 ```tsx
 import { PropsWithChildren } from 'react';
@@ -1084,7 +1091,9 @@ it('loads every resource and looks each distinct product up once', async () => {
     }),
   );
 
-  const { result } = renderHook(() => useSubscriptionsData(someCustomerId()), { wrapper });
+  // Drawn outside the callback: a value generated per render would re-key every query each render.
+  const customerId = someCustomerId();
+  const { result } = renderHook(() => useSubscriptionsData(customerId), { wrapper });
 
   await waitFor(() => expect(result.current.products.isSuccess).toBe(true));
   expect(result.current.subscriptions.data).toHaveLength(3);
@@ -1105,7 +1114,9 @@ it('keeps a failed product lookup as null instead of failing the query', async (
     http.get(`${ogBase}/products/1_2/`, () => new HttpResponse(null, { status: 500 })),
   );
 
-  const { result } = renderHook(() => useSubscriptionsData(someCustomerId()), { wrapper });
+  // Drawn outside the callback: a value generated per render would re-key every query each render.
+  const customerId = someCustomerId();
+  const { result } = renderHook(() => useSubscriptionsData(customerId), { wrapper });
 
   await waitFor(() => expect(result.current.products.isSuccess).toBe(true));
   expect(result.current.products.data?.get('1_2')).toBeNull();
@@ -1131,7 +1142,9 @@ it('starts order history at today and pages through next', async () => {
     }),
   );
 
-  const { result } = renderHook(() => useSubscriptionsData(someCustomerId()), { wrapper });
+  // Drawn outside the callback: a value generated per render would re-key every query each render.
+  const customerId = someCustomerId();
+  const { result } = renderHook(() => useSubscriptionsData(customerId), { wrapper });
 
   await waitFor(() => expect(result.current.orderHistory.isSuccess).toBe(true));
   expect(requestedUrls[0]).toContain(`place_end=${today}`);
@@ -1145,12 +1158,12 @@ it('starts order history at today and pages through next', async () => {
 });
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/hooks`
 Expected: FAIL — `Failed to resolve import "./useSubscriptionsData"`.
 
-- [ ] **Step 3: Implement** — `src/pages/ManageSubscriptions/hooks/useSubscriptionsData.ts`
+- [x] **Step 3: Implement** — `src/pages/ManageSubscriptions/hooks/useSubscriptionsData.ts`
 
 ```ts
 import { useState } from 'react';
@@ -1233,12 +1246,12 @@ export const useSubscriptionsData = (customerId: number) => {
 };
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/hooks`
 Expected: PASS (3 tests).
 
-- [ ] **Step 5: Lint, type-check, commit**
+- [x] **Step 5: Lint, type-check, commit**
 
 Run: `yarn eslint --fix src/pages/ManageSubscriptions/hooks && yarn tsc --noEmit` — import order is auto-fixed; both exit 0.
 
@@ -1260,7 +1273,7 @@ git commit -m "feat: B2B-0000 Load the subscriptions page data with one query pe
 - Consumes: `SubscriptionCard` model from Task 3; `displayFormat(date: string, isDateStr: true)` from `@/utils/b3DateFormat`; `useMobile()` from `@/hooks/useMobile`.
 - Produces: default export `SubscriptionCard({ card, variant: 'active' | 'cancelled', loading: CellLoading })`; `export interface CellLoading { product: boolean; shipping: boolean; payment: boolean; nextOrder: boolean }` — true while the query behind a cell is still pending, false once it settled (even by failing; the card then shows the fallback).
 
-- [ ] **Step 1: Add the copy** — in `en.json`, after `"paymentMethods.deleteDialog.subscriptions.checkFailed": …,`:
+- [x] **Step 1: Add the copy** — in `en.json`, after `"paymentMethods.deleteDialog.subscriptions.checkFailed": …,`:
 
 ```json
   "subscriptions.card.quantity": "Qty {count}",
@@ -1280,7 +1293,7 @@ git commit -m "feat: B2B-0000 Load the subscriptions page data with one query pe
   "subscriptions.card.cancelled": "Cancelled",
 ```
 
-- [ ] **Step 2: Write the failing tests** — `src/pages/ManageSubscriptions/components/SubscriptionCard.test.tsx`
+- [x] **Step 2: Write the failing tests** — `src/pages/ManageSubscriptions/components/SubscriptionCard.test.tsx`
 
 ```tsx
 import { builder, faker, renderWithProviders, screen, within } from 'tests/test-utils';
@@ -1397,12 +1410,12 @@ it('shows the cancellation instead of a next order on a cancelled card', () => {
 });
 ```
 
-- [ ] **Step 3: Run it to verify it fails**
+- [x] **Step 3: Run it to verify it fails**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/components/SubscriptionCard.test.tsx`
 Expected: FAIL — `Failed to resolve import "./SubscriptionCard"`.
 
-- [ ] **Step 4: Implement** — `src/pages/ManageSubscriptions/components/SubscriptionCard.tsx`
+- [x] **Step 4: Implement** — `src/pages/ManageSubscriptions/components/SubscriptionCard.tsx`
 
 ```tsx
 import { Box, Card, CardContent, Link, Skeleton, Typography } from '@mui/material';
@@ -1554,12 +1567,12 @@ function SubscriptionCard({ card, variant, loading }: SubscriptionCardProps) {
 export default SubscriptionCard;
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/components/SubscriptionCard.test.tsx`
 Expected: PASS (5 tests).
 
-- [ ] **Step 6: Lint, type-check, commit**
+- [x] **Step 6: Lint, type-check, commit**
 
 Run: `yarn eslint --fix src/pages/ManageSubscriptions/components && yarn tsc --noEmit` — both exit 0.
 
@@ -1581,7 +1594,7 @@ git commit -m "feat: B2B-0000 Add the subscription card" -m "Co-Authored-By: Cla
 - Consumes: `RecentOrder`, `OrderOutcome` from Task 3; `currencyFormat(price: string | number): string` from `@/utils/b3CurrencyFormat`; `displayFormat` from `@/utils/b3DateFormat`.
 - Produces: default export `RecentOrders({ orders: RecentOrder[]; isPending: boolean; isError: boolean; hasNextPage: boolean; isFetchingNextPage: boolean; onShowMore: () => void; onRetry: () => void })`.
 
-- [ ] **Step 1: Add the copy**
+- [x] **Step 1: Add the copy**
 
 ```json
   "subscriptions.retry": "Try again",
@@ -1596,7 +1609,7 @@ git commit -m "feat: B2B-0000 Add the subscription card" -m "Co-Authored-By: Cla
   "subscriptions.orders.outcome.processing": "Processing",
 ```
 
-- [ ] **Step 2: Write the failing tests** — `src/pages/ManageSubscriptions/components/RecentOrders.test.tsx`
+- [x] **Step 2: Write the failing tests** — `src/pages/ManageSubscriptions/components/RecentOrders.test.tsx`
 
 `createElement` with a merged props object is used instead of JSX prop spreading (a disabled rule
 the project does not add violations of).
@@ -1697,12 +1710,12 @@ it('disables show more while the next page is loading', () => {
 });
 ```
 
-- [ ] **Step 3: Run it to verify it fails**
+- [x] **Step 3: Run it to verify it fails**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/components/RecentOrders.test.tsx`
 Expected: FAIL — `Failed to resolve import "./RecentOrders"`.
 
-- [ ] **Step 4: Implement** — `src/pages/ManageSubscriptions/components/RecentOrders.tsx`
+- [x] **Step 4: Implement** — `src/pages/ManageSubscriptions/components/RecentOrders.tsx`
 
 ```tsx
 import { Link as RouterLink } from 'react-router-dom';
@@ -1830,12 +1843,12 @@ function RecentOrders({
 export default RecentOrders;
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/components/RecentOrders.test.tsx`
 Expected: PASS (5 tests).
 
-- [ ] **Step 6: Lint, type-check, commit**
+- [x] **Step 6: Lint, type-check, commit**
 
 Run: `yarn eslint --fix src/pages/ManageSubscriptions/components && yarn tsc --noEmit` — both exit 0.
 
@@ -1858,7 +1871,7 @@ git commit -m "feat: B2B-0000 Add the recent subscription orders section" -m "Co
 - Consumes: Tasks 3–6; `OrdergrooveError` (barrel); `useAppSelector` from `@/store`; `BigCommerceStorefrontAPIBaseURL` from `@/utils/basicConfig`; `B3Spin` from `@/components/spin/B3Spin`.
 - Produces: default export `SubscriptionsManager()` (no props); default export `CancelledSubscriptions({ cards: SubscriptionCard[]; loading: CellLoading })`.
 
-- [ ] **Step 1: Add the copy**
+- [x] **Step 1: Add the copy**
 
 ```json
   "subscriptions.hostedManagerLink": "Manage in the subscription manager",
@@ -1869,7 +1882,7 @@ git commit -m "feat: B2B-0000 Add the recent subscription orders section" -m "Co
   "subscriptions.cancelled.toggle": "{count, plural, one {# cancelled subscription} other {# cancelled subscriptions}}",
 ```
 
-- [ ] **Step 2: Write the failing tests** — `src/pages/ManageSubscriptions/SubscriptionsManager.test.tsx`
+- [x] **Step 2: Write the failing tests** — `src/pages/ManageSubscriptions/SubscriptionsManager.test.tsx`
 
 ```tsx
 import {
@@ -2144,12 +2157,12 @@ it('links back to the hosted manager in the top window', async () => {
 });
 ```
 
-- [ ] **Step 3: Run it to verify it fails**
+- [x] **Step 3: Run it to verify it fails**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/SubscriptionsManager.test.tsx`
 Expected: FAIL — `Failed to resolve import "./SubscriptionsManager"`.
 
-- [ ] **Step 4: Implement the cancelled section** — `src/pages/ManageSubscriptions/components/CancelledSubscriptions.tsx`
+- [x] **Step 4: Implement the cancelled section** — `src/pages/ManageSubscriptions/components/CancelledSubscriptions.tsx`
 
 ```tsx
 import { useState } from 'react';
@@ -2194,7 +2207,7 @@ function CancelledSubscriptions({ cards, loading }: CancelledSubscriptionsProps)
 export default CancelledSubscriptions;
 ```
 
-- [ ] **Step 5: Implement the page** — `src/pages/ManageSubscriptions/SubscriptionsManager.tsx`
+- [x] **Step 5: Implement the page** — `src/pages/ManageSubscriptions/SubscriptionsManager.tsx`
 
 ```tsx
 import { Alert, Box, Button, Link, Typography } from '@mui/material';
@@ -2294,12 +2307,12 @@ function SubscriptionsManager() {
 export default SubscriptionsManager;
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions`
 Expected: PASS — this file's 7 tests plus every earlier ManageSubscriptions test. If the "degrades cell by cell" test cannot find `Product 1_2`, check that the 404 from `/products/1_2/` is reaching `getProduct` (the hook's `.catch(() => null)` turns it into an unnamed card); if the recent-orders test finds two `Show more` buttons, the second page's `next` is not `null` — fix the fixture, not the component.
 
-- [ ] **Step 7: Lint, type-check, commit**
+- [x] **Step 7: Lint, type-check, commit**
 
 Run: `yarn eslint --fix src/pages/ManageSubscriptions && yarn tsc --noEmit` — both exit 0.
 
@@ -2321,7 +2334,7 @@ git commit -m "feat: B2B-0000 Add the portal subscriptions page" -m "Co-Authored
 - Consumes: `isCustomManagerAvailable()` (Task 1), `SubscriptionsManager` (Task 7), `useAppSelector`.
 - Produces: default export `ManageSubscriptions()` — no props; `routesMap` types its entries as `(props: PageProps) => ReactElement`, and a zero-parameter component is assignable to that.
 
-- [ ] **Step 1: Rewrite the tests** — `src/pages/ManageSubscriptions/index.test.tsx` (replace the whole file)
+- [x] **Step 1: Rewrite the tests** — `src/pages/ManageSubscriptions/index.test.tsx` (replace the whole file)
 
 ```tsx
 import {
@@ -2401,12 +2414,12 @@ it('keeps the hosted iframe for a masquerading rep even with the flag on', () =>
 });
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/index.test.tsx`
 Expected: FAIL — "renders the portal page when the flag is on" cannot find `portal subscriptions page` (today's component always renders the iframe). The two iframe tests pass already.
 
-- [ ] **Step 3: Move the iframe** — `src/pages/ManageSubscriptions/components/HostedManagerFrame.tsx`
+- [x] **Step 3: Move the iframe** — `src/pages/ManageSubscriptions/components/HostedManagerFrame.tsx`
 
 ```tsx
 import { useState } from 'react';
@@ -2468,7 +2481,7 @@ function HostedManagerFrame() {
 export default HostedManagerFrame;
 ```
 
-- [ ] **Step 4: Write the switch** — `src/pages/ManageSubscriptions/index.tsx` (replace the whole file)
+- [x] **Step 4: Write the switch** — `src/pages/ManageSubscriptions/index.tsx` (replace the whole file)
 
 ```tsx
 import { isCustomManagerAvailable } from '@/shared/service/ordergroove';
@@ -2495,12 +2508,12 @@ export default function ManageSubscriptions() {
 }
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions`
 Expected: PASS (all four switch tests plus every earlier file).
 
-- [ ] **Step 6: Lint, type-check, commit**
+- [x] **Step 6: Lint, type-check, commit**
 
 Run: `yarn eslint --fix src/pages/ManageSubscriptions && yarn eslint --max-warnings 0 src/pages/ManageSubscriptions && yarn tsc --noEmit` — the second command proves the two pre-existing findings on this folder (`_props` unused, `console.warn`) are gone; all exit 0.
 
@@ -2519,7 +2532,7 @@ git commit -m "feat: B2B-0000 Switch /manage-subscriptions to the portal page be
 **Interfaces:**
 - Consumes: the page (Task 7); `useMobile()` reads `document.body.clientWidth <= 768`, which the repo's mobile tests drive with `vi.spyOn(document.body, 'clientWidth', 'get')`.
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 ```tsx
 import {
@@ -2610,13 +2623,13 @@ it('stacks the schedule under the product title on a phone', async () => {
 });
 ```
 
-- [ ] **Step 2: Run it — it must pass, then prove it can fail**
+- [x] **Step 2: Run it — it must pass, then prove it can fail**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/SubscriptionsManager.mobile.test.tsx` — PASS.
 
 Negative control: temporarily change `mockReturnValue(500)` to `mockReturnValue(1200)` and re-run — the test must FAIL (the schedule is in the sibling column). Restore `500`, re-run, PASS.
 
-- [ ] **Step 3: Lint and commit**
+- [x] **Step 3: Lint and commit**
 
 Run: `yarn eslint --fix src/pages/ManageSubscriptions/SubscriptionsManager.mobile.test.tsx` — exit 0.
 
@@ -2634,7 +2647,7 @@ git commit -m "test: B2B-0000 Cover the subscriptions page phone layout" -m "Co-
 - Modify: `.memory/b2b-buyer-portal--ordergroove-custom-msp-architecture.md`
 - Modify: this plan (tick the boxes; record the Task 0 findings if not done)
 
-- [ ] **Step 1: Type-check and lint everything**
+- [x] **Step 1: Type-check and lint everything**
 
 Run, from `apps/storefront/`:
 
@@ -2651,7 +2664,7 @@ the first time on this branch** (the only findings on `dev` were the two in
 pre-existing `BillingStateOption` in `src/pages/PaymentMethods/billingPrefill.ts` — anything else
 is yours to fix (an export nothing in `src` consumes, or a file nothing imports).
 
-- [ ] **Step 2: Run the scoped suites, then the full suite against the baseline**
+- [x] **Step 2: Run the scoped suites, then the full suite against the baseline**
 
 ```bash
 yarn vitest run src/pages/ManageSubscriptions src/pages/PaymentMethods src/shared/service/ordergroove src/utils/hostFlag.test.ts
@@ -2669,7 +2682,7 @@ lists only files that pass when run alone — run each listed file by itself; a 
 fails alone is a real regression to fix before continuing. The suite's own worker pool pushes this
 machine's load average past 25, so ~20 timing-out files is the normal baseline, not a signal.
 
-- [ ] **Step 3: Align the spec with what shipped** — edit the Phase 2 spec:
+- [x] **Step 3: Align the spec with what shipped** — edit the Phase 2 spec:
 
 1. §2.1: the flag is on for `true` **or `"true"`** (any case) via `isHostFlagEnabled`; the helper
    was lifted from the payment-methods page.
@@ -2684,7 +2697,7 @@ machine's load average past 25, so ~20 timing-out files is the normal baseline, 
    product name.
 5. §3.3: replace the tick boxes with the recorded Task 0 findings.
 
-- [ ] **Step 4: Record the outcome in the memory note** — append to the Ordergroove note in
+- [x] **Step 4: Record the outcome in the memory note** — append to the Ordergroove note in
 `.memory/`, after the Phase 1 sections:
 
 ```
@@ -2703,7 +2716,7 @@ machine's load average past 25, so ~20 timing-out files is the normal baseline, 
 
 Replace `YYYY-MM-DD` and the two placeholders with the real values before committing.
 
-- [ ] **Step 5: Commit the docs**
+- [x] **Step 5: Commit the docs**
 
 ```bash
 git add docs/superpowers/specs/2026-09-17-ordergroove-phase2-subscriptions-page-design.md docs/superpowers/plans/2026-09-17-ordergroove-phase2-subscriptions-page.md .memory/b2b-buyer-portal--ordergroove-custom-msp-architecture.md
@@ -2719,12 +2732,12 @@ git commit -m "docs: B2B-0000 Record the Ordergroove Phase 2 implementation" -m 
 **Interfaces:**
 - Consumes: a deploy-flavour build of this branch; the Phase 1 recipe (request-level login, route interception of the deployed bundle, `BC_CONTEXT` setter injection); `playwright` with the system Chrome.
 
-- [ ] **Step 1: Build the deploy flavour**
+- [x] **Step 1: Build the deploy flavour**
 
 Run: `VITE_ASSETS_ABSOLUTE_PATH='https://sandbox.storesupply.com/content/b2bBuyerPortal/dist/' yarn build`
 Expected: `apps/storefront/dist/` with hashed root entries (`index.<hash>.js`); the script below aliases the loader's unhashed names.
 
-- [ ] **Step 2: Write the script** to `<scratch>/pw/phase2-live.mjs` (needs `npm i playwright` in `<scratch>/pw` once, or reuse the Phase 1 install)
+- [x] **Step 2: Write the script** to `<scratch>/pw/phase2-live.mjs` (needs `npm i playwright` in `<scratch>/pw` once, or reuse the Phase 1 install)
 
 ```js
 // Read-only live check of the Phase 2 page on sandbox. INJECT=0 runs the gate-off control.
@@ -2849,7 +2862,7 @@ await browser.close();
 console.log(JSON.stringify(summary, null, 2));
 ```
 
-- [ ] **Step 3: Run with the flag injected**
+- [x] **Step 3: Run with the flag injected**
 
 Run: `DIST=<abs path to apps/storefront/dist> ENV_FILE=<abs path to apps/storefront/.env> OG_PUBLIC_ID=<merchant id> node <scratch>/pw/phase2-live.mjs`
 
@@ -2862,12 +2875,12 @@ Expected, for customer 80591:
 - `ogRequestsFromPortal` contains `GET /subscriptions/`, `GET /payments/`, `GET /addresses/`, `GET /orders/?status=1`, `GET /items/?status=1`, `GET /orders/?place_end=…`, and `GET /products/<id>/` for two ids only.
 - Inspect `out/phase2-live.png`.
 
-- [ ] **Step 4: Run the gate-off control**
+- [x] **Step 4: Run the gate-off control**
 
 Run: same command with `INJECT=0`.
 Expected: `iframePresent: true`, `ogRequestsFromPortal` empty (the frame's own requests are counted separately in `ogRequestsFromFrames` and are expected), screenshot shows today's hosted manager.
 
-- [ ] **Step 5: Record**
+- [x] **Step 5: Record**
 
 Paste the two summaries (with product names, never tokens or the merchant id) into the memory note section from Task 10 Step 4, and commit that note change with the Task 10 docs commit if it has not been made yet, else as `docs: B2B-0000 Record the Phase 2 live check`.
 
