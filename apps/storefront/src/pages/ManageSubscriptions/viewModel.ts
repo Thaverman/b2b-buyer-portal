@@ -8,14 +8,14 @@ import {
 } from '@/shared/service/ordergroove';
 import { formatOrderId } from '@/utils/orderId';
 
-export interface ProductSummary {
+interface ProductSummary {
   name: string;
   imageUrl: string | null;
   detailUrl: string | null;
   sku: string | null;
 }
 
-export interface AddressSummary {
+interface AddressSummary {
   name: string;
   company: string | null;
   line1: string;
@@ -24,7 +24,7 @@ export interface AddressSummary {
   locality: string;
 }
 
-export interface PaymentSummary {
+interface PaymentSummary {
   /** null for a card type Ordergroove's table does not name */
   brand: string | null;
   last4: string;
@@ -47,7 +47,7 @@ export interface SubscriptionCard {
 }
 
 /** Each lookup is `undefined` until its query settles; a failed lookup stays `undefined`. */
-export interface SubscriptionLookups {
+interface SubscriptionLookups {
   products: Map<string, OgProduct | null> | undefined;
   addresses: OgAddress[] | undefined;
   payments: OgPayment[] | undefined;
