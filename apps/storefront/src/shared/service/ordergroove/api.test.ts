@@ -13,6 +13,7 @@ import {
 } from 'tests/test-utils';
 
 import {
+  changeNextOrderDate,
   getProduct,
   getSubscriptionsUsingToken,
   listAddresses,
@@ -21,6 +22,8 @@ import {
   listSubscriptions,
   listUpcomingOrders,
   orderHistoryUrl,
+  sendOrderNow,
+  skipSubscription,
 } from './api';
 import { invalidateAuthorization } from './auth';
 
@@ -303,4 +306,129 @@ it('fetches one page of order history, newest first, at exactly the URL it is gi
   );
   expect(result.results).toEqual([order]);
   expect(result.next).toBe(`${ogBase}/orders/?place_end=2026-09-17&page=2`);
+});
+
+describe('writes', () => {
+  it('skips one subscription on its upcoming order with a PATCH and a JSON body', async () => {
+    const received = vi.fn();
+    const order = buildOgOrderWith({ status: 1 });
+    server.use(
+      http.patch(`${ogBase}/orders/:orderId/skip_subscription/`, async ({ params, request }) => {
+        received(params.orderId, await request.json(), request.headers.get('Content-Type'));
+
+        return HttpResponse.json(order);
+      }),
+    );
+
+    expect(await skipSubscription(someCustomerId(), order.public_id, 'sub-1')).toEqual(order);
+    expect(received).toHaveBeenCalledWith(
+      order.public_id,
+      { subscription: 'sub-1' },
+      'application/json',
+    );
+  });
+
+  it('sends an order now with an empty PATCH', async () => {
+    const bodies = vi.fn();
+    const order = buildOgOrderWith({ status: 1 });
+    server.use(
+      http.patch(`${ogBase}/orders/${order.public_id}/send_now/`, async ({ request }) => {
+        bodies(await request.text());
+
+        return HttpResponse.json(order);
+      }),
+    );
+
+    expect(await sendOrderNow(someCustomerId(), order.public_id)).toEqual(order);
+    expect(bodies).toHaveBeenCalledWith('');
+  });
+
+  it("changes a subscription's next order date", async () => {
+    const received = vi.fn();
+    const subscription = buildOgSubscriptionWith('WHATEVER_VALUES');
+    server.use(
+      http.patch(
+        `${ogBase}/subscriptions/${subscription.public_id}/change_next_order_date/`,
+        async ({ request }) => {
+          received(await request.json());
+
+          return HttpResponse.json(subscription);
+        },
+      ),
+    );
+
+    expect(
+      await changeNextOrderDate(someCustomerId(), subscription.public_id, '2026-10-31'),
+    ).toEqual(subscription);
+    expect(received).toHaveBeenCalledWith({ order_date: '2026-10-31' });
+  });
+
+  it('re-mints once on a 403 and repeats the same write', async () => {
+    const mints = vi.fn();
+    let calls = 0;
+    server.use(
+      http.post(authEndpoint, () => {
+        mints();
+
+        return HttpResponse.json({ success: true, cookieValue: '80591|1|sig', expiresIn: 7200 });
+      }),
+      http.patch(`${ogBase}/orders/o-1/send_now/`, () => {
+        calls += 1;
+
+        return calls === 1
+          ? HttpResponse.json({ detail: 'Authentication Failed' }, { status: 403 })
+          : HttpResponse.json(buildOgOrderWith('WHATEVER_VALUES'));
+      }),
+    );
+
+    await sendOrderNow(someCustomerId(), 'o-1');
+
+    expect(calls).toBe(2);
+    expect(mints).toHaveBeenCalledTimes(2);
+  });
+
+  it('maps a 400 and a 423 to upstream', async () => {
+    server.use(
+      http.patch(`${ogBase}/orders/o-1/send_now/`, () =>
+        HttpResponse.json({ detail: 'prepaid' }, { status: 400 }),
+      ),
+    );
+    await expect(sendOrderNow(someCustomerId(), 'o-1')).rejects.toMatchObject({ kind: 'upstream' });
+
+    server.use(
+      http.patch(`${ogBase}/orders/o-1/send_now/`, () => new HttpResponse(null, { status: 423 })),
+    );
+    await expect(sendOrderNow(someCustomerId(), 'o-1')).rejects.toMatchObject({ kind: 'upstream' });
+  });
+
+  it('gives a write ten seconds, not five', async () => {
+    const customerId = someCustomerId();
+
+    // Prime the header with real timers so only the Ordergroove call is under the fake clock.
+    mockPayments([]);
+    await listPayments(customerId);
+
+    vi.useFakeTimers();
+    server.use(
+      http.patch(`${ogBase}/orders/o-1/send_now/`, async () => {
+        await delay('infinite');
+
+        return HttpResponse.json({});
+      }),
+    );
+
+    let settled = false;
+    const pending = sendOrderNow(customerId, 'o-1').catch((error: unknown) => {
+      settled = true;
+      throw error;
+    });
+    const assertion = expect(pending).rejects.toMatchObject({ kind: 'timeout' });
+
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(settled).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(5000);
+    await assertion;
+    expect(settled).toBe(true);
+  });
 });

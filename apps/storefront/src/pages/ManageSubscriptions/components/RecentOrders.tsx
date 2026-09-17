@@ -3,8 +3,8 @@ import { Alert, Box, Button, Chip, Link, Skeleton, Typography } from '@mui/mater
 
 import { useB3Lang } from '@/lib/lang';
 import { currencyFormat } from '@/utils/b3CurrencyFormat';
-import { displayFormat } from '@/utils/b3DateFormat';
 
+import { formatDate } from '../format';
 import { OrderOutcome, RecentOrder } from '../viewModel';
 
 interface RecentOrdersProps {
@@ -79,7 +79,7 @@ function RecentOrders({
           }}
         >
           <Typography variant="body2" sx={{ minWidth: '7rem' }}>
-            {String(displayFormat(order.placedOn, true))}
+            {formatDate(order.placedOn)}
           </Typography>
           <Typography variant="body2" sx={{ minWidth: '9rem' }}>
             {order.webOrderNumber && order.orderDetailPath ? (

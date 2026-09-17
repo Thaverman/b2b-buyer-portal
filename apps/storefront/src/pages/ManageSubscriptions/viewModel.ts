@@ -1,4 +1,7 @@
+import dayjs from 'dayjs';
+
 import {
+  FrequencyPeriod,
   OgAddress,
   OgItem,
   OgOrder,
@@ -24,12 +27,25 @@ interface AddressSummary {
   locality: string;
 }
 
-interface PaymentSummary {
+export interface PaymentSummary {
   /** null for a card type Ordergroove's table does not name */
   brand: string | null;
   last4: string;
   /** "M/YYYY" as Ordergroove sends it */
   expiry: string;
+}
+
+interface SiblingProduct {
+  externalProductId: string;
+  /** null until the product lookup names it (the component falls back to "Product {id}") */
+  name: string | null;
+}
+
+interface NextOrder {
+  /** Ordergroove order public_id — the target of skip and send now */
+  orderId: string;
+  /** the other subscriptions' products shipping on that order, one entry per product */
+  otherProducts: SiblingProduct[];
 }
 
 export interface SubscriptionCard {
@@ -38,9 +54,15 @@ export interface SubscriptionCard {
   product: ProductSummary | null;
   quantity: number;
   frequencyDays: number;
+  every: number;
+  everyPeriod: FrequencyPeriod;
   /** "YYYY-MM-DD" of the earliest upcoming order holding one of its items */
   nextOrderDate: string | null;
+  /** that order, with what else ships on it; null while nothing is scheduled */
+  nextOrder: NextOrder | null;
   shippingAddress: AddressSummary | null;
+  /** Ordergroove address public_id the subscription ships to */
+  shippingAddressId: string;
   payment: PaymentSummary | null;
   /** Ordergroove timestamp when cancelled; null for active cards and for retired ones with no date */
   cancelledOn: string | null;
@@ -112,28 +134,63 @@ const summarizePayment = (payment: OgPayment): PaymentSummary => ({
   expiry: payment.cc_exp_date,
 });
 
-// subscription public_id → earliest place date among the upcoming orders holding its items.
-const nextOrderDates = (upcoming: SubscriptionLookups['upcoming']) => {
-  const dates = new Map<string, string>();
+interface UpcomingOrder {
+  orderId: string;
+  date: string;
+}
+
+// subscription public_id → the earliest upcoming order holding one of its items.
+const earliestOrders = (upcoming: SubscriptionLookups['upcoming']) => {
+  const earliest = new Map<string, UpcomingOrder>();
   if (!upcoming) {
-    return dates;
+    return earliest;
   }
   const placeByOrder = new Map(
     upcoming.orders.map((order) => [order.public_id, placeDate(order.place)]),
   );
   upcoming.items.forEach((item) => {
-    const place = item.subscription ? placeByOrder.get(item.order) : undefined;
-    if (!item.subscription || !place) {
+    const date = item.subscription ? placeByOrder.get(item.order) : undefined;
+    if (!item.subscription || !date) {
       return;
     }
-    const current = dates.get(item.subscription);
+    const current = earliest.get(item.subscription);
     // ISO dates compare correctly as strings.
-    if (!current || place < current) {
-      dates.set(item.subscription, place);
+    if (!current || date < current.date) {
+      earliest.set(item.subscription, { orderId: item.order, date });
     }
   });
 
-  return dates;
+  return earliest;
+};
+
+// The other subscriptions' products on an order, once per product; one-time lines never count.
+const otherProductsOn = (
+  orderId: string,
+  subscriptionId: string,
+  items: OgItem[],
+  products: SubscriptionLookups['products'],
+): SiblingProduct[] => {
+  const seen = new Set<string>();
+
+  return items
+    .filter(
+      (item) =>
+        item.order === orderId &&
+        item.subscription !== null &&
+        item.subscription !== subscriptionId,
+    )
+    .filter((item) => {
+      if (seen.has(item.product)) {
+        return false;
+      }
+      seen.add(item.product);
+
+      return true;
+    })
+    .map((item) => ({
+      externalProductId: item.product,
+      name: products?.get(item.product)?.name ?? null,
+    }));
 };
 
 const byNextOrderThenName = (a: SubscriptionCard, b: SubscriptionCard) => {
@@ -164,12 +221,13 @@ export const buildSubscriptionCards = (
   const paymentById = new Map(
     (lookups.payments ?? []).map((payment) => [payment.public_id, payment]),
   );
-  const nextDates = nextOrderDates(lookups.upcoming);
+  const earliest = earliestOrders(lookups.upcoming);
 
   const toCard = (subscription: OgSubscription): SubscriptionCard => {
     const product = lookups.products?.get(subscription.product) ?? null;
     const address = addressById.get(subscription.shipping_address);
     const payment = paymentById.get(subscription.payment);
+    const upcomingOrder = earliest.get(subscription.public_id);
 
     return {
       publicId: subscription.public_id,
@@ -177,8 +235,22 @@ export const buildSubscriptionCards = (
       product: product ? summarizeProduct(product) : null,
       quantity: subscription.quantity,
       frequencyDays: subscription.frequency_days,
-      nextOrderDate: nextDates.get(subscription.public_id) ?? null,
+      every: subscription.every,
+      everyPeriod: subscription.every_period,
+      nextOrderDate: upcomingOrder?.date ?? null,
+      nextOrder: upcomingOrder
+        ? {
+            orderId: upcomingOrder.orderId,
+            otherProducts: otherProductsOn(
+              upcomingOrder.orderId,
+              subscription.public_id,
+              lookups.upcoming?.items ?? [],
+              lookups.products,
+            ),
+          }
+        : null,
       shippingAddress: address ? summarizeAddress(address) : null,
+      shippingAddressId: subscription.shipping_address,
       payment: payment ? summarizePayment(payment) : null,
       cancelledOn: subscription.cancelled,
     };
@@ -191,6 +263,48 @@ export const buildSubscriptionCards = (
       .map(toCard)
       .sort(byCancelledNewestFirst),
   };
+};
+
+const PERIOD_UNITS: Record<FrequencyPeriod, 'day' | 'week' | 'month'> = {
+  1: 'day',
+  2: 'week',
+  3: 'month',
+};
+
+/**
+ * `date` plus `multiplier` intervals of the schedule, "YYYY-MM-DD". Calendar arithmetic, as the
+ * hosted manager does it: Sep 19 + 10 months is Jul 19, which `frequency_days` would miss.
+ */
+export const addIntervals = (
+  date: string,
+  every: number,
+  period: FrequencyPeriod,
+  multiplier: number,
+) =>
+  dayjs(date)
+    .add(every * multiplier, PERIOD_UNITS[period])
+    .format('YYYY-MM-DD');
+
+export interface DatePreset {
+  /** the offset in the card's period unit, e.g. 20 (months) for the second preset */
+  every: number;
+  period: FrequencyPeriod;
+  /** "YYYY-MM-DD" */
+  date: string;
+}
+
+/** The manager's pause presets: one, two and three intervals after the next order (spec §4.2). */
+export const changeDatePresets = (card: SubscriptionCard): DatePreset[] => {
+  const from = card.nextOrderDate;
+  if (!from) {
+    return [];
+  }
+
+  return [1, 2, 3].map((multiplier) => ({
+    every: card.every * multiplier,
+    period: card.everyPeriod,
+    date: addIntervals(from, card.every, card.everyPeriod, multiplier),
+  }));
 };
 
 const outcomeOf = (status: number): OrderOutcome => {

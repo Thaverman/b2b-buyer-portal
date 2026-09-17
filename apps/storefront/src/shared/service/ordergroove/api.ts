@@ -5,6 +5,14 @@ import { OgAddress, OgItem, OgOrder, OgPage, OgPayment, OgProduct, OgSubscriptio
 const API_BASE = 'https://restapi.ordergroove.com';
 // The warning is advisory; past this the dialog falls back to "we couldn't check" (spec §6.3).
 const REQUEST_TIMEOUT_MS = 5000;
+// Writes get longer: a customer is watching a spinner, and a change that lands after we gave up
+// still shows on the next read (Phase 3 spec §8).
+const WRITE_TIMEOUT_MS = 10000;
+
+interface Write {
+  method: 'PATCH' | 'POST';
+  body?: object;
+}
 
 // Promise.race rather than AbortSignal: nothing else in the portal passes signals to fetch, and
 // the jsdom/undici pairing in tests has historically disagreed about AbortSignal identity.
@@ -18,14 +26,19 @@ const request = async (
   customerId: string,
   url: string,
   retryOnForbidden: boolean,
+  write?: Write,
 ): Promise<Response> => {
   const authorization = await getAuthorizationHeader(customerId);
 
   let response: Response;
   try {
     response = await withTimeout(
-      fetch(url, { headers: { Authorization: authorization, 'Content-Type': 'application/json' } }),
-      REQUEST_TIMEOUT_MS,
+      fetch(url, {
+        method: write?.method ?? 'GET',
+        headers: { Authorization: authorization, 'Content-Type': 'application/json' },
+        body: write?.body === undefined ? undefined : JSON.stringify(write.body),
+      }),
+      write ? WRITE_TIMEOUT_MS : REQUEST_TIMEOUT_MS,
     );
   } catch (error) {
     throw error instanceof OrdergrooveError ? error : new OrdergrooveError('upstream');
@@ -35,15 +48,13 @@ const request = async (
     // The signature can be revoked or age out server-side; mint once more before giving up.
     invalidateAuthorization();
 
-    return request(customerId, url, false);
+    return request(customerId, url, false, write);
   }
 
   return response;
 };
 
-const ogFetch = async <T>(customerId: string, url: string): Promise<T> => {
-  const response = await request(customerId, url, true);
-
+const parse = async <T>(response: Response): Promise<T> => {
   if (response.ok) {
     return response.json() as Promise<T>;
   }
@@ -55,6 +66,16 @@ const ogFetch = async <T>(customerId: string, url: string): Promise<T> => {
   }
   throw new OrdergrooveError('upstream');
 };
+
+const ogFetch = async <T>(customerId: string, url: string): Promise<T> =>
+  parse<T>(await request(customerId, url, true));
+
+const ogMutate = async <T>(
+  customerId: string,
+  url: string,
+  method: Write['method'],
+  body?: object,
+): Promise<T> => parse<T>(await request(customerId, url, true, { method, body }));
 
 // Every Ordergroove list is paginated; `next` is an absolute URL or null. Recursive rather than a
 // loop so there is no await-in-loop; a customer has a handful of pages at most.
@@ -130,3 +151,33 @@ export const getSubscriptionsUsingToken = async (
 
 export const getProduct = (customerId: string, externalProductId: string) =>
   ogFetch<OgProduct>(customerId, `${API_BASE}/products/${encodeURIComponent(externalProductId)}/`);
+
+const orderUrl = (orderId: string, action: string) =>
+  `${API_BASE}/orders/${encodeURIComponent(orderId)}/${action}/`;
+
+// The trailing slash is the documented form; the Phase 3a probe confirmed it live (finding A).
+const subscriptionUrl = (subscriptionId: string, action: string) =>
+  `${API_BASE}/subscriptions/${encodeURIComponent(subscriptionId)}/${action}/`;
+
+/** Removes this subscription's items from the order and generates its next order (spec §3.2). */
+export const skipSubscription = (customerId: string, orderId: string, subscriptionId: string) =>
+  ogMutate<OgOrder>(customerId, orderUrl(orderId, 'skip_subscription'), 'PATCH', {
+    subscription: subscriptionId,
+  });
+
+/** Places the whole order within 24 hours — every subscription shipping on it, not just one. */
+export const sendOrderNow = (customerId: string, orderId: string) =>
+  ogMutate<OgOrder>(customerId, orderUrl(orderId, 'send_now'), 'PATCH');
+
+/** `orderDate` is "YYYY-MM-DD" and must be in the future. */
+export const changeNextOrderDate = (
+  customerId: string,
+  subscriptionId: string,
+  orderDate: string,
+) =>
+  ogMutate<OgSubscription>(
+    customerId,
+    subscriptionUrl(subscriptionId, 'change_next_order_date'),
+    'PATCH',
+    { order_date: orderDate },
+  );

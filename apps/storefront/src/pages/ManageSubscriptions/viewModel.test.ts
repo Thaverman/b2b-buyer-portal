@@ -9,7 +9,12 @@ import {
 
 import { formatOrderId } from '@/utils/orderId';
 
-import { buildRecentOrders, buildSubscriptionCards } from './viewModel';
+import {
+  addIntervals,
+  buildRecentOrders,
+  buildSubscriptionCards,
+  changeDatePresets,
+} from './viewModel';
 
 const nothingLoaded = {
   products: undefined,
@@ -17,6 +22,128 @@ const nothingLoaded = {
   payments: undefined,
   upcoming: undefined,
 };
+
+describe('upcoming order and schedule on a card', () => {
+  it("names the upcoming order and the other subscriptions' products on it, once each", () => {
+    const subscription = buildOgSubscriptionWith({ product: '9537_12118' });
+    const sibling = buildOgSubscriptionWith({ product: '7674_9534' });
+    const twin = buildOgSubscriptionWith({ product: '7674_9534' });
+    const unnamed = buildOgSubscriptionWith({ product: '1_2' });
+    const order = buildOgOrderWith({ status: 1, place: '2026-10-03 00:00:00' });
+    const items = [
+      buildOgItemWith({
+        order: order.public_id,
+        subscription: subscription.public_id,
+        product: '9537_12118',
+      }),
+      buildOgItemWith({
+        order: order.public_id,
+        subscription: sibling.public_id,
+        product: '7674_9534',
+      }),
+      buildOgItemWith({
+        order: order.public_id,
+        subscription: twin.public_id,
+        product: '7674_9534',
+      }),
+      buildOgItemWith({ order: order.public_id, subscription: unnamed.public_id, product: '1_2' }),
+      // A one-time upsell line has no subscription and never counts as a sibling.
+      buildOgItemWith({ order: order.public_id, subscription: null, product: '5_5' }),
+    ];
+
+    const [card] = buildSubscriptionCards([subscription], {
+      ...nothingLoaded,
+      products: new Map([['7674_9534', buildOgProductWith({ name: 'Kraft Bags' })]]),
+      upcoming: { orders: [order], items },
+    }).active;
+
+    expect(card.nextOrderDate).toBe('2026-10-03');
+    expect(card.nextOrder).toEqual({
+      orderId: order.public_id,
+      otherProducts: [
+        { externalProductId: '7674_9534', name: 'Kraft Bags' },
+        { externalProductId: '1_2', name: null },
+      ],
+    });
+  });
+
+  it('points at the earliest order when the subscription has items on several', () => {
+    const subscription = buildOgSubscriptionWith('WHATEVER_VALUES');
+    const later = buildOgOrderWith({ status: 1, place: '2026-11-07 00:00:00' });
+    const sooner = buildOgOrderWith({ status: 1, place: '2026-10-10 00:00:00' });
+
+    const [card] = buildSubscriptionCards([subscription], {
+      ...nothingLoaded,
+      upcoming: {
+        orders: [later, sooner],
+        items: [
+          buildOgItemWith({ order: later.public_id, subscription: subscription.public_id }),
+          buildOgItemWith({ order: sooner.public_id, subscription: subscription.public_id }),
+        ],
+      },
+    }).active;
+
+    expect(card.nextOrder?.orderId).toBe(sooner.public_id);
+    expect(card.nextOrder?.otherProducts).toEqual([]);
+  });
+
+  it('carries the raw schedule and the address id, and no order while nothing is scheduled', () => {
+    const subscription = buildOgSubscriptionWith({
+      every: 6,
+      every_period: 2,
+      shipping_address: 'addr-1',
+    });
+
+    const [card] = buildSubscriptionCards([subscription], nothingLoaded).active;
+
+    expect(card).toMatchObject({
+      every: 6,
+      everyPeriod: 2,
+      shippingAddressId: 'addr-1',
+      nextOrder: null,
+    });
+  });
+});
+
+describe('date arithmetic', () => {
+  it('adds calendar intervals the way the hosted manager does', () => {
+    // Observed on the manager 2026-09-17: Sep 19 + 10 months = Jul 19 2027; + 2 months = Nov 19.
+    expect(addIntervals('2026-09-19', 10, 3, 1)).toBe('2027-07-19');
+    expect(addIntervals('2026-09-19', 2, 3, 1)).toBe('2026-11-19');
+    expect(addIntervals('2026-09-29', 2, 2, 1)).toBe('2026-10-13');
+    expect(addIntervals('2026-09-29', 2, 2, 3)).toBe('2026-11-10');
+    expect(addIntervals('2026-09-19', 12, 1, 2)).toBe('2026-10-13');
+    // Month arithmetic clamps to the last day, as dayjs does.
+    expect(addIntervals('2026-01-31', 1, 3, 1)).toBe('2026-02-28');
+  });
+
+  it('offers presets at one, two and three intervals after the next order', () => {
+    const subscription = buildOgSubscriptionWith({ every: 10, every_period: 3 });
+    const order = buildOgOrderWith({ status: 1, place: '2026-09-19 00:00:00' });
+    const [card] = buildSubscriptionCards([subscription], {
+      ...nothingLoaded,
+      upcoming: {
+        orders: [order],
+        items: [buildOgItemWith({ order: order.public_id, subscription: subscription.public_id })],
+      },
+    }).active;
+
+    expect(changeDatePresets(card)).toEqual([
+      { every: 10, period: 3, date: '2027-07-19' },
+      { every: 20, period: 3, date: '2028-05-19' },
+      { every: 30, period: 3, date: '2029-03-19' },
+    ]);
+  });
+
+  it('has no presets without an upcoming order', () => {
+    const [card] = buildSubscriptionCards(
+      [buildOgSubscriptionWith('WHATEVER_VALUES')],
+      nothingLoaded,
+    ).active;
+
+    expect(changeDatePresets(card)).toEqual([]);
+  });
+});
 
 describe('buildSubscriptionCards', () => {
   it('splits active from cancelled and keeps the cancellation date', () => {

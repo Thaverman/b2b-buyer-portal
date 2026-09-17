@@ -17,6 +17,9 @@ export interface OgPayment {
   live: boolean;
 }
 
+/** Ordergroove period codes: 1 = days, 2 = weeks, 3 = months (reference "Reactivate"; manager bundle). */
+export type FrequencyPeriod = 1 | 2 | 3;
+
 export interface OgSubscription {
   public_id: string;
   customer: string;
@@ -27,6 +30,9 @@ export interface OgSubscription {
   shipping_address: string;
   quantity: number;
   frequency_days: number;
+  /** the schedule as configured: `every` periods of `every_period`; the source of calendar date arithmetic */
+  every: number;
+  every_period: FrequencyPeriod;
   start_date: string;
   /** ISO timestamp when cancelled, null while active */
   cancelled: string | null;

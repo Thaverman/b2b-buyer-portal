@@ -1,9 +1,10 @@
+import { ReactNode } from 'react';
 import { Box, Card, CardContent, Link, Skeleton, Typography } from '@mui/material';
 
 import { useMobile } from '@/hooks/useMobile';
 import { useB3Lang } from '@/lib/lang';
-import { displayFormat } from '@/utils/b3DateFormat';
 
+import { describePayment, formatDate } from '../format';
 import { SubscriptionCard as SubscriptionCardModel } from '../viewModel';
 
 /** True while the query behind a cell is still pending; false once it settled, even by failing. */
@@ -18,11 +19,11 @@ interface SubscriptionCardProps {
   card: SubscriptionCardModel;
   variant: 'active' | 'cancelled';
   loading: CellLoading;
+  /** the actions row (Phase 3); rendered at the end of the details group */
+  actions?: ReactNode;
 }
 
-const formatDate = (date: string) => String(displayFormat(date, true));
-
-function SubscriptionCard({ card, variant, loading }: SubscriptionCardProps) {
+function SubscriptionCard({ card, variant, loading, actions }: SubscriptionCardProps) {
   const b3Lang = useB3Lang();
   const [isMobile] = useMobile();
 
@@ -52,16 +53,7 @@ function SubscriptionCard({ card, variant, loading }: SubscriptionCardProps) {
       .filter(Boolean)
       .join(', ');
 
-  const paymentText = () => {
-    if (!card.payment) {
-      return null;
-    }
-    const { brand, last4, expiry } = card.payment;
-
-    return brand
-      ? b3Lang('subscriptions.card.payment', { brand, last4, expiry })
-      : b3Lang('subscriptions.card.paymentUnbranded', { last4, expiry });
-  };
+  const paymentText = () => (card.payment ? describePayment(card.payment, b3Lang) : null);
 
   const schedule = () => {
     if (variant === 'cancelled') {
@@ -137,6 +129,7 @@ function SubscriptionCard({ card, variant, loading }: SubscriptionCardProps) {
             {b3Lang('subscriptions.card.paidWith')}{' '}
             {cell(loading.payment, paymentText(), b3Lang('subscriptions.card.unavailable'))}
           </Typography>
+          {actions}
         </Box>
         {!isMobile && <Box sx={{ minWidth: '11rem', textAlign: 'right' }}>{scheduleNode}</Box>}
       </CardContent>

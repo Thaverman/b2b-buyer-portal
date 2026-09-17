@@ -36,7 +36,10 @@ export const buildOgSubscriptionWith = builder<OgSubscription>(() => ({
   payment: hex(32),
   shipping_address: hex(32),
   quantity: faker.number.int({ min: 1, max: 40 }),
-  frequency_days: faker.helpers.arrayElement([7, 14, 21, 28, 30, 45, 60, 90]),
+  // The three schedule fields describe one schedule; keep them consistent in fixtures.
+  frequency_days: 28,
+  every: 4,
+  every_period: 2,
   start_date: faker.date.recent({ days: 365 }).toISOString().slice(0, 10),
   cancelled: null,
   merchant_order_id: String(faker.number.int({ min: 250000, max: 259999 })),

@@ -104,9 +104,9 @@ const ogMutate = async <T>(
 
 All accept Storefront scope (verified in the reference for each) and are the exact calls
 Ordergroove's own manager bundle makes today (§12.3). Paths carry the trailing slash the reference
-documents; the manager omits it on `change_next_order_date` and `items/{id}/change_quantity` — the
-Task 0 probe (§10.1) settles which form Ordergroove accepts for `change_next_order_date`, because a
-redirect would drop a PATCH.
+documents; the manager omits it on `change_next_order_date` and `items/{id}/change_quantity`. The
+3a Task 0 probe (2026-09-17) sent `PATCH /subscriptions/{id}/change_next_order_date/` **with** the
+slash and got `200` first time, so the documented form is the one the service uses.
 
 | Function (exported from `index.ts`) | Call | Body |
 |---|---|---|
@@ -322,13 +322,22 @@ retry or close. Inline selects fall back to the query value (they render from it
 
 All on `B3Dialog` (`maxWidth="sm"`, `fullScreen` on phones by the component itself). The right
 button carries the verb and uses `loading={isPending}` (spinner + disabled); the left button is
-`global.dialog.cancel` unless stated. Dates render with `displayFormat(date, true)` like the card.
+`global.dialog.cancel` unless stated. Dates render with `formatDate` from `format.ts` like the card.
+
+**Calendar dates (found in 3a, fixes a Phase 2 defect).** `displayFormat` converts an instant into
+the store's wall clock, so it shifts its argument by the store's timezone offset. Ordergroove's
+`place` is a calendar day, not an instant, and on this store (offset `-21600`) every date on the
+page rendered **one day early** — the live page showed "Nov 19th 2026" for an order Ordergroove
+places on 2026-11-20, across all fourteen cards and the order history. The page now formats
+calendar dates with `displayCalendarDate` (`src/utils/b3DateFormat`), which formats local midnight
+of the given day and so cannot move it. Anything rendering an Ordergroove date — card, dialogs,
+order rows — goes through `format.ts`'s `formatDate`.
 
 | Dialog | Body | Right button | Notes |
 |---|---|---|---|
 | **Skip** | "{product} will leave your order on {date}. Your next order will be on {projectedDate}." | Skip | `projectedDate` from §4.2. |
 | **Send now** | "Your order will be placed within 24 hours and charged to {card}." — `{card}` is the card's payment summary; the sentence without the charge clause when payment is unknown. When `nextOrder.otherProducts` is non-empty: "This order also includes:" and a bulleted list of names (fallback `Product {id}`). | Send now | |
-| **Change date** | `RadioGroup`: three presets labelled "In {offset} ({date})" with offsets from §4.2 (e.g. "In 8 weeks (Nov 28, 2026)"), then "Pick a date" which reveals `B3Picker` (`@/components/ui/B3Picker`, `formatInput 'YYYY-MM-DD'`) with the minimum tomorrow. | Save | Save disabled until a preset is chosen or a valid picked date (after today) exists. |
+| **Change date** | `RadioGroup`: three presets labelled "In {offset} ({date})" with offsets from §4.2 (e.g. "In 8 weeks (Nov 28, 2026)"), then "Pick a date" which reveals a native date input (MUI `TextField type="date"`, `min` = tomorrow) with the hint "Choose a date after today." when the typed date is not in the future. *As built in 3a: the native input replaced `B3Picker` because no test in the repo drives the MUI x-date-pickers input, the native input enforces `min` for free and `fireEvent.change` tests it reliably; on phones it opens the OS picker.* | Save | Save disabled until a preset is chosen or a valid picked date (after today) exists. |
 | **Cancel** (3b) | First: "Want to skip the next order instead?" with a `Skip next order` link that closes this dialog and opens Skip (hidden when the card has no upcoming order). Then "Tell us why (optional)" `RadioGroup` of the seven reasons plus "Other (please specify)" with a `TextField` shown when Other is selected. | Cancel subscription (`color="error"`) | Left button reads "Keep subscription". |
 | **Reactivate** (3b) | "You'll receive {product} again in an upcoming order." `Select` "Frequency" (options from §4.3 with the old frequency preselected when in the list, else the first option) and `B3Picker` "First order date" defaulting to tomorrow, minimum tomorrow. Body sent: `start_date` today, `next_order_date` the picked date. | Reactivate | |
 | **Change address** (3b) | `RadioGroup` of address summaries (§4.6), current preselected. Footer: "To add a new address, use the subscription manager." where "subscription manager" is the existing escape link (`target="_top"`). | Save | Save disabled until the selection differs from the current id. |
@@ -373,7 +382,7 @@ only skip for SSW (no cancel-flow discount configured, §12.1).
 "subscriptions.actions.skip.title": "Skip next order",
 "subscriptions.actions.skip.body": "{product} will leave your order on {date}. Your next order will be on {nextDate}.",
 "subscriptions.actions.skip.confirm": "Skip",
-"subscriptions.actions.skip.success": "Order skipped.",
+"subscriptions.actions.skip.success": "Next order skipped.",
 
 "subscriptions.actions.sendNow.title": "Send order now",
 "subscriptions.actions.sendNow.body": "Your order will be placed within 24 hours and charged to {card}.",
@@ -389,6 +398,7 @@ only skip for SSW (no cancel-flow discount configured, §12.1).
 "subscriptions.actions.changeDate.offsetMonths": "{count, plural, one {# month} other {# months}}",
 "subscriptions.actions.changeDate.pick": "Pick a date",
 "subscriptions.actions.changeDate.pickerLabel": "Next order date",
+"subscriptions.actions.changeDate.pickerHint": "Choose a date after today.",
 "subscriptions.actions.changeDate.confirm": "Save",
 "subscriptions.actions.changeDate.success": "Next order date updated.",
 
@@ -474,6 +484,18 @@ customer 80591, every step reads back the record and prints a redacted summary:
 
 Findings go into the plan's Task 0 record and, if any contract differs, back into this spec.
 
+**3a findings (probe run 2026-09-17, steps 1–3; steps 4–6 belong to 3b):** subject was a
+12-month subscription (`every: 12, every_period: 3, frequency_days: 360`) alone on an order due
+2026-11-20. (A) `change_next_order_date/` with the trailing slash answered 200 first time; the
+response carries `every` and `every_period`. (B) `skip_subscription` moved the item to an order
+dated 2027-11-20 — exactly one calendar interval, where a `frequency_days` sum would have said
+2027-11-15 — and the emptied order stayed in `/orders/?status=1`; the join derives dates from items,
+so an empty order never reaches a card. (C) Changing the date back re-attached the item to the
+**original** order id; one upcoming order carried that date afterwards. (D) `every`/`every_period`
+are on every list record, alongside `cancel_reason`, `cancel_reason_code`, `offer`,
+`subscription_type`, `price` and `reminder_days`. Every write returned 200 and the subject ended
+exactly where it started.
+
 ### 10.2 Unit and component tests (Vitest, MSW, builders)
 
 - **`api.test.ts`** — per function: method, path and JSON body asserted from the intercepted
@@ -498,7 +520,9 @@ Findings go into the plan's Task 0 record and, if any contract differs, back int
 - **`SubscriptionsManager.test.tsx`** — one end-to-end skip: click Skip, confirm, MSW receives the
   PATCH, the subscriptions/upcoming handlers return the moved date, the card shows it; the
   `sessionExpired` snackbar path.
-- **`SubscriptionsManager.mobile.test.tsx`** — the row wraps and the selects are full width.
+- **`SubscriptionsManager.mobile.test.tsx`** — 3b only: the selects go full width. 3a added no
+  phone case: its row merely wraps (`flexWrap`), which jsdom cannot observe, and nothing structural
+  differs between layouts.
 - **Negative control** for every new test: revert the code under test, watch it fail, restore.
 - Lint: knip (export only what `src` consumes — `FREQUENCY_OPTIONS`, `CANCEL_REASONS` are consumed
   by components, so exported; helpers used only by tests are not), depcruise, eslint with

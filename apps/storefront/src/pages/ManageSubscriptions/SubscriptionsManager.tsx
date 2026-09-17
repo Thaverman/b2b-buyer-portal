@@ -6,6 +6,7 @@ import { OrdergrooveError } from '@/shared/service/ordergroove';
 import { useAppSelector } from '@/store';
 import { BigCommerceStorefrontAPIBaseURL } from '@/utils/basicConfig';
 
+import SubscriptionActions from './components/actions/SubscriptionActions';
 import CancelledSubscriptions from './components/CancelledSubscriptions';
 import RecentOrders from './components/RecentOrders';
 import SubscriptionCard, { CellLoading } from './components/SubscriptionCard';
@@ -75,7 +76,13 @@ function SubscriptionsManager() {
           <Typography color="text.secondary">{b3Lang('subscriptions.empty')}</Typography>
         )}
         {active.map((card) => (
-          <SubscriptionCard key={card.publicId} card={card} variant="active" loading={loading} />
+          <SubscriptionCard
+            key={card.publicId}
+            card={card}
+            variant="active"
+            loading={loading}
+            actions={<SubscriptionActions card={card} customerId={customerId} />}
+          />
         ))}
         <CancelledSubscriptions cards={cancelled} loading={loading} />
         <RecentOrders
