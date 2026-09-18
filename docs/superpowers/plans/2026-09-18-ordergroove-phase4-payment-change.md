@@ -64,7 +64,7 @@
 **Interfaces:**
 - Produces: findings A–C below, which Tasks 2, 4 and 5 read.
 
-- [ ] **Step 1: Write the probe script** to `<scratch>/og-payment-probe.mjs`
+- [x] **Step 1: Write the probe script** to `<scratch>/og-payment-probe.mjs`
 
 ```js
 // Phase 4 Task 0. Reversible probe for customer 80591: repoints ONE subscription between two
@@ -180,12 +180,12 @@ if (distinctBefore.size !== 1) {
 }
 ```
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 Run: `OG_PUBLIC_ID=<merchant id> node <scratch>/og-payment-probe.mjs`
 Expected: every `->` shows `200`; both restore lines report `true`. If a restore reports `false`, re-run the matching `change_payment` or `use_for_all` by hand before doing anything else.
 
-- [ ] **Step 3: Record the findings here** (edit this file; Tasks 2, 4 and 5 read these lines)
+- [x] **Step 3: Record the findings here** (edit this file; Tasks 2, 4 and 5 read these lines)
 
 - Finding A — **does the already-generated upcoming order follow the subscription?** `[x] yes, order.payment moved`. Run 2026-09-18: `change_payment` on a subscription due 2027-07-17 returned 200, and the upcoming order's `payment` moved with it while the order stayed upcoming; the restore moved both back. **Consequence: `changeOrderPayment` is deleted from Task 2, and Task 4's mutation and variables carry no `orderId`.**
 - Finding B — record inventory: **8** records, **4** distinct tokens, **4** live, **4** dead, **1** token carrying more than one record. Live and dead records both exist, so Task 3's reuse tests have live coverage for all three shapes.
@@ -1843,12 +1843,12 @@ git commit -m "docs: B2B-0000 Record the Ordergroove Phase 4 implementation" -m 
 **Interfaces:**
 - Consumes: a deploy-flavour build of this branch; the Phase 3a recipe (request-level login, route interception of `/content/b2bBuyerPortal/dist/`, `portalEval` into the ThemeFrame).
 
-- [ ] **Step 1: Build the deploy flavour**
+- [x] **Step 1: Build the deploy flavour**
 
 Run: `VITE_ASSETS_ABSOLUTE_PATH='https://sandbox.storesupply.com/content/b2bBuyerPortal/dist/' yarn build`
 Expected: `apps/storefront/dist/` with hashed root entries.
 
-- [ ] **Step 2: Write the script** to `<scratch>/pw/phase4-live.mjs`, copying `phase3a-live.mjs`
+- [x] **Step 2: Write the script** to `<scratch>/pw/phase4-live.mjs`, copying `phase3a-live.mjs`
 wholesale and replacing everything after the "settled cards" wait with:
 
 ```js
@@ -1924,7 +1924,7 @@ summary.ok =
 console.log(JSON.stringify(summary, null, 2));
 ```
 
-- [ ] **Step 3: Run it**
+- [x] **Step 3: Run it**
 
 Run: `DIST=<abs path to apps/storefront/dist> ENV_FILE=<abs path to apps/storefront/.env> node <scratch>/pw/phase4-live.mjs`
 
@@ -1945,7 +1945,7 @@ fixture account and that it cannot be deleted.
 If the run aborts between the two repoints, restore by hand with the Task 0 probe's
 `change_payment` step using the ids in `writes`.
 
-- [ ] **Step 4: Record**
+- [x] **Step 4: Record**
 
 Paste the summary (card brands and last four digits only — never tokens, never the merchant id)
 into the memory-note section from Task 6 Step 4, mirror to the vault and Mongo as there, and commit
