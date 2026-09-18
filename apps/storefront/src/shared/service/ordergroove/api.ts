@@ -54,10 +54,7 @@ const request = async (
   return response;
 };
 
-const parse = async <T>(response: Response): Promise<T> => {
-  if (response.ok) {
-    return response.json() as Promise<T>;
-  }
+const throwForFailure = (response: Response): never => {
   if (response.status === 401 || response.status === 403) {
     throw new OrdergrooveError('sessionExpired');
   }
@@ -65,6 +62,29 @@ const parse = async <T>(response: Response): Promise<T> => {
     throw new OrdergrooveError('rateLimited');
   }
   throw new OrdergrooveError('upstream');
+};
+
+const parse = async <T>(response: Response): Promise<T> => {
+  if (response.ok) {
+    return response.json() as Promise<T>;
+  }
+
+  return throwForFailure(response);
+};
+
+// Tolerates the empty body the vendor documents (spec §3.1): unlike `parse`, an empty 200 resolves
+// instead of `response.json()` throwing a raw SyntaxError.
+const parseAllowingEmptyBody = async (response: Response): Promise<void> => {
+  if (response.ok) {
+    const text = await response.text();
+    if (text) {
+      JSON.parse(text);
+    }
+
+    return;
+  }
+
+  throwForFailure(response);
 };
 
 const ogFetch = async <T>(customerId: string, url: string): Promise<T> =>
@@ -76,6 +96,12 @@ const ogMutate = async <T>(
   method: Write['method'],
   body?: object,
 ): Promise<T> => parse<T>(await request(customerId, url, true, { method, body }));
+
+const ogMutateAllowingEmptyBody = async (
+  customerId: string,
+  url: string,
+  method: Write['method'],
+): Promise<void> => parseAllowingEmptyBody(await request(customerId, url, true, { method }));
 
 // Every Ordergroove list is paginated; `next` is an absolute URL or null. Recursive rather than a
 // loop so there is no await-in-loop; a customer has a handful of pages at most.
@@ -227,4 +253,4 @@ export const changeSubscriptionPayment = (
  * "all my subscriptions" rather than "these".
  */
 export const applyPaymentToAll = (customerId: string, paymentId: string) =>
-  ogMutate<unknown>(customerId, paymentUrl(paymentId, 'use_for_all'), 'POST');
+  ogMutateAllowingEmptyBody(customerId, paymentUrl(paymentId, 'use_for_all'), 'POST');

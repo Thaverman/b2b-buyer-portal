@@ -9,6 +9,7 @@ import {
   OgProduct,
   OgSubscription,
 } from '@/shared/service/ordergroove';
+import { CARD_BRANDS } from '@/shared/service/ssw/cardOptions';
 import { formatOrderId } from '@/utils/orderId';
 
 interface ProductSummary {
@@ -94,16 +95,6 @@ export interface RecentOrder {
   /** the merchant's rejection message, failed orders only */
   message: string | null;
 }
-
-// Ordergroove reference "Credit Card Types".
-const CARD_BRANDS: Record<number, string> = {
-  1: 'Visa',
-  2: 'Mastercard',
-  3: 'American Express',
-  4: 'Discover',
-  5: 'Diners',
-  6: 'JCB',
-};
 
 // Ordergroove reference "Order Status Codes" (spec §4.3).
 const SUCCESS_STATUS = 5;

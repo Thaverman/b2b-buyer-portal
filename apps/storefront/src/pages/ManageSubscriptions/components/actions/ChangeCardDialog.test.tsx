@@ -74,6 +74,28 @@ it('explains itself when the only saved card is the one in use', async () => {
   expect(navigation).toHaveBeenCalledWith('/payment-methods');
 });
 
+it('offers the one remaining card when the current one is already gone', async () => {
+  // A customer can delete every other card down to one, stranding the subscription on a dead
+  // token — options.length is 1, but that lone option is not the one in use.
+  const onConfirm = vi.fn();
+
+  const { user } = renderOpen((isOpen) => (
+    <ChangeCardDialog
+      options={[amex]}
+      isOpen={isOpen}
+      isPending={false}
+      onClose={vi.fn()}
+      onConfirm={onConfirm}
+    />
+  ));
+
+  expect(screen.queryByRole('dialog')).not.toHaveTextContent('This is your only saved card.');
+  await user.click(screen.getByRole('radio', { name: 'AMEX ending in 1881 · exp 11/2029' }));
+  await user.click(screen.getByRole('button', { name: 'Save' }));
+
+  expect(onConfirm).toHaveBeenCalledWith(amex);
+});
+
 it('disables Save while the write is pending', () => {
   renderOpen((isOpen) => (
     <ChangeCardDialog

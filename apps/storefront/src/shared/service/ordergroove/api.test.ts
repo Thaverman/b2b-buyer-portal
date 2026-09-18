@@ -520,6 +520,17 @@ describe('payment changes', () => {
     expect(calls).toHaveBeenCalledWith('POST', '');
   });
 
+  it('resolves an empty 200 on the use-for-all call, the response the vendor documents', async () => {
+    server.use(
+      http.post(
+        `${ogBase}/payments/pay-2/use_for_all/`,
+        () => new HttpResponse(null, { status: 200 }),
+      ),
+    );
+
+    await expect(applyPaymentToAll(someCustomerId(), 'pay-2')).resolves.toBeUndefined();
+  });
+
   it('maps failures on the use-for-all call', async () => {
     server.use(
       http.post(

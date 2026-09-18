@@ -45,7 +45,9 @@ function ChangeCardDialog({
 
   const chosen = options.find((option) => option.token === token);
   const canSave = Boolean(chosen) && !chosen?.isCurrent;
-  const hasChoice = options.length > 1;
+  // Not a count: a customer can delete every other card down to one, stranding the subscription
+  // on a dead token, so the picker must appear whenever any option would actually change the card.
+  const hasChoice = options.some((option) => !option.isCurrent);
 
   return (
     <B3Dialog

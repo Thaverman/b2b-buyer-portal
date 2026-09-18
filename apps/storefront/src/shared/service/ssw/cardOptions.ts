@@ -15,8 +15,9 @@ export interface CardOption {
   paymentId: string | null;
 }
 
-// Ordergroove reference "Credit Card Types" — the inverse of CARD_BRANDS above. BigCommerce sends
-// upper-case names; anything unmapped is left out because Ordergroove marks the field optional.
+// Ordergroove reference "Credit Card Types". CC_TYPES and CARD_BRANDS are two directions of one
+// mapping — brand name to code, and code to display name — and must change together, or a card
+// renders correctly but is created in Ordergroove with no card type, or vice versa.
 const CC_TYPES: Record<string, number> = {
   VISA: 1,
   MASTERCARD: 2,
@@ -26,6 +27,15 @@ const CC_TYPES: Record<string, number> = {
   DINERS: 5,
   'DINERS CLUB': 5,
   JCB: 6,
+};
+
+export const CARD_BRANDS: Record<number, string> = {
+  1: 'Visa',
+  2: 'Mastercard',
+  3: 'American Express',
+  4: 'Discover',
+  5: 'Diners',
+  6: 'JCB',
 };
 
 export const ccTypeFor = (brand: string) => CC_TYPES[brand.trim().toUpperCase()];
@@ -41,7 +51,8 @@ export const formatExpiry = (month: number, year: number) =>
 export const buildCardOptions = (
   instruments: StoredInstrument[],
   payments: OgPayment[] | undefined,
-  currentPaymentId: string,
+  /** the subscription's current payment record id, or `null` for no current card in this context */
+  currentPaymentId: string | null,
 ): CardOption[] => {
   const liveByToken = new Map(
     (payments ?? [])

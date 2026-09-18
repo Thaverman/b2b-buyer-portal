@@ -37,12 +37,12 @@ export const useMoveSubscriptions = (
     retry: false,
   });
 
-  // Never offer the card being deleted. `currentPaymentId` is irrelevant here, so pass a value no
-  // record can have: nothing in this list should render as "current".
+  // Never offer the card being deleted. `currentPaymentId` is irrelevant here, so pass `null`:
+  // nothing in this list should render as "current".
   const options = buildCardOptions(
     (instruments.data?.instruments ?? []).filter((instrument) => instrument.token !== token),
     payments.data,
-    '',
+    null,
   );
 
   const move = useMutation({
@@ -76,6 +76,11 @@ export const useMoveSubscriptions = (
         queryKey: ['subscriptionsUsingToken', customerId, token],
       });
     },
+    // On settle, not only on success: a failed move can still follow a successful create, and
+    // Ordergroove has no delete for payment records, so the retry must see that created record
+    // rather than create a second, permanent one (spec §8).
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: ['ordergroove', customerId, 'payments'] }),
     onError: (error: unknown) => {
       const expired = error instanceof OrdergrooveError && error.kind === 'sessionExpired';
       snackbar.error(

@@ -74,6 +74,14 @@ describe('card options', () => {
 
     expect(option).toMatchObject({ paymentId: null, isCurrent: false });
   });
+
+  it('marks nothing current when there is no current card in this context', () => {
+    const live = buildOgPaymentWith({ public_id: 'pay-a', token_id: 'tok-a', live: true });
+
+    const [option] = buildCardOptions([instrument()], [live], null);
+
+    expect(option).toMatchObject({ paymentId: 'pay-a', isCurrent: false });
+  });
 });
 
 describe('card type and expiry', () => {

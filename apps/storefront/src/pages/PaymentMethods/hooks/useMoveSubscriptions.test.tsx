@@ -166,6 +166,56 @@ it('creates a record first when Ordergroove does not hold the chosen card', asyn
   );
 });
 
+it('invalidates payments on settle so a retry after a failed move reuses the created record', async () => {
+  const created = vi.fn();
+  let moveAttempts = 0;
+  let paymentsList: ReturnType<typeof buildOgPaymentWith>[] = [];
+  server.use(
+    http.get(`${ogBase}/payments/`, () =>
+      HttpResponse.json({
+        count: paymentsList.length,
+        next: null,
+        previous: null,
+        results: paymentsList,
+      }),
+    ),
+    http.post(`${ogBase}/payments/create/`, async ({ request }) => {
+      created();
+      const body = (await request.json()) as { token_id: string };
+      const payment = buildOgPaymentWith({
+        public_id: 'pay-made',
+        token_id: body.token_id,
+        live: true,
+      });
+      paymentsList = [payment];
+
+      return HttpResponse.json(payment);
+    }),
+    http.post(`${ogBase}/payments/pay-made/use_for_all/`, () => {
+      moveAttempts += 1;
+
+      return moveAttempts === 1 ? new HttpResponse(null, { status: 500 }) : HttpResponse.json({});
+    }),
+  );
+  renderHookProbe();
+  await waitFor(() => expect(hook().options).toHaveLength(1));
+  expect(hook().options[0].paymentId).toBeNull();
+
+  hook().move.mutate(hook().options[0]);
+
+  await waitFor(() => expect(hook().move.isError).toBe(true));
+  expect(created).toHaveBeenCalledTimes(1);
+
+  // The failed attempt's invalidation refetches payments, so the retried option now carries the
+  // record the create call already made.
+  await waitFor(() => expect(hook().options[0].paymentId).toBe('pay-made'));
+
+  hook().move.mutate(hook().options[0]);
+
+  await waitFor(() => expect(hook().move.isSuccess).toBe(true));
+  expect(created).toHaveBeenCalledTimes(1);
+});
+
 it('reports a failed move', async () => {
   server.use(
     http.post(

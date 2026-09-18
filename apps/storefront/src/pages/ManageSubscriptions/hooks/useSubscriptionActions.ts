@@ -96,11 +96,11 @@ export const useSubscriptionActions = (customerId: number) => {
       await changeSubscriptionPayment(id, subscriptionId, paymentId);
     },
     onSuccess: () =>
-      succeed('subscriptions.actions.changeCard.success', [
-        'subscriptions',
-        'upcoming',
-        'payments',
-      ]),
+      succeed('subscriptions.actions.changeCard.success', ['subscriptions', 'upcoming']),
+    // On settle, not only on success: a failed repoint can still follow a successful create, and
+    // Ordergroove has no delete for payment records, so the retry must see that created record
+    // rather than create a second, permanent one (spec §8).
+    onSettled: () => refresh(['payments']),
     onError,
   });
 
