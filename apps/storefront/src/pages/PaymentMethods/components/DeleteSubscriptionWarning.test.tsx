@@ -12,10 +12,34 @@ const buildAffectedSubscriptionWith = builder<AffectedSubscription>(() => ({
 
 it('renders nothing when the card is clear', () => {
   const { result } = renderWithProviders(
-    <DeleteSubscriptionWarning status="clear" subscriptions={[]} onManageSubscriptions={vi.fn()} />,
+    <DeleteSubscriptionWarning
+      status="clear"
+      subscriptions={[]}
+      onManageSubscriptions={vi.fn()}
+      moveOptions={[]}
+      isMoving={false}
+      hasMoved={false}
+      onMove={vi.fn()}
+    />,
   );
 
   expect(result.container).toBeEmptyDOMElement();
+});
+
+it('shows the moved confirmation when the card is clear after a move', () => {
+  renderWithProviders(
+    <DeleteSubscriptionWarning
+      status="clear"
+      subscriptions={[]}
+      onManageSubscriptions={vi.fn()}
+      moveOptions={[]}
+      isMoving={false}
+      hasMoved
+      onMove={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByText('No subscriptions use this card.')).toBeInTheDocument();
 });
 
 it('announces that it is checking', () => {
@@ -24,6 +48,10 @@ it('announces that it is checking', () => {
       status="checking"
       subscriptions={[]}
       onManageSubscriptions={vi.fn()}
+      moveOptions={[]}
+      isMoving={false}
+      hasMoved={false}
+      onMove={vi.fn()}
     />,
   );
 
@@ -37,6 +65,10 @@ it('discloses when the check failed', () => {
       status="failed"
       subscriptions={[]}
       onManageSubscriptions={vi.fn()}
+      moveOptions={[]}
+      isMoving={false}
+      hasMoved={false}
+      onMove={vi.fn()}
     />,
   );
 
@@ -60,6 +92,10 @@ it('lists the affected subscriptions with weekly or daily frequency and a manage
         buildAffectedSubscriptionWith({ productName: null, frequencyDays: 10 }),
       ]}
       onManageSubscriptions={onManage}
+      moveOptions={[]}
+      isMoving={false}
+      hasMoved={false}
+      onMove={vi.fn()}
     />,
   );
 
@@ -85,6 +121,10 @@ it('uses the singular for one subscription', () => {
       status="affected"
       subscriptions={[buildAffectedSubscriptionWith('WHATEVER_VALUES')]}
       onManageSubscriptions={vi.fn()}
+      moveOptions={[]}
+      isMoving={false}
+      hasMoved={false}
+      onMove={vi.fn()}
     />,
   );
 
@@ -102,6 +142,10 @@ it('truncates the list after five entries', () => {
         }),
       )}
       onManageSubscriptions={vi.fn()}
+      moveOptions={[]}
+      isMoving={false}
+      hasMoved={false}
+      onMove={vi.fn()}
     />,
   );
 

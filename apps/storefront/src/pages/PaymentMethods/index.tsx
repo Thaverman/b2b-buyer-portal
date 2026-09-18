@@ -22,6 +22,7 @@ import AddPaymentMethodBraintreeDialog from './components/AddPaymentMethodBraint
 import AddPaymentMethodDialog from './components/AddPaymentMethodDialog';
 import DeleteSubscriptionWarning from './components/DeleteSubscriptionWarning';
 import PaymentMethodRow from './components/PaymentMethodRow';
+import { useMoveSubscriptions } from './hooks/useMoveSubscriptions';
 import {
   deriveSubscriptionCheckStatus,
   useSubscriptionsUsingInstrument,
@@ -69,6 +70,11 @@ function PaymentMethods({ variant }: PaymentMethodsProps) {
   const subscriptionCheckStatus = deriveSubscriptionCheckStatus(
     isSubscriptionCheckEnabled,
     affectedSubscriptions,
+  );
+  const moveSubscriptions = useMoveSubscriptions(
+    customerId,
+    pendingDelete?.token,
+    isSubscriptionCheckEnabled,
   );
 
   const { data, isFetching, isError, error, refetch } = useQuery({
@@ -243,9 +249,11 @@ function PaymentMethods({ variant }: PaymentMethodsProps) {
           leftSizeBtn={b3Lang('paymentMethods.deleteDialog.cancel')}
           rightSizeBtn={b3Lang('paymentMethods.deleteDialog.confirm')}
           loading={deleteMutation.isPending}
-          disabledSaveBtn={subscriptionCheckStatus === 'checking'}
+          disabledSaveBtn={
+            subscriptionCheckStatus === 'checking' || moveSubscriptions.move.isPending
+          }
           handleLeftClick={() => {
-            if (!deleteMutation.isPending) {
+            if (!deleteMutation.isPending && !moveSubscriptions.move.isPending) {
               setPendingDelete(null);
             }
           }}
@@ -267,6 +275,10 @@ function PaymentMethods({ variant }: PaymentMethodsProps) {
               status={subscriptionCheckStatus}
               subscriptions={affectedSubscriptions.data ?? []}
               onManageSubscriptions={() => navigate('/manage-subscriptions')}
+              moveOptions={moveSubscriptions.options}
+              isMoving={moveSubscriptions.move.isPending}
+              hasMoved={moveSubscriptions.move.isSuccess}
+              onMove={(option) => moveSubscriptions.move.mutate(option)}
             />
           </Box>
         </B3Dialog>

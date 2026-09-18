@@ -344,6 +344,97 @@ it('mints the signature once across two dialog opens', async () => {
   expect(mints).toHaveBeenCalledTimes(1);
 });
 
+it('offers to move the subscriptions, then shows the card is clear without deleting it', async () => {
+  const deleted = vi.fn();
+  const visa = buildStoredInstrumentWith({
+    token: 'tok-a',
+    brand: 'VISA',
+    last4: '4242',
+    isDefault: true,
+  });
+  // Expiry must be pinned: the builder randomises it, and the radio label asserts it.
+  const amex = buildStoredInstrumentWith({
+    token: 'tok-b',
+    brand: 'AMEX',
+    last4: '1881',
+    expiryMonth: 11,
+    expiryYear: 2029,
+    isDefault: false,
+  });
+  const payment = buildOgPaymentWith({ token_id: 'tok-a', live: true });
+  let moved = false;
+
+  configureSubscriptions();
+  mockJwt();
+  mockList([visa, amex]);
+  mockOgAuth();
+  server.use(
+    http.get(`${ogBase}/payments/`, () =>
+      HttpResponse.json(
+        page([payment, buildOgPaymentWith({ public_id: 'pay-b', token_id: 'tok-b', live: true })]),
+      ),
+    ),
+    http.get(`${ogBase}/subscriptions/`, () =>
+      HttpResponse.json(
+        page(moved ? [] : [buildOgSubscriptionWith({ payment: payment.public_id })]),
+      ),
+    ),
+    http.post(`${ogBase}/payments/pay-b/use_for_all/`, () => {
+      moved = true;
+
+      return HttpResponse.json({});
+    }),
+    http.post(`${apiBase}/customers/Customer/DeleteStoredInstrument`, () => {
+      deleted();
+
+      return HttpResponse.json({ customerId: 999, instruments: [] });
+    }),
+    http.get(`${ogBase}/products/*`, () =>
+      HttpResponse.json(buildOgProductWith('WHATEVER_VALUES')),
+    ),
+  );
+
+  const { user } = renderPage();
+
+  await user.click((await screen.findAllByRole('button', { name: 'Delete' }))[0]);
+  expect(await screen.findByText(/This card is used by 1 active subscription/)).toBeInTheDocument();
+
+  await user.click(screen.getByRole('radio', { name: 'AMEX ending in 1881 · exp 11/2029' }));
+  await user.click(screen.getByRole('button', { name: 'Move subscriptions' }));
+
+  expect(await screen.findByText('No subscriptions use this card.')).toBeInTheDocument();
+  expect(screen.queryByText(/This card is used by/)).not.toBeInTheDocument();
+  // Moving is not deleting: the customer still has to choose.
+  expect(deleted).not.toHaveBeenCalled();
+  expect(confirmButton()).toBeEnabled();
+});
+
+it('does not offer a move when there is nowhere to move to', async () => {
+  const visa = buildStoredInstrumentWith({ token: 'tok-a', isDefault: true });
+  const payment = buildOgPaymentWith({ token_id: 'tok-a', live: true });
+
+  configureSubscriptions();
+  mockJwt();
+  mockList([visa]);
+  mockOgAuth();
+  server.use(
+    http.get(`${ogBase}/payments/`, () => HttpResponse.json(page([payment]))),
+    http.get(`${ogBase}/subscriptions/`, () =>
+      HttpResponse.json(page([buildOgSubscriptionWith({ payment: payment.public_id })])),
+    ),
+    http.get(`${ogBase}/products/*`, () =>
+      HttpResponse.json(buildOgProductWith('WHATEVER_VALUES')),
+    ),
+  );
+
+  const { user } = renderPage();
+
+  await user.click((await screen.findAllByRole('button', { name: 'Delete' }))[0]);
+
+  expect(await screen.findByText(/This card is used by 1 active subscription/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Move subscriptions' })).not.toBeInTheDocument();
+});
+
 it('navigates to the subscriptions page from the warning', async () => {
   const card = buildStoredInstrumentWith('WHATEVER_VALUES');
   const payment = buildOgPaymentWith({ token_id: card.token });
