@@ -410,3 +410,13 @@ with NO route interception and NO injection, so this is what a customer gets.
   is the only distinguishing token; (2) the delete dialog's heading "Use this card for all my
   subscriptions" sits above radios for the OTHER cards, so "this card" reads as the card being
   deleted.
+
+Both were fixed in `607c4d50`: `displayBrand` and `formatRawExpiry` in
+`shared/service/ssw/cardOptions.ts` give every screen one shape ("Visa", "03/2028"), applied at the
+subscription card line (`summarizePayment`), the card picker (`buildCardOptions`), the payment-methods
+rows and the delete sentence; `paymentMethods.deleteDialog.move.title` became "Move them all to
+another card:". `displayBrand` round-trips through `ccTypeFor`, which the create body reads — there is
+a test holding that. Verified live against a local build served over the sandbox page: the card line
+and the picker now print the identical string. NOTE: repeated full page loads on customer 80591 start
+failing ("We couldn't load your subscriptions", all requests 200, later ones never answered) — space
+live runs out, and re-run the deployed bundle as the control before blaming a build.
