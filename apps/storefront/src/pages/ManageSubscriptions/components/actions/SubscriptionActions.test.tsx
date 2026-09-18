@@ -68,10 +68,19 @@ afterEach(() => {
   delete window.BC_CONTEXT;
 });
 
-it('renders nothing for a card with no upcoming order', () => {
-  renderRow(buildCardWith({ nextOrder: null, nextOrderDate: null }));
+it('offers Change card even when nothing is scheduled', async () => {
+  server.use(
+    http.get(`${ogBase}/payments/`, () =>
+      HttpResponse.json({ count: 0, next: null, previous: null, results: [] }),
+    ),
+  );
 
-  expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  const { user } = renderRow(buildCardWith({ nextOrder: null, nextOrderDate: null }));
+
+  await user.click(screen.getByRole('button', { name: 'Change card' }));
+
+  expect(screen.getByRole('dialog')).toHaveTextContent('Change card');
+  expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
 });
 
 // One dialog per case: opening and closing MUI dialogs costs real time, and a case that cycles

@@ -1,6 +1,7 @@
 import { QueryClient } from '@tanstack/react-query';
 import {
   buildOgOrderWith,
+  buildOgPaymentWith,
   buildOgSubscriptionWith,
   faker,
   http,
@@ -11,6 +12,7 @@ import {
 } from 'tests/test-utils';
 import type { MockInstance } from 'vitest';
 
+import { CardOption } from '@/shared/service/ssw/cardOptions';
 import { snackbar } from '@/utils/b3Tip';
 
 import { useSubscriptionActions } from './useSubscriptionActions';
@@ -171,4 +173,105 @@ it('uses the session copy when Ordergroove rejects the signature twice', async (
 
   await waitFor(() => expect(actions().sendNow.isError).toBe(true));
   expect(snackbar.error).toHaveBeenCalledWith('Your session has expired — please sign in again.');
+});
+
+describe('changeCard', () => {
+  const option = (over: Partial<CardOption> = {}): CardOption => ({
+    token: 'tok-b',
+    brand: 'VISA',
+    last4: '4242',
+    expiry: '03/2028',
+    isCurrent: false,
+    paymentId: null,
+    ...over,
+  });
+
+  it('reuses an existing record without creating one', async () => {
+    const created = vi.fn();
+    const repointed = vi.fn();
+    server.use(
+      http.post(`${ogBase}/payments/create/`, () => {
+        created();
+
+        return HttpResponse.json(buildOgPaymentWith('WHATEVER_VALUES'));
+      }),
+      http.patch(`${ogBase}/subscriptions/s-1/change_payment/`, async ({ request }) => {
+        repointed(await request.json());
+
+        return HttpResponse.json(buildOgSubscriptionWith('WHATEVER_VALUES'));
+      }),
+    );
+    const { customerId } = renderActions();
+
+    actions().changeCard.mutate({
+      subscriptionId: 's-1',
+      option: option({ paymentId: 'pay-b' }),
+      billingAddress: 'addr-1',
+    });
+
+    await waitFor(() => expect(actions().changeCard.isSuccess).toBe(true));
+    expect(created).not.toHaveBeenCalled();
+    expect(repointed).toHaveBeenCalledWith({ payment: 'pay-b' });
+    expect(invalidatedKeys()).toEqual([
+      ['ordergroove', customerId, 'subscriptions'],
+      ['ordergroove', customerId, 'upcoming'],
+      ['ordergroove', customerId, 'payments'],
+    ]);
+    expect(snackbar.success).toHaveBeenCalledWith('Card updated.');
+  });
+
+  it('creates a record from the card when Ordergroove has none, then repoints', async () => {
+    const created = vi.fn();
+    const repointed = vi.fn();
+    server.use(
+      http.post(`${ogBase}/payments/create/`, async ({ request }) => {
+        created(await request.json());
+
+        return HttpResponse.json(buildOgPaymentWith({ public_id: 'pay-new' }));
+      }),
+      http.patch(`${ogBase}/subscriptions/s-1/change_payment/`, async ({ request }) => {
+        repointed(await request.json());
+
+        return HttpResponse.json(buildOgSubscriptionWith('WHATEVER_VALUES'));
+      }),
+    );
+    const { customerId } = renderActions();
+
+    actions().changeCard.mutate({
+      subscriptionId: 's-1',
+      option: option(),
+      billingAddress: 'addr-1',
+    });
+
+    await waitFor(() => expect(actions().changeCard.isSuccess).toBe(true));
+    expect(created).toHaveBeenCalledWith({
+      customer: String(customerId),
+      token_id: 'tok-b',
+      cc_number_ending: '4242',
+      cc_exp_date: '03/2028',
+      cc_type: 1,
+      billing_address: 'addr-1',
+    });
+    expect(repointed).toHaveBeenCalledWith({ payment: 'pay-new' });
+  });
+
+  it('reports a failed repoint and leaves the cache alone', async () => {
+    server.use(
+      http.patch(
+        `${ogBase}/subscriptions/s-1/change_payment/`,
+        () => new HttpResponse(null, { status: 500 }),
+      ),
+    );
+    renderActions();
+
+    actions().changeCard.mutate({
+      subscriptionId: 's-1',
+      option: option({ paymentId: 'pay-b' }),
+      billingAddress: null,
+    });
+
+    await waitFor(() => expect(actions().changeCard.isError).toBe(true));
+    expect(invalidate).not.toHaveBeenCalled();
+    expect(snackbar.error).toHaveBeenCalledWith("We couldn't apply that change. Please try again.");
+  });
 });
