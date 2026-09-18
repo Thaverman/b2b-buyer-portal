@@ -406,16 +406,11 @@ it('offers actions only on active cards with an upcoming order', async () => {
       name: 'Skip',
     }),
   ).toBeInTheDocument();
-  expect(
-    within(screen.getByRole('group', { name: 'Unscheduled' })).queryByRole('button', {
-      name: 'Skip',
-    }),
-  ).not.toBeInTheDocument();
-  expect(
-    within(screen.getByRole('group', { name: 'Unscheduled' })).getByRole('button', {
-      name: 'Change card',
-    }),
-  ).toBeInTheDocument();
+  const unscheduledGroup = within(screen.getByRole('group', { name: 'Unscheduled' }));
+  expect(unscheduledGroup.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
+  expect(unscheduledGroup.queryByRole('button', { name: 'Send now' })).not.toBeInTheDocument();
+  expect(unscheduledGroup.queryByRole('button', { name: 'Change date' })).not.toBeInTheDocument();
+  expect(unscheduledGroup.getByRole('button', { name: 'Change card' })).toBeInTheDocument();
 
   await user.click(screen.getByRole('button', { name: '1 cancelled subscription' }));
   expect(

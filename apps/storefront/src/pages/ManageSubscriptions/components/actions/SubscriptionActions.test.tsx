@@ -81,6 +81,9 @@ it('offers Change card even when nothing is scheduled', async () => {
 
   expect(screen.getByRole('dialog')).toHaveTextContent('Change card');
   expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Send now' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Change date' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Change card' })).toBeInTheDocument();
 });
 
 // One dialog per case: opening and closing MUI dialogs costs real time, and a case that cycles
