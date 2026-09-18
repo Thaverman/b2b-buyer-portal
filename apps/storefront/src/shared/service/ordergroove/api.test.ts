@@ -13,6 +13,7 @@ import {
 } from 'tests/test-utils';
 
 import {
+  applyPaymentToAll,
   changeNextOrderDate,
   changeSubscriptionPayment,
   createPayment,
@@ -26,7 +27,6 @@ import {
   orderHistoryUrl,
   sendOrderNow,
   skipSubscription,
-  usePaymentForAll,
 } from './api';
 import { invalidateAuthorization } from './auth';
 
@@ -515,7 +515,7 @@ describe('payment changes', () => {
       }),
     );
 
-    await usePaymentForAll(someCustomerId(), 'pay-2');
+    await applyPaymentToAll(someCustomerId(), 'pay-2');
 
     expect(calls).toHaveBeenCalledWith('POST', '');
   });
@@ -527,7 +527,7 @@ describe('payment changes', () => {
         () => new HttpResponse(null, { status: 500 }),
       ),
     );
-    await expect(usePaymentForAll(someCustomerId(), 'pay-2')).rejects.toMatchObject({
+    await expect(applyPaymentToAll(someCustomerId(), 'pay-2')).rejects.toMatchObject({
       kind: 'upstream',
     });
 
@@ -536,7 +536,7 @@ describe('payment changes', () => {
         HttpResponse.json({ detail: 'Authentication Failed' }, { status: 403 }),
       ),
     );
-    await expect(usePaymentForAll(someCustomerId(), 'pay-2')).rejects.toMatchObject({
+    await expect(applyPaymentToAll(someCustomerId(), 'pay-2')).rejects.toMatchObject({
       kind: 'sessionExpired',
     });
   });

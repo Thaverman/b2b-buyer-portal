@@ -1,4 +1,5 @@
 export {
+  applyPaymentToAll,
   changeNextOrderDate,
   changeSubscriptionPayment,
   createPayment,
@@ -12,7 +13,6 @@ export {
   orderHistoryUrl,
   sendOrderNow,
   skipSubscription,
-  usePaymentForAll,
   withTimeout,
 } from './api';
 export { isCustomManagerAvailable, isSubscriptionsAvailable } from './config';

@@ -2,10 +2,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useB3Lang } from '@/lib/lang';
 import {
+  applyPaymentToAll,
   createPayment,
   listPayments,
   OrdergrooveError,
-  usePaymentForAll,
 } from '@/shared/service/ordergroove';
 import { buildCardOptions, CardOption, ccTypeFor } from '@/shared/service/ssw/cardOptions';
 import { listStoredInstruments } from '@/shared/service/ssw/customerClient';
@@ -59,9 +59,7 @@ export const useMoveSubscriptions = (
           })
         ).public_id;
 
-      // Not a hook despite the name: an Ordergroove API call from Task 2.
-      // eslint-disable-next-line react-hooks/rules-of-hooks
-      await usePaymentForAll(String(customerId), paymentId);
+      await applyPaymentToAll(String(customerId), paymentId);
     },
     onSuccess: async (_result, option) => {
       snackbar.success(

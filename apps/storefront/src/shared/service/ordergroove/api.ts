@@ -226,5 +226,5 @@ export const changeSubscriptionPayment = (
  * live 2026-09-18 (14 of 14 subscriptions, 12 of 12 orders), which is why the copy says
  * "all my subscriptions" rather than "these".
  */
-export const usePaymentForAll = (customerId: string, paymentId: string) =>
+export const applyPaymentToAll = (customerId: string, paymentId: string) =>
   ogMutate<unknown>(customerId, paymentUrl(paymentId, 'use_for_all'), 'POST');
