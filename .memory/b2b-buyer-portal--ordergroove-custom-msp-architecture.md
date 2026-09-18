@@ -336,3 +336,57 @@ real gateway tokens; otherwise last4/brand is a heuristic only.
   write refactor: the delete dialog still lists "14 active subscriptions" with names and
   frequencies, settled in 1274 ms. Zero mutating requests, zero failed requests, ONE auth mint per
   page load.
+
+## Phase 4 implemented (2026-09-18)
+
+- A customer can move a subscription onto another saved card from its card, and move every
+  subscription off a card from the delete dialog before deleting it. Service:
+  `createPayment` / `changeSubscriptionPayment` / `applyPaymentToAll` in
+  `shared/service/ordergroove/api.ts`. TWO reference claims are WRONG about the live API, both
+  settled by the Task 0 probe: an upcoming order DOES follow its subscription's new payment (so no
+  order-level repoint is needed — `changeOrderPayment` was never built), and `use_for_all` answers
+  200 with a parseable JSON body, not the documented empty response (so no no-content helper was
+  needed — `applyPaymentToAll` is a plain `ogMutate`). It moved 14 of 14 subscriptions and 12 of 12
+  upcoming orders.
+- Reuse before create: only a LIVE record whose token_id matches is reusable, because Ordergroove
+  mints a record per checkout and keeps records for cards BigCommerce no longer has. Creating is
+  ONE-WAY — there is no delete, only deactivate — so the live probe never creates one.
+- The SSW customer middleware client now lives at `shared/service/ssw/customerClient.ts`; the
+  payment-methods page keeps only its own actions. `CardOption` / `buildCardOptions` / `ccTypeFor` /
+  `formatExpiry` live in the same directory, `shared/service/ssw/cardOptions.ts` — shared rather than
+  in either page's view model, because both `/manage-subscriptions` and `/payment-methods` let a
+  customer pick a card, and a page importing another page's view model fails dependency-cruiser.
+- The service function is named `applyPaymentToAll`, not the spec's original `usePaymentForAll` —
+  the `use` prefix reads as a React hook name, which it is not; it is an ordinary async call.
+- Two vendor-documentation contradictions, both worth remembering beyond this feature: (1) the
+  Ordergroove REST reference says an upcoming order's payment is silent on whether it follows a
+  `change_payment` call on its subscription — live behaviour is that it DOES follow automatically,
+  removing the need for any order-level repoint. (2) the reference says `POST
+  /payments/{id}/use_for_all/` answers 200 with an empty body — live behaviour is 200 with a
+  parseable (if empty-object) JSON body, so code written defensively around an unparseable response
+  is unnecessary and was never built.
+- Task 0 findings: (A) an already-generated upcoming order follows its subscription's new payment
+  automatically (`change_payment` on the subscription moved the order's `payment` too, order stayed
+  upcoming; both writes were reversed). (B) record inventory: 8 payment records, 4 distinct tokens,
+  4 live, 4 dead, 1 token carrying more than one record. (C) `use_for_all` returned 200 with a
+  parseable JSON body, not empty; moved 14 of 14 active subscriptions and 12 of 12 upcoming orders;
+  fully reversed.
+- Live check (2026-09-18, sandbox, customer 80591, deploy-flavour build routed over
+  `/content/b2bBuyerPortal/dist/`, no BC_CONTEXT injection): the last card's subscription was
+  repointed from the 3/2028 card to the 08/2027 card through the real Change card dialog and back.
+  Picker listed all three saved cards with exactly one marked "(current)"; snackbar "Card updated.";
+  the card line changed and changed back. The delete dialog showed the 14-subscription warning AND
+  the move offer listing only the OTHER two cards (the card being deleted is correctly excluded);
+  cancelled without moving and WITHOUT ever clicking Delete. Zero `use_for_all`, zero
+  `DeleteStoredInstrument`, zero failed requests. Account verified back to 14-of-14 on one record.
+- REUSE-BEFORE-CREATE PROVEN LIVE across two runs: run 1 fired `POST /payments/create/` because
+  Ordergroove held no live record for the 08/2027 card (body carried `token_id`, `cc_number_ending`,
+  `cc_exp_date`, `cc_type: 1` and `billing_address`); run 2 repointed to the SAME card with only
+  `change_payment` and no create, because run 1's record now exists. That spare record cannot be
+  deleted — Ordergroove has no delete for payment records — so the fixture account now carries one
+  extra live record for that token. Expected and documented, not a defect.
+- SCRAPER GOTCHA for future live checks: the subscription CARD line prints Ordergroove's raw
+  `cc_exp_date` ("3/2028") while the card PICKER prints `formatExpiry`'s zero-padded form
+  ("03/2028"), so the two never match as strings. A first run aborted between its two repoints on
+  exactly that mismatch and left one subscription on the wrong card until a restore script moved it
+  back. Match the picker's own "(current)" label instead of the card line.

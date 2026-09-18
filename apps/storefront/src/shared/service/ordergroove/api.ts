@@ -54,10 +54,7 @@ const request = async (
   return response;
 };
 
-const parse = async <T>(response: Response): Promise<T> => {
-  if (response.ok) {
-    return response.json() as Promise<T>;
-  }
+const throwForFailure = (response: Response): never => {
   if (response.status === 401 || response.status === 403) {
     throw new OrdergrooveError('sessionExpired');
   }
@@ -65,6 +62,29 @@ const parse = async <T>(response: Response): Promise<T> => {
     throw new OrdergrooveError('rateLimited');
   }
   throw new OrdergrooveError('upstream');
+};
+
+const parse = async <T>(response: Response): Promise<T> => {
+  if (response.ok) {
+    return response.json() as Promise<T>;
+  }
+
+  return throwForFailure(response);
+};
+
+// Tolerates the empty body the vendor documents (spec §3.1): unlike `parse`, an empty 200 resolves
+// instead of `response.json()` throwing a raw SyntaxError.
+const parseAllowingEmptyBody = async (response: Response): Promise<void> => {
+  if (response.ok) {
+    const text = await response.text();
+    if (text) {
+      JSON.parse(text);
+    }
+
+    return;
+  }
+
+  throwForFailure(response);
 };
 
 const ogFetch = async <T>(customerId: string, url: string): Promise<T> =>
@@ -76,6 +96,12 @@ const ogMutate = async <T>(
   method: Write['method'],
   body?: object,
 ): Promise<T> => parse<T>(await request(customerId, url, true, { method, body }));
+
+const ogMutateAllowingEmptyBody = async (
+  customerId: string,
+  url: string,
+  method: Write['method'],
+): Promise<void> => parseAllowingEmptyBody(await request(customerId, url, true, { method }));
 
 // Every Ordergroove list is paginated; `next` is an absolute URL or null. Recursive rather than a
 // loop so there is no await-in-loop; a customer has a handful of pages at most.
@@ -181,3 +207,50 @@ export const changeNextOrderDate = (
     'PATCH',
     { order_date: orderDate },
   );
+
+const paymentUrl = (paymentId: string, action: string) =>
+  `${API_BASE}/payments/${encodeURIComponent(paymentId)}/${action}/`;
+
+/** A BigCommerce stored instrument, in the shape Ordergroove's create endpoint wants. */
+interface NewPaymentInput {
+  /** the BigCommerce stored-instrument token — Ordergroove's token_id, byte for byte (spec §11.2) */
+  tokenId: string;
+  last4: string;
+  /** "MM/YYYY", zero-padded */
+  expiry: string;
+  /** Ordergroove credit-card type code; omitted for a brand we do not map */
+  ccType?: number;
+  /** the billing address of the subscription's current record, when known */
+  billingAddress?: string;
+}
+
+/**
+ * Registers a card Ordergroove does not hold yet. One-way: Ordergroove has no delete for payment
+ * records, so callers must look for a live record with the same token first (spec §5).
+ */
+export const createPayment = (customerId: string, input: NewPaymentInput) =>
+  ogMutate<OgPayment>(customerId, `${API_BASE}/payments/create/`, 'POST', {
+    customer: customerId,
+    token_id: input.tokenId,
+    cc_number_ending: input.last4,
+    cc_exp_date: input.expiry,
+    ...(input.ccType === undefined ? {} : { cc_type: input.ccType }),
+    ...(input.billingAddress === undefined ? {} : { billing_address: input.billingAddress }),
+  });
+
+export const changeSubscriptionPayment = (
+  customerId: string,
+  subscriptionId: string,
+  paymentId: string,
+) =>
+  ogMutate<OgSubscription>(customerId, subscriptionUrl(subscriptionId, 'change_payment'), 'PATCH', {
+    payment: paymentId,
+  });
+
+/**
+ * Moves every subscription AND every upcoming order of the customer onto this record — verified
+ * live 2026-09-18 (14 of 14 subscriptions, 12 of 12 orders), which is why the copy says
+ * "all my subscriptions" rather than "these".
+ */
+export const applyPaymentToAll = (customerId: string, paymentId: string) =>
+  ogMutateAllowingEmptyBody(customerId, paymentUrl(paymentId, 'use_for_all'), 'POST');

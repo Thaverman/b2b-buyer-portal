@@ -9,6 +9,7 @@ import {
   OgProduct,
   OgSubscription,
 } from '@/shared/service/ordergroove';
+import { CARD_BRANDS } from '@/shared/service/ssw/cardOptions';
 import { formatOrderId } from '@/utils/orderId';
 
 interface ProductSummary {
@@ -64,6 +65,10 @@ export interface SubscriptionCard {
   /** Ordergroove address public_id the subscription ships to */
   shippingAddressId: string;
   payment: PaymentSummary | null;
+  /** the Ordergroove payment record this subscription charges today */
+  paymentId: string;
+  /** that record's billing address, carried onto a new record; null until payments load */
+  billingAddressId: string | null;
   /** Ordergroove timestamp when cancelled; null for active cards and for retired ones with no date */
   cancelledOn: string | null;
 }
@@ -90,16 +95,6 @@ export interface RecentOrder {
   /** the merchant's rejection message, failed orders only */
   message: string | null;
 }
-
-// Ordergroove reference "Credit Card Types".
-const CARD_BRANDS: Record<number, string> = {
-  1: 'Visa',
-  2: 'Mastercard',
-  3: 'American Express',
-  4: 'Discover',
-  5: 'Diners',
-  6: 'JCB',
-};
 
 // Ordergroove reference "Order Status Codes" (spec §4.3).
 const SUCCESS_STATUS = 5;
@@ -252,6 +247,8 @@ export const buildSubscriptionCards = (
       shippingAddress: address ? summarizeAddress(address) : null,
       shippingAddressId: subscription.shipping_address,
       payment: payment ? summarizePayment(payment) : null,
+      paymentId: subscription.payment,
+      billingAddressId: payment?.billing_address ?? null,
       cancelledOn: subscription.cancelled,
     };
   };

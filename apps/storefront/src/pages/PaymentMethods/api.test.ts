@@ -1,10 +1,10 @@
 import { assertQueryParams, http, HttpResponse, startMockServer } from 'tests/test-utils';
 
+import { listStoredInstruments, PaymentMethodsError } from '@/shared/service/ssw/customerClient';
+
 import {
   deleteStoredInstrument,
   getBraintreeClientToken,
-  listStoredInstruments,
-  PaymentMethodsError,
   setDefaultStoredInstrument,
   vaultBraintreeInstrument,
 } from './api';

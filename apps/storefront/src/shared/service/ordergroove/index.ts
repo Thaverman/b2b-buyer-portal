@@ -1,5 +1,8 @@
 export {
+  applyPaymentToAll,
   changeNextOrderDate,
+  changeSubscriptionPayment,
+  createPayment,
   getProduct,
   getSubscriptionsUsingToken,
   listAddresses,

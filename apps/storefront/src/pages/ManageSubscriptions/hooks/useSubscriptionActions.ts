@@ -3,11 +3,21 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useB3Lang } from '@/lib/lang';
 import {
   changeNextOrderDate,
+  changeSubscriptionPayment,
+  createPayment,
   OrdergrooveError,
   sendOrderNow,
   skipSubscription,
 } from '@/shared/service/ordergroove';
+import { CardOption, ccTypeFor } from '@/shared/service/ssw/cardOptions';
 import { snackbar } from '@/utils/b3Tip';
+
+interface ChangeCardVariables {
+  subscriptionId: string;
+  option: CardOption;
+  /** billing address of the subscription's current record, carried onto a new one */
+  billingAddress: string | null;
+}
 
 /**
  * The three 3a writes as mutations. Success re-reads the resources a write changes and confirms
@@ -66,5 +76,33 @@ export const useSubscriptionActions = (customerId: number) => {
     onError,
   });
 
-  return { skip, sendNow, changeDate };
+  const changeCard = useMutation({
+    mutationFn: async ({ subscriptionId, option, billingAddress }: ChangeCardVariables) => {
+      // Reuse before create: Ordergroove cannot delete a payment record (spec §1 decision 3).
+      const paymentId =
+        option.paymentId ??
+        (
+          await createPayment(id, {
+            tokenId: option.token,
+            last4: option.last4,
+            expiry: option.expiry,
+            ccType: ccTypeFor(option.brand),
+            ...(billingAddress === null ? {} : { billingAddress }),
+          })
+        ).public_id;
+
+      // The upcoming order follows the subscription on its own (Task 0 finding A), so this is
+      // the only repoint needed.
+      await changeSubscriptionPayment(id, subscriptionId, paymentId);
+    },
+    onSuccess: () =>
+      succeed('subscriptions.actions.changeCard.success', ['subscriptions', 'upcoming']),
+    // On settle, not only on success: a failed repoint can still follow a successful create, and
+    // Ordergroove has no delete for payment records, so the retry must see that created record
+    // rather than create a second, permanent one (spec §8).
+    onSettled: () => refresh(['payments']),
+    onError,
+  });
+
+  return { skip, sendNow, changeDate, changeCard };
 };

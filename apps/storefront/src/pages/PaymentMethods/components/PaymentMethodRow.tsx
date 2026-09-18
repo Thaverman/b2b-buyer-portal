@@ -1,8 +1,7 @@
 import { Box, Button, Card, CardContent, Chip, Typography } from '@mui/material';
 
 import { useB3Lang } from '@/lib/lang';
-
-import { StoredInstrument } from '../api';
+import { StoredInstrument } from '@/shared/service/ssw/customerClient';
 
 interface PaymentMethodRowProps {
   instrument: StoredInstrument;

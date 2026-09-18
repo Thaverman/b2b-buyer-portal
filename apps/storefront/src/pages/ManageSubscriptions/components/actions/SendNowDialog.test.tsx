@@ -29,6 +29,8 @@ const buildCardWith = builder<SubscriptionCardModel>(() => ({
   shippingAddress: null,
   shippingAddressId: faker.string.hexadecimal({ length: 32, prefix: '' }),
   payment: null,
+  paymentId: 'pay-a',
+  billingAddressId: 'addr-1',
   cancelledOn: null,
 }));
 

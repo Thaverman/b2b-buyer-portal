@@ -15,10 +15,11 @@ import {
 } from '@mui/material';
 
 import { useB3Lang } from '@/lib/lang';
+import { PaymentMethodsError } from '@/shared/service/ssw/customerClient';
 import { useAppSelector } from '@/store';
 import { themeFrameSelector } from '@/store/selectors';
 
-import { PaymentMethodsError, vaultBraintreeInstrument } from '../api';
+import { vaultBraintreeInstrument } from '../api';
 import {
   BillingCountryOption,
   BillingFormValues,

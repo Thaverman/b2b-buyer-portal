@@ -70,66 +70,40 @@ rule, so splitting them would duplicate the interesting part and test it twice.
 
 ## 3. Service
 
-### 3.1 A no-content helper
+### 3.1 No no-content helper needed
 
-`POST /payments/{id}/use_for_all/` answers **200 with an empty body**. Today's `parse()` always calls
-`response.json()`, which rejects on an empty body — and because `ogMutate` does not wrap that
-rejection, a *successful* move would surface as a raw `SyntaxError`, miss the `OrdergrooveError`
-branch in the hook's `onError`, and show the customer a failure. Split the status mapping out:
-
-```ts
-const assertOk = (response: Response) => {
-  if (response.ok) {
-    return;
-  }
-  if (response.status === 401 || response.status === 403) {
-    throw new OrdergrooveError('sessionExpired');
-  }
-  if (response.status === 429) {
-    throw new OrdergrooveError('rateLimited');
-  }
-  throw new OrdergrooveError('upstream');
-};
-
-const parse = async <T>(response: Response): Promise<T> => {
-  assertOk(response);
-
-  return response.json() as Promise<T>;
-};
-
-/** For endpoints that answer 200 with no body. */
-const ogMutateNoContent = async (
-  customerId: string,
-  url: string,
-  method: Write['method'],
-  body?: object,
-): Promise<void> => {
-  assertOk(await request(customerId, url, true, { method, body }));
-};
-```
-
-`ogFetch` and `ogMutate` keep their behaviour; only the mapping moves.
+The reference says `POST /payments/{id}/use_for_all/` answers **200 with an empty body**, which
+would make `response.json()` reject on a successful call and required a separate no-content helper
+(`ogMutateNoContent`) to keep that rejection from surfacing as a raw `SyntaxError` instead of the
+customer-facing snackbar. **Task 0's live probe found this claim wrong**: the call answers 200 with
+a parseable JSON body (an empty object). `ogMutateNoContent` and the `assertOk` split described here
+were therefore never built — `usePaymentForAll` (renamed `applyPaymentToAll`, §3.2) is a plain
+`ogMutate` like every other write, and `parse` is untouched.
 
 ### 3.2 Endpoints
 
-All four accept Storefront scope (reference, §11.1).
+All three accept Storefront scope (reference, §11.1).
 
 | Function | Call | Body |
 |---|---|---|
 | `createPayment(customerId, input)` → `OgPayment` | `POST /payments/create/` | see §3.3 |
 | `changeSubscriptionPayment(customerId, subscriptionId, paymentId)` → `OgSubscription` | `PATCH /subscriptions/{id}/change_payment/` | `{ payment }` |
-| `changeOrderPayment(customerId, orderId, paymentId)` → `OgOrder` | `PATCH /orders/{id}/change_payment/` | `{ payment }` |
-| `usePaymentForAll(customerId, paymentId)` → `void` | `POST /payments/{id}/use_for_all/` | none |
+| `applyPaymentToAll(customerId, paymentId)` → `unknown` | `POST /payments/{id}/use_for_all/` | none |
 
-`changeOrderPayment` exists because of the open question in §9.1: the reference does not say whether
-an already-generated upcoming order follows its subscription's new payment. **If the probe shows it
-does, delete `changeOrderPayment` before implementing** — the plan's Task 0 decides, and the spec is
-written so the answer removes code rather than adding it.
+`changeOrderPayment(customerId, orderId, paymentId)` → `PATCH /orders/{id}/change_payment/` is
+**struck from this table.** §9.1 planned it for the open question of whether an already-generated
+upcoming order follows its subscription's new payment. **Task 0's live probe found it does**:
+repointing a subscription with `change_payment` moved its upcoming order's `payment` along with it,
+with the order staying upcoming. `changeOrderPayment` was therefore never built, and the hook (§6.1)
+carries no order id.
+
+The function is named `applyPaymentToAll`, not the `usePaymentForAll` this spec originally used —
+the `use` prefix reads as a React hook, which it is not.
 
 ### 3.3 Creating a record
 
 ```ts
-export interface NewPaymentInput {
+interface NewPaymentInput {
   /** the BigCommerce stored-instrument token — Ordergroove's token_id, byte for byte (spike §2) */
   tokenId: string;
   last4: string;
@@ -174,7 +148,13 @@ tests.
 the customer payment-method middleware, including the `declined` kind — and renaming it would churn
 every call site for no gain.
 
-## 5. View model (pure, `viewModel.ts`)
+## 5. View model (pure)
+
+`CardOption`, `buildCardOptions`, `ccTypeFor` and `formatExpiry` live in the **shared**
+`src/shared/service/ssw/cardOptions.ts`, not in `ManageSubscriptions/viewModel.ts` as originally
+laid out here — both `/manage-subscriptions` and `/payment-methods` let a customer pick a card, and
+a page importing another page's view model fails dependency-cruiser. `viewModel.ts` keeps only the
+two new `SubscriptionCard` fields (`paymentId`, `billingAddressId`) that feed `buildCardOptions`.
 
 ```ts
 export interface CardOption {
@@ -231,12 +211,19 @@ accepts `MM/YYYY`; we send the documented form.
 | Element | Behaviour |
 |---|---|
 | Body | A `RadioGroup` of `CardOption`s, each "Visa ending in 1111 · exp 3/2028"; the current one preselected and suffixed "(current)". |
-| Only one saved card | No radio list. A line explaining there are no other saved cards, and a link to the payment methods page in the top window (`target="_top"`, the ThemeFrame rule). Save hidden. |
+| Only one saved card | No radio list. A line explaining there are no other saved cards, followed by a **button** — not the anchor originally planned here — that navigates to `/payment-methods`. Save hidden. |
 | Right button | `Save`, disabled until the selection differs from the current card, spinner while pending. |
 | Left button | `global.dialog.cancel`; ignored while pending. |
 
-On confirm: resolve or create the record, repoint the subscription, repoint its upcoming order if
-§9.1 says orders do not follow, refresh `subscriptions`, `upcoming` and `payments`, snackbar, close.
+`/payment-methods` is a portal route, not a storefront page, so the link leaves the SPA nowhere —
+it navigates inside the app via the router, the same pattern `DeleteSubscriptionWarning` already
+uses, and does not need `target="_top"`. The sentence is also split into two rendered nodes because
+`b3Lang` interpolation takes only strings, not React elements: `onlyCard` renders with its `{link}`
+placeholder passed as `''`, and the button renders as a sibling immediately after it, labelled by
+the separate `onlyCardLink` key.
+
+On confirm: resolve or create the record, repoint the subscription, refresh `subscriptions`,
+`upcoming` and `payments`, snackbar, close. There is no order-level repoint (§3.2, §9.1 finding A).
 
 ### 6.2 Move before delete, on payment methods
 
@@ -303,6 +290,11 @@ It answers one question and confirms two facts.
    - Order's `payment` changed → **delete `changeOrderPayment`** from §3.2 and skip it in the hook.
    - Order's `payment` unchanged → keep it; the hook repoints the order too, and the copy is
      unaffected.
+
+   **Outcome: the order's `payment` changed.** The probe (2026-09-18) repointed a subscription due
+   2027-07-17 and its already-generated upcoming order moved to the new record while staying
+   upcoming; the restore moved both back. `changeOrderPayment` was deleted from §3.2 before it was
+   ever implemented, and the change-card mutation (§6.1) carries no order id.
 2. **Record inventory.** `GET /payments/` — confirm the account still shows several records sharing
    a token and at least one non-live record, so the §5 reuse rule has live coverage.
 3. **`use_for_all` round trip.** All fourteen active subscriptions currently share one record, so
@@ -365,10 +357,12 @@ record that it leaves one spare record on the fixture account.
   "Associates provided payment to all orders and subscriptions of a customer."
 - `PATCH /orders/{id}/change_payment/` — "changes the payment method and associated billing address".
 
-### 11.2 Carried from the 2026-09-15 spike (program spec §2)
+### 11.2 Live inventory (Task 0 probe, 2026-09-18, replaces the 2026-09-15 spike's remembered numbers)
 
-The BigCommerce stored-instrument `token` **is** Ordergroove's `token_id`, byte for byte. Ordergroove
-mints a new payment record per checkout, so several records share one token and five of eight did on
-the fixture account; it also keeps records for cards BigCommerce no longer has, so it held four
-token ids against BigCommerce's three instruments. Both facts are why §5 reuses only **live** records
-and matches on token rather than on last four digits.
+The BigCommerce stored-instrument `token` **is** Ordergroove's `token_id`, byte for byte. The
+fixture account (customer 80591) held **8** payment records across **4** distinct tokens: **4**
+live, **4** dead, and **1** token carrying more than one record — Ordergroove mints a new payment
+record per checkout, and keeps records for cards BigCommerce no longer has. Both facts are why §5
+reuses only **live** records and matches on token rather than on last four digits, and both shapes
+(a live record for the token, only a dead record) had real coverage on the account for Task 0 to
+probe against.
