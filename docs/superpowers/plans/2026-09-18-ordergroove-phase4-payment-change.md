@@ -42,8 +42,9 @@
 | File | Responsibility |
 |---|---|
 | `src/shared/service/ssw/customerClient.ts` | **new** — the SSW customer-middleware transport: config, `PaymentMethodsError`, `fetchJson`, `post`, `StoredInstrument`, `listStoredInstruments` |
+| `src/shared/service/ssw/cardOptions.ts` | **new** — `CardOption`, `buildCardOptions`, `ccTypeFor`, `formatExpiry`; shared because both pages pick a card (preflight ruling 1) |
 | `src/pages/PaymentMethods/api.ts` | keeps the page's own actions (`setDefault`, `delete`, Braintree), importing the transport |
-| `src/shared/service/ordergroove/api.ts` | `assertOk`, `ogMutateNoContent`, `createPayment`, `changeSubscriptionPayment`, `changeOrderPayment`, `usePaymentForAll` |
+| `src/shared/service/ordergroove/api.ts` | `createPayment`, `changeSubscriptionPayment`, `usePaymentForAll` |
 | `src/shared/service/ordergroove/index.ts` | barrel: the four calls and `NewPaymentInput` |
 | `src/pages/ManageSubscriptions/viewModel.ts` | `CardOption`, `buildCardOptions`, `ccTypeFor`, `formatExpiry` |
 | `src/pages/ManageSubscriptions/hooks/useSubscriptionActions.ts` | the `changeCard` mutation and its resolve-or-create |
@@ -186,13 +187,12 @@ Expected: every `->` shows `200`; both restore lines report `true`. If a restore
 
 - [ ] **Step 3: Record the findings here** (edit this file; Tasks 2, 4 and 5 read these lines)
 
-- Finding A — **does the already-generated upcoming order follow the subscription?** `[ ] yes, order.payment moved` / `[ ] no, order.payment unchanged`.
-  - **yes** → delete `changeOrderPayment` from Task 2 entirely, and drop the order step from Task 4's mutation and its test.
-  - **no** → keep both; the change-card flow repoints the upcoming order after the subscription.
-- Finding B — record inventory: ___ records, ___ distinct tokens, ___ live, ___ dead, ___ tokens carrying more than one record. Task 3's reuse tests mirror these shapes.
-- Finding C — `use_for_all`: status ___, empty body `[ ] yes` / `[ ] no`, moved ___ of ___ active subscriptions and ___ of ___ upcoming orders, restored `[ ] yes` / `[ ] no`. The empty-body answer is what Task 2's no-content helper exists for; if the body is **not** empty, simplify `usePaymentForAll` to a normal `ogMutate` and say so at Task 6.
+- Finding A — **does the already-generated upcoming order follow the subscription?** `[x] yes, order.payment moved`. Run 2026-09-18: `change_payment` on a subscription due 2027-07-17 returned 200, and the upcoming order's `payment` moved with it while the order stayed upcoming; the restore moved both back. **Consequence: `changeOrderPayment` is deleted from Task 2, and Task 4's mutation and variables carry no `orderId`.**
+- Finding B — record inventory: **8** records, **4** distinct tokens, **4** live, **4** dead, **1** token carrying more than one record. Live and dead records both exist, so Task 3's reuse tests have live coverage for all three shapes.
+- Finding C — `use_for_all`: status **200**, empty body **no — it returns parseable JSON**, moved **14 of 14** active subscriptions and **12 of 12** upcoming orders, restored **yes**. **Consequence: `ogMutateNoContent` and the `assertOk` split are deleted from Task 2 — `usePaymentForAll` is a plain `ogMutate`.** The reference's "empty response" is wrong about the live API.
+- Both live writes were reversible and were reversed: the subject subscription is back on its original record, and all fourteen subscriptions are back on the record they started on.
 
-- [ ] **Step 4: Delete nothing, commit nothing.** The script stays in scratch.
+- [x] **Step 4: Delete nothing, commit nothing.** The script stays in scratch.
 
 ---
 
@@ -286,7 +286,12 @@ git commit -m "refactor: B2B-0000 Lift the SSW customer middleware client into a
 
 ---
 
-### Task 2: Service — the no-content helper and the four payment calls
+### Task 2: Service — the three payment calls
+
+> **Simplified by Task 0.** Finding A: an upcoming order follows its subscription, so there is no
+> `changeOrderPayment`. Finding C: `use_for_all` answers 200 with parseable JSON, not an empty body,
+> so there is no `ogMutateNoContent` and no `assertOk` split — `parse` stays exactly as it is and
+> every call below is a plain `ogMutate`.
 
 **Files:**
 - Modify: `apps/storefront/src/shared/service/ordergroove/api.ts`
@@ -294,15 +299,14 @@ git commit -m "refactor: B2B-0000 Lift the SSW customer middleware client into a
 - Test: `apps/storefront/src/shared/service/ordergroove/api.test.ts`
 
 **Interfaces:**
-- Consumes: `request`, `OrdergrooveError`, `OgOrder`, `OgPayment`, `OgSubscription` (existing).
+- Consumes: `request`, `ogMutate`, `OrdergrooveError`, `OgPayment`, `OgSubscription` (existing).
 - Produces:
   - `interface NewPaymentInput { tokenId: string; last4: string; expiry: string; ccType?: number; billingAddress?: string }`
   - `createPayment(customerId: string, input: NewPaymentInput): Promise<OgPayment>`
   - `changeSubscriptionPayment(customerId: string, subscriptionId: string, paymentId: string): Promise<OgSubscription>`
-  - `changeOrderPayment(customerId: string, orderId: string, paymentId: string): Promise<OgOrder>` — **omit entirely if Task 0 finding A is "yes"**
-  - `usePaymentForAll(customerId: string, paymentId: string): Promise<void>`
+  - `usePaymentForAll(customerId: string, paymentId: string): Promise<unknown>`
 
-- [ ] **Step 1: Write the failing tests** — append to `api.test.ts`, adding `changeOrderPayment`, `changeSubscriptionPayment`, `createPayment`, `usePaymentForAll` to the existing `from './api'` import list (alphabetical), and `buildOgSubscriptionWith` is already imported.
+- [ ] **Step 1: Write the failing tests** — append to `api.test.ts`, adding `changeSubscriptionPayment`, `createPayment`, `usePaymentForAll` to the existing `from './api'` import list (alphabetical), and `buildOgSubscriptionWith` is already imported.
 
 ```ts
 describe('payment changes', () => {
@@ -373,37 +377,23 @@ describe('payment changes', () => {
     expect(received).toHaveBeenCalledWith({ payment: 'pay-2' });
   });
 
-  it('repoints one upcoming order at a payment record', async () => {
-    const received = vi.fn();
-    const order = buildOgOrderWith({ status: 1, payment: 'pay-2' });
-    server.use(
-      http.patch(`${ogBase}/orders/order-1/change_payment/`, async ({ request }) => {
-        received(await request.json());
-
-        return HttpResponse.json(order);
-      }),
-    );
-
-    expect(await changeOrderPayment(someCustomerId(), 'order-1', 'pay-2')).toEqual(order);
-    expect(received).toHaveBeenCalledWith({ payment: 'pay-2' });
-  });
-
-  it('uses a payment for everything and tolerates the empty 200 body', async () => {
+  it('uses a payment for every subscription and order the customer has', async () => {
     const calls = vi.fn();
     server.use(
       http.post(`${ogBase}/payments/pay-2/use_for_all/`, async ({ request }) => {
         calls(request.method, await request.text());
 
-        // Ordergroove answers 200 with no body at all — parsing it as JSON would throw.
-        return new HttpResponse(null, { status: 200 });
+        // Verified live 2026-09-18: 200 with a parseable JSON body, and it moves orders too.
+        return HttpResponse.json({});
       }),
     );
 
-    await expect(usePaymentForAll(someCustomerId(), 'pay-2')).resolves.toBeUndefined();
+    await usePaymentForAll(someCustomerId(), 'pay-2');
+
     expect(calls).toHaveBeenCalledWith('POST', '');
   });
 
-  it('still maps failures on the no-content call', async () => {
+  it('maps failures on the use-for-all call', async () => {
     server.use(
       http.post(`${ogBase}/payments/pay-2/use_for_all/`, () => new HttpResponse(null, { status: 500 })),
     );
@@ -423,53 +413,12 @@ describe('payment changes', () => {
 });
 ```
 
-If Task 0 finding A is "yes", delete the `repoints one upcoming order` case along with the function.
-
 - [ ] **Step 2: Run the file to verify the new tests fail**
 
 Run: `yarn vitest run src/shared/service/ordergroove/api.test.ts`
 Expected: the new cases fail — `createPayment is not a function` and siblings. The existing cases stay green.
 
-- [ ] **Step 3: Split the status mapping out of `parse`** in `api.ts` — replace the existing `parse` with:
-
-```ts
-const assertOk = (response: Response) => {
-  if (response.ok) {
-    return;
-  }
-  if (response.status === 401 || response.status === 403) {
-    throw new OrdergrooveError('sessionExpired');
-  }
-  if (response.status === 429) {
-    throw new OrdergrooveError('rateLimited');
-  }
-  throw new OrdergrooveError('upstream');
-};
-
-const parse = async <T>(response: Response): Promise<T> => {
-  assertOk(response);
-
-  return response.json() as Promise<T>;
-};
-
-/**
- * For endpoints that answer 200 with no body — `use_for_all` is the only one today. Parsing an
- * empty body as JSON throws, and that rejection would escape as a SyntaxError rather than an
- * OrdergrooveError, so a successful call would report a failure to the customer.
- */
-const ogMutateNoContent = async (
-  customerId: string,
-  url: string,
-  method: Write['method'],
-  body?: object,
-): Promise<void> => {
-  assertOk(await request(customerId, url, true, { method, body }));
-};
-```
-
-`ogFetch` and `ogMutate` keep their bodies; only the mapping moved.
-
-- [ ] **Step 4: Add the four calls** at the end of `api.ts`, beside the Phase 3a actions:
+- [ ] **Step 3: Add the three calls** at the end of `api.ts`, beside the Phase 3a actions. Nothing else in `api.ts` changes — `parse`, `ogFetch` and `ogMutate` are untouched:
 
 ```ts
 const paymentUrl = (paymentId: string, action: string) =>
@@ -514,20 +463,21 @@ export const changeSubscriptionPayment = (
     { payment: paymentId },
   );
 
-/** An order already generated keeps its own payment; repoint it too (Task 0 finding A). */
-export const changeOrderPayment = (customerId: string, orderId: string, paymentId: string) =>
-  ogMutate<OgOrder>(customerId, orderUrl(orderId, 'change_payment'), 'PATCH', {
-    payment: paymentId,
-  });
-
-/** Moves every subscription AND every order of the customer onto this record. 200, empty body. */
+/**
+ * Moves every subscription AND every upcoming order of the customer onto this record — verified
+ * live 2026-09-18 (14 of 14 subscriptions, 12 of 12 orders), which is why the copy says
+ * "all my subscriptions" rather than "these".
+ */
 export const usePaymentForAll = (customerId: string, paymentId: string) =>
-  ogMutateNoContent(customerId, paymentUrl(paymentId, 'use_for_all'), 'POST');
+  ogMutate<unknown>(customerId, paymentUrl(paymentId, 'use_for_all'), 'POST');
 ```
 
-- [ ] **Step 5: Export from the barrel** — in `index.ts` add `changeOrderPayment`, `changeSubscriptionPayment`, `createPayment`, `usePaymentForAll` to the `from './api'` list (alphabetical) and `NewPaymentInput` to the `export type` list.
+An upcoming order follows its subscription's new payment on its own (Task 0 finding A), so there is
+no order-level repoint here.
 
-- [ ] **Step 6: Run the file to verify it passes**
+- [ ] **Step 4: Export from the barrel** — in `index.ts` add `changeSubscriptionPayment`, `createPayment`, `usePaymentForAll` to the `from './api'` list (alphabetical) and `NewPaymentInput` to the `export type` list.
+
+- [ ] **Step 5: Run the file to verify it passes**
 
 Run: `yarn vitest run src/shared/service/ordergroove/api.test.ts`
 Expected: every case passes, the pre-existing ones included.
@@ -543,21 +493,37 @@ git commit -m "feat: B2B-0000 Add the Ordergroove payment create, repoint and us
 
 ---
 
-### Task 3: View model — card options, card-type codes, expiry
+### Task 3: Card options module, and the two card fields the pickers need
+
+> **Two preflight rulings shape this task.** (1) `CardOption` and its helpers live in a **shared**
+> module, not in the subscriptions page's view model, because both pages pick a card — a page
+> importing another page's view model would fail dependency-cruiser. (2) The `paymentId` and
+> `billingAddressId` fields on `SubscriptionCard` belong here, with the rest of the view-model work,
+> rather than inside the UI task that consumes them.
 
 **Files:**
-- Modify: `apps/storefront/src/pages/ManageSubscriptions/viewModel.ts`
+- Create: `apps/storefront/src/shared/service/ssw/cardOptions.ts`
+- Create: `apps/storefront/src/shared/service/ssw/cardOptions.test.ts`
+- Modify: `apps/storefront/src/pages/ManageSubscriptions/viewModel.ts` (two new `SubscriptionCard` fields)
 - Test: `apps/storefront/src/pages/ManageSubscriptions/viewModel.test.ts`
+- Modify (card builders gain the two fields): `components/SubscriptionCard.test.tsx`, `components/actions/SkipDialog.test.tsx`, `components/actions/SendNowDialog.test.tsx`, `components/actions/ChangeDateDialog.test.tsx`, `components/actions/SubscriptionActions.test.tsx`
 
 **Interfaces:**
-- Consumes: `OgPayment` (existing), `StoredInstrument` from `@/shared/service/ssw/customerClient` (Task 1).
-- Produces:
+- Consumes: `OgPayment` from `@/shared/service/ordergroove`, `StoredInstrument` from `@/shared/service/ssw/customerClient` (Task 1).
+- Produces, from `@/shared/service/ssw/cardOptions`:
   - `interface CardOption { token: string; brand: string; last4: string; expiry: string; isCurrent: boolean; paymentId: string | null }`
   - `buildCardOptions(instruments: StoredInstrument[], payments: OgPayment[] | undefined, currentPaymentId: string): CardOption[]`
   - `ccTypeFor(brand: string): number | undefined`
   - `formatExpiry(month: number, year: number): string`
 
-- [ ] **Step 1: Write the failing tests** — append to `viewModel.test.ts`, adding `buildCardOptions`, `ccTypeFor`, `formatExpiry` to the `./viewModel` import and `StoredInstrument` from `@/shared/service/ssw/customerClient` if you annotate.
+Also produced, on `SubscriptionCard` in `viewModel.ts`:
+  - `paymentId: string` — the subscription's current Ordergroove payment record (`subscription.payment`)
+  - `billingAddressId: string | null` — that record's `billing_address`, null until payments load
+
+- [ ] **Step 1: Write the failing tests** — put the card-option cases in the **new**
+`src/shared/service/ssw/cardOptions.test.ts`, importing `buildCardOptions`, `ccTypeFor`,
+`formatExpiry` from `./cardOptions`, `StoredInstrument` from `./customerClient`, and
+`buildOgPaymentWith` from `tests/test-utils`.
 
 ```ts
 describe('card options', () => {
@@ -653,10 +619,19 @@ describe('card type and expiry', () => {
 
 - [ ] **Step 2: Run the file to verify the new tests fail**
 
-Run: `yarn vitest run src/pages/ManageSubscriptions/viewModel.test.ts`
-Expected: compile errors — `buildCardOptions`, `ccTypeFor` and `formatExpiry` are not exported.
+Run: `yarn vitest run src/shared/service/ssw/cardOptions.test.ts`
+Expected: the file fails to resolve `./cardOptions`.
 
-- [ ] **Step 3: Implement** — in `viewModel.ts`, add `StoredInstrument` to the imports and append:
+- [ ] **Step 3: Implement** — create `src/shared/service/ssw/cardOptions.ts` opening with
+
+```ts
+import { OgPayment } from '@/shared/service/ordergroove';
+
+import { StoredInstrument } from './customerClient';
+```
+
+and then the code below. It is shared rather than page-local because both `/manage-subscriptions`
+and `/payment-methods` let a customer pick a card:
 
 ```ts
 export interface CardOption {
@@ -721,15 +696,64 @@ export const buildCardOptions = (
 
 - [ ] **Step 4: Run the file to verify it passes**
 
-Run: `yarn vitest run src/pages/ManageSubscriptions/viewModel.test.ts`
+Run: `yarn vitest run src/shared/service/ssw/cardOptions.test.ts`
 Expected: every case passes.
 
-- [ ] **Step 5: Type-check and lint** — `yarn tsc --noEmit`; `yarn eslint --fix src/pages/ManageSubscriptions/viewModel.ts src/pages/ManageSubscriptions/viewModel.test.ts`. Both exit 0.
+- [ ] **Step 5: Write the failing test for the two new card fields** — append to
+`src/pages/ManageSubscriptions/viewModel.test.ts`:
 
-- [ ] **Step 6: Commit**
+```ts
+it('carries the current payment record and its billing address', () => {
+  const payment = buildOgPaymentWith({ public_id: 'pay-a', billing_address: 'addr-1' });
+  const subscription = buildOgSubscriptionWith({ payment: payment.public_id });
+
+  const [loaded] = buildSubscriptionCards([subscription], {
+    ...nothingLoaded,
+    payments: [payment],
+  }).active;
+  const [unloaded] = buildSubscriptionCards([subscription], nothingLoaded).active;
+
+  expect(loaded).toMatchObject({ paymentId: 'pay-a', billingAddressId: 'addr-1' });
+  // The id is the subscription's own field, so it is known before payments load; the address is not.
+  expect(unloaded).toMatchObject({ paymentId: 'pay-a', billingAddressId: null });
+});
+```
+
+- [ ] **Step 6: Run it to verify it fails**
+
+Run: `yarn vitest run src/pages/ManageSubscriptions/viewModel.test.ts`
+Expected: fails — `paymentId` and `billingAddressId` are not on the card.
+
+- [ ] **Step 7: Add the two fields** — in `viewModel.ts`, extend `SubscriptionCard`:
+
+```ts
+  /** the Ordergroove payment record this subscription charges today */
+  paymentId: string;
+  /** that record's billing address, carried onto a new record; null until payments load */
+  billingAddressId: string | null;
+```
+
+and in `toCard`:
+
+```ts
+      paymentId: subscription.payment,
+      billingAddressId: payment?.billing_address ?? null,
+```
+
+Then add both fields to the `buildCardWith` defaults in all five card-builder test files listed
+above, using `paymentId: 'pay-a'` and `billingAddressId: 'addr-1'`.
+
+- [ ] **Step 8: Run the subscriptions suite**
+
+Run: `yarn vitest run src/pages/ManageSubscriptions src/shared/service/ssw`
+Expected: every file green.
+
+- [ ] **Step 9: Type-check and lint** — `yarn tsc --noEmit`; `yarn eslint --fix src/shared/service/ssw src/pages/ManageSubscriptions`. Both exit 0.
+
+- [ ] **Step 10: Commit**
 
 ```bash
-git add apps/storefront/src/pages/ManageSubscriptions/viewModel.ts apps/storefront/src/pages/ManageSubscriptions/viewModel.test.ts
+git add apps/storefront/src/shared/service/ssw apps/storefront/src/pages/ManageSubscriptions
 git commit -m "feat: B2B-0000 Build saved-card options joined to their Ordergroove payment records" -m "Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ```
 
@@ -745,10 +769,10 @@ git commit -m "feat: B2B-0000 Build saved-card options joined to their Ordergroo
 - Test: `hooks/useSubscriptionActions.test.tsx`, `components/actions/ChangeCardDialog.test.tsx`, `components/actions/SubscriptionActions.test.tsx`
 
 **Interfaces:**
-- Consumes: `createPayment`, `changeSubscriptionPayment`, `changeOrderPayment`, `NewPaymentInput` (Task 2); `CardOption`, `ccTypeFor` (Task 3); `listStoredInstruments`, `StoredInstrument` (Task 1).
+- Consumes: `createPayment`, `changeSubscriptionPayment`, `NewPaymentInput` (Task 2); `CardOption`, `ccTypeFor` from `@/shared/service/ssw/cardOptions` (Task 3); `listStoredInstruments`, `StoredInstrument` (Task 1).
 - Produces:
   - `useSubscriptionActions(customerId)` gains `changeCard: UseMutationResult<void, Error, ChangeCardVariables>` where
-    `interface ChangeCardVariables { subscriptionId: string; orderId: string | null; option: CardOption; billingAddress: string | null }`
+    `interface ChangeCardVariables { subscriptionId: string; option: CardOption; billingAddress: string | null }`
   - `ChangeCardDialog` props `{ options: CardOption[]; isOpen: boolean; isPending: boolean; onClose: () => void; onConfirm: (option: CardOption) => void }`
   - `SubscriptionActions` renders the `Change card` button on every active card.
 
@@ -803,7 +827,6 @@ describe('changeCard', () => {
 
     actions().changeCard.mutate({
       subscriptionId: 's-1',
-      orderId: 'o-1',
       option: option({ paymentId: 'pay-b' }),
       billingAddress: 'addr-1',
     });
@@ -841,7 +864,6 @@ describe('changeCard', () => {
 
     actions().changeCard.mutate({
       subscriptionId: 's-1',
-      orderId: 'o-1',
       option: option(),
       billingAddress: 'addr-1',
     });
@@ -858,40 +880,6 @@ describe('changeCard', () => {
     expect(repointed).toHaveBeenCalledWith({ payment: 'pay-new' });
   });
 
-  it('repoints the upcoming order too, and skips it when nothing is scheduled', async () => {
-    const orderRepointed = vi.fn();
-    server.use(
-      http.patch(`${ogBase}/subscriptions/s-1/change_payment/`, () =>
-        HttpResponse.json(buildOgSubscriptionWith('WHATEVER_VALUES')),
-      ),
-      http.patch(`${ogBase}/orders/o-1/change_payment/`, async ({ request }) => {
-        orderRepointed(await request.json());
-
-        return HttpResponse.json(buildOgOrderWith('WHATEVER_VALUES'));
-      }),
-    );
-    renderActions();
-
-    actions().changeCard.mutate({
-      subscriptionId: 's-1',
-      orderId: 'o-1',
-      option: option({ paymentId: 'pay-b' }),
-      billingAddress: null,
-    });
-    await waitFor(() => expect(actions().changeCard.isSuccess).toBe(true));
-    expect(orderRepointed).toHaveBeenCalledWith({ payment: 'pay-b' });
-
-    orderRepointed.mockClear();
-    actions().changeCard.mutate({
-      subscriptionId: 's-1',
-      orderId: null,
-      option: option({ paymentId: 'pay-b' }),
-      billingAddress: null,
-    });
-    await waitFor(() => expect(actions().changeCard.isSuccess).toBe(true));
-    expect(orderRepointed).not.toHaveBeenCalled();
-  });
-
   it('reports a failed repoint and leaves the cache alone', async () => {
     server.use(
       http.patch(
@@ -903,7 +891,6 @@ describe('changeCard', () => {
 
     actions().changeCard.mutate({
       subscriptionId: 's-1',
-      orderId: null,
       option: option({ paymentId: 'pay-b' }),
       billingAddress: null,
     });
@@ -915,9 +902,9 @@ describe('changeCard', () => {
 });
 ```
 
-Add `CardOption` to the `../viewModel` import and `buildOgPaymentWith` to the `tests/test-utils`
-import. If Task 0 finding A is "yes", delete the third case's order assertions and the
-`orders/o-1/change_payment` handlers, and drop `orderId` from the variables everywhere.
+Add `CardOption` from `@/shared/service/ssw/cardOptions` and `buildOgPaymentWith` from
+`tests/test-utils`. The `orders/o-1/change_payment` handlers in the first two cases are harmless
+leftovers — delete them; Task 0 finding A proved the order follows on its own.
 
 - [ ] **Step 3: Run it to verify it fails**
 
@@ -929,15 +916,13 @@ Expected: `actions().changeCard` is undefined — "Cannot read properties of und
 ```ts
 export interface ChangeCardVariables {
   subscriptionId: string;
-  /** the subscription's upcoming order, when it has one */
-  orderId: string | null;
   option: CardOption;
   /** billing address of the subscription's current record, carried onto a new one */
   billingAddress: string | null;
 }
 
 const changeCard = useMutation({
-  mutationFn: async ({ subscriptionId, orderId, option, billingAddress }: ChangeCardVariables) => {
+  mutationFn: async ({ subscriptionId, option, billingAddress }: ChangeCardVariables) => {
     // Reuse before create: Ordergroove cannot delete a payment record (spec §1 decision 3).
     const paymentId =
       option.paymentId ??
@@ -951,11 +936,9 @@ const changeCard = useMutation({
         })
       ).public_id;
 
+    // The upcoming order follows the subscription on its own (Task 0 finding A), so this is
+    // the only repoint needed.
     await changeSubscriptionPayment(id, subscriptionId, paymentId);
-    // An order already generated keeps its own payment (Task 0 finding A).
-    if (orderId) {
-      await changeOrderPayment(id, orderId, paymentId);
-    }
   },
   onSuccess: () =>
     succeed('subscriptions.actions.changeCard.success', ['subscriptions', 'upcoming', 'payments']),
@@ -976,7 +959,7 @@ Expected: all cases pass.
 import { ReactElement } from 'react';
 import { renderWithProviders, screen } from 'tests/test-utils';
 
-import { CardOption } from '../../viewModel';
+import { CardOption } from '@/shared/service/ssw/cardOptions';
 
 import ChangeCardDialog from './ChangeCardDialog';
 
@@ -1029,8 +1012,8 @@ it('lists the saved cards, marks the current one and saves the chosen one', asyn
   expect(onConfirm).toHaveBeenCalledWith(amex);
 });
 
-it('explains itself when the only saved card is the one in use', () => {
-  renderOpen((isOpen) => (
+it('explains itself when the only saved card is the one in use', async () => {
+  const { user, navigation } = renderOpen((isOpen) => (
     <ChangeCardDialog
       options={[visa]}
       isOpen={isOpen}
@@ -1043,11 +1026,10 @@ it('explains itself when the only saved card is the one in use', () => {
   expect(screen.getByRole('dialog')).toHaveTextContent('This is your only saved card.');
   expect(screen.queryByRole('radio')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
-  // The payment methods page is outside the SPA, so the link must leave the ThemeFrame.
-  expect(screen.getByRole('link', { name: 'payment methods page' })).toHaveAttribute(
-    'target',
-    '_top',
-  );
+  // /payment-methods is a portal route, so this navigates inside the SPA — the same pattern
+  // DeleteSubscriptionWarning uses ("a button, not an anchor: internal router navigation").
+  await user.click(screen.getByRole('button', { name: 'payment methods page' }));
+  expect(navigation).toHaveBeenCalledWith('/payment-methods');
 });
 
 it('disables Save while the write is pending', () => {
@@ -1074,13 +1056,12 @@ Expected: fails to resolve `./ChangeCardDialog`.
 
 ```tsx
 import { useEffect, useState } from 'react';
-import { FormControlLabel, Link, Radio, RadioGroup, Typography } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import { Button, FormControlLabel, Radio, RadioGroup, Typography } from '@mui/material';
 
 import B3Dialog from '@/components/B3Dialog';
 import { useB3Lang } from '@/lib/lang';
-import { BigCommerceStorefrontAPIBaseURL } from '@/utils/basicConfig';
-
-import { CardOption } from '../../viewModel';
+import { CardOption } from '@/shared/service/ssw/cardOptions';
 
 interface ChangeCardDialogProps {
   options: CardOption[];
@@ -1098,6 +1079,7 @@ function ChangeCardDialog({
   onConfirm,
 }: ChangeCardDialogProps) {
   const b3Lang = useB3Lang();
+  const navigate = useNavigate();
   const current = options.find((option) => option.isCurrent);
   const [token, setToken] = useState('');
 
@@ -1154,14 +1136,17 @@ function ChangeCardDialog({
         </RadioGroup>
       ) : (
         <Typography>
-          {b3Lang('subscriptions.actions.changeCard.onlyCard', {
-            link: (
-              // A storefront page outside the SPA: open it in the top window, not the ThemeFrame.
-              <Link href={`${BigCommerceStorefrontAPIBaseURL}/account.php?action=payment_methods`} target="_top">
-                {b3Lang('subscriptions.actions.changeCard.onlyCardLink')}
-              </Link>
-            ),
-          })}
+          {b3Lang('subscriptions.actions.changeCard.onlyCard', { link: '' })}
+          {/* A button, not an anchor: /payment-methods is a portal route, and internal navigation
+              inside the ThemeFrame goes through the router (the delete warning does the same). */}
+          <Button
+            variant="text"
+            size="small"
+            onClick={() => navigate('/payment-methods')}
+            sx={{ px: 0 }}
+          >
+            {b3Lang('subscriptions.actions.changeCard.onlyCardLink')}
+          </Button>
         </Typography>
       )}
     </B3Dialog>
@@ -1171,10 +1156,8 @@ function ChangeCardDialog({
 export default ChangeCardDialog;
 ```
 
-If `b3Lang` will not accept a React node for `{link}` (its values are typed
-`string | number | Date`), render the sentence as two `Typography` children instead: the copy up to
-`{link}` as plain text, then the `Link`. Keep the copy key text identical and note the split at
-Task 6.
+`b3Lang` values are typed `string | number | Date`, so the sentence cannot carry a React node: pass
+`{ link: '' }` and render the button after the text, as above. Record the split at Task 6.
 
 - [ ] **Step 9: Run the dialog test to verify it passes**
 
@@ -1254,7 +1237,6 @@ only when `upcoming` exists, since each needs its order id.
           changeCard.mutate(
             {
               subscriptionId: card.publicId,
-              orderId: upcoming?.orderId ?? null,
               option,
               billingAddress: card.billingAddressId,
             },
@@ -1264,11 +1246,8 @@ only when `upcoming` exists, since each needs its order id.
       />
 ```
 
-`card.paymentId` and `card.billingAddressId` do not exist yet — add them in `viewModel.ts`
-alongside `shippingAddressId`, taking `subscription.payment` and the current payment record's
-`billing_address` (null when the record has not loaded), and extend the card builders in
-`SubscriptionCard.test.tsx`, `SkipDialog.test.tsx`, `SendNowDialog.test.tsx`,
-`ChangeDateDialog.test.tsx` and `SubscriptionActions.test.tsx` with both fields.
+`card.paymentId` and `card.billingAddressId` come from Task 3; the card builders in the test files
+already carry them.
 
 - [ ] **Step 13: Run the ManageSubscriptions suite**
 
@@ -1299,7 +1278,7 @@ git commit -m "feat: B2B-0000 Let a customer move a subscription onto another sa
 - Consumes: `createPayment`, `usePaymentForAll` (Task 2); `CardOption`, `buildCardOptions`, `ccTypeFor` (Task 3); `listPayments` (existing); `StoredInstrument` (Task 1); `AffectedSubscription`, `SubscriptionCheckStatus` (existing).
 - Produces:
   - `useMoveSubscriptions(customerId: number, token: string | undefined, enabled: boolean)` returning `{ options: CardOption[]; move: UseMutationResult<void, Error, CardOption> }`
-  - `DeleteSubscriptionWarning` gains props `{ moveOptions: CardOption[]; isMoving: boolean; onMove: (option: CardOption) => void }`
+  - `DeleteSubscriptionWarning` gains FOUR props: `{ moveOptions: CardOption[]; isMoving: boolean; hasMoved: boolean; onMove: (option: CardOption) => void }`
 
 - [ ] **Step 1: Add the copy** — in `en.json`, after `paymentMethods.deleteDialog.subscriptions.checkFailed`:
 
@@ -1497,7 +1476,7 @@ import {
 import { listStoredInstruments } from '@/shared/service/ssw/customerClient';
 import { snackbar } from '@/utils/b3Tip';
 
-import { buildCardOptions, CardOption, ccTypeFor } from '@/pages/ManageSubscriptions/viewModel';
+import { buildCardOptions, CardOption, ccTypeFor } from '@/shared/service/ssw/cardOptions';
 
 /**
  * The cards a customer can move their subscriptions to before deleting one, and the move itself.
@@ -1575,10 +1554,8 @@ export const useMoveSubscriptions = (
 };
 ```
 
-Importing `buildCardOptions` from another page is a cross-page import. If dependency-cruiser
-rejects it at Task 6, move `CardOption`, `buildCardOptions`, `ccTypeFor` and `formatExpiry` into
-`src/shared/service/ssw/cardOptions.ts` (they depend only on `OgPayment` and `StoredInstrument`,
-both already shared) and re-point both consumers. Record the move at Task 6.
+`buildCardOptions` is imported from the shared module Task 3 created, not from the subscriptions
+page — a page importing another page's view model would fail dependency-cruiser.
 
 - [ ] **Step 5: Run the hook test to verify it passes**
 
@@ -1591,7 +1568,8 @@ Expected: four cases pass.
 it('offers to move the subscriptions, then shows the card is clear without deleting it', async () => {
   const deleted = vi.fn();
   const visa = buildStoredInstrumentWith({ token: 'tok-a', brand: 'VISA', last4: '4242', isDefault: true });
-  const amex = buildStoredInstrumentWith({ token: 'tok-b', brand: 'AMEX', last4: '1881', isDefault: false });
+  // Expiry must be pinned: the builder randomises it, and the radio label asserts it.
+  const amex = buildStoredInstrumentWith({ token: 'tok-b', brand: 'AMEX', last4: '1881', expiryMonth: 11, expiryYear: 2029, isDefault: false });
   const payment = buildOgPaymentWith({ token_id: 'tok-a', live: true });
   let moved = false;
   mockInstruments([visa, amex]);
@@ -1787,10 +1765,8 @@ yarn lint:eslint
 yarn lint:knip
 ```
 
-Expected: `tsc` exit 0; dependency-cruiser "no dependency violations" — if it rejects the
-`PaymentMethods → ManageSubscriptions/viewModel` import, carry out the fallback named in Task 5
-Step 4 and re-run; `lint:eslint` exit 0; knip reports only the pre-existing `BillingStateOption` in
-`src/pages/PaymentMethods/billingPrefill.ts`.
+Expected: `tsc` exit 0; dependency-cruiser "no dependency violations"; `lint:eslint` exit 0; knip
+reports only the pre-existing `BillingStateOption` in `src/pages/PaymentMethods/billingPrefill.ts`.
 
 - [ ] **Step 2: Run the scoped suites, then the full suite against the baseline**
 
@@ -1811,11 +1787,13 @@ run, so names appearing and disappearing is normal.
 
 - [ ] **Step 3: Align the spec with what shipped** — edit the Phase 4 spec:
 
-1. §3.2 and §9.1: record Task 0 finding A, and if orders follow their subscription, strike
-   `changeOrderPayment` from the table and say the probe removed it.
-2. §3.1: if Task 0 finding C shows `use_for_all` returns a body after all, record that
-   `ogMutateNoContent` was not needed and `usePaymentForAll` uses `ogMutate`.
-3. §5: if `CardOption` and friends moved to `src/shared/service/ssw/cardOptions.ts`, say so and why.
+1. §3.2 and §9.1: record Task 0 finding A — the upcoming order DOES follow its subscription — and
+   strike `changeOrderPayment` from the table, saying the probe removed it.
+2. §3.1: record Task 0 finding C — `use_for_all` answers 200 with a parseable JSON body, not the
+   empty response the reference claims — so `ogMutateNoContent` was never built and
+   `usePaymentForAll` is a plain `ogMutate`.
+3. §5: record that `CardOption`, `buildCardOptions`, `ccTypeFor` and `formatExpiry` live in
+   `src/shared/service/ssw/cardOptions.ts` because both pages pick a card.
 4. §6.1: if the only-one-card sentence had to be split into two nodes because `b3Lang` takes no
    React values, record the split.
 5. §11.2: replace the spike's remembered inventory with Task 0 finding B's live numbers.
@@ -1828,10 +1806,12 @@ run, so names appearing and disappearing is normal.
 
 - A customer can move a subscription onto another saved card from its card, and move every
   subscription off a card from the delete dialog before deleting it. Service:
-  `createPayment` / `changeSubscriptionPayment` / `changeOrderPayment` / `usePaymentForAll` in
-  `shared/service/ordergroove/api.ts`; `use_for_all` answers 200 with an EMPTY BODY, so
-  `ogMutateNoContent` exists (parsing it as JSON would surface a success as a SyntaxError, miss the
-  OrdergrooveError branch and show the customer a failure).
+  `createPayment` / `changeSubscriptionPayment` / `usePaymentForAll` in
+  `shared/service/ordergroove/api.ts`. TWO reference claims are WRONG about the live API, both
+  settled by the Task 0 probe: an upcoming order DOES follow its subscription's new payment (so no
+  order-level repoint is needed), and `use_for_all` answers 200 with a parseable JSON body, not the
+  documented empty response (so no no-content helper is needed). It moved 14 of 14 subscriptions
+  and 12 of 12 upcoming orders.
 - Reuse before create: only a LIVE record whose token_id matches is reusable, because Ordergroove
   mints a record per checkout and keeps records for cards BigCommerce no longer has. Creating is
   ONE-WAY — there is no delete, only deactivate — so the live probe never creates one.
