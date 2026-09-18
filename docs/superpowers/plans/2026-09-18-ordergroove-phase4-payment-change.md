@@ -1971,8 +1971,8 @@ as `docs: B2B-0000 Record the Phase 4 live check` if the Task 6 docs commit is a
 - §4 shared client: Task 1, including the one-canonical-path rule and keeping the error's name. ✓
 - §5 view model: Task 3 — the three reuse shapes, current marking, `ccTypeFor` including an unmapped
   brand, `formatExpiry`. ✓
-- §6.1 change-card dialog: Task 4 Steps 6 and 8 (preselect, disabled Save, one-card message with a
-  `target="_top"` link, pending). §6.2 move flow: Task 5 Steps 6 and 8 (offer, moving, moved,
+- §6.1 change-card dialog: Task 4 Steps 6 and 8 (preselect, disabled Save, one-card message with
+  a button that navigates to /payment-methods, pending). §6.2 move flow: Task 5 Steps 6 and 8 (offer, moving, moved,
   failed). ✓
 - §7 copy: Task 4 Step 1 and Task 5 Step 1 add every key; `move.option` is added beyond the spec's
   list because the success sentence and the radio labels need one card wording — recorded at Task 6.
