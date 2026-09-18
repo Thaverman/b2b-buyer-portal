@@ -84,6 +84,12 @@ Sandbox fixture for live verification in every phase: customer **80591** — 3 s
 
 ## 4. Security finding — the signature endpoint is unauthenticated (Phase 0)
 
+> **Full design (2026-09-17):** [2026-09-17-ordergroove-auth-path-design.md](2026-09-17-ordergroove-auth-path-design.md)
+> — the exact contract change for `ssw-microservices`, its four acceptance checks, and the
+> proxy-the-calls architecture the portal's Ordergroove service is aimed at. Decided there: harden
+> the mint now, adopt the proxy as the target, and keep building features on today's transport
+> because `request()` in `api.ts` is the one seam the migration touches.
+
 `POST …/products/productclient/ordergroove-auth` accepts a bare `{customerId, storeHash}` body
 and returns a valid **Storefront-scope Ordergroove credential for that customer** — no session
 cookie, no JWT, no proof the caller is that customer (spike #1). BigCommerce customer ids are
@@ -358,6 +364,14 @@ ones behind `B3Dialog`. No optimistic updates (Ordergroove is the source of trut
 cheap). Rate limit is 6000 req/IP/min — irrelevant at this traffic.
 
 ## 9. Phase 4 — payment change and cutover (scoped design)
+
+> **Full design of the payment change (2026-09-17):**
+> [2026-09-17-ordergroove-phase4-payment-change-design.md](2026-09-17-ordergroove-phase4-payment-change-design.md).
+> Scope settled there: a *Change card* action on each subscription card plus a move offer inside the
+> Phase 1 delete dialog, saved cards only, reuse a live Ordergroove record before creating one, and
+> the delete-dialog move uses `use_for_all` with copy that says so. The **cutover** below (retiring
+> the iframe, the theme redirect, the middleware's body `customerId`) is still owned by this section
+> and follows the payment change.
 
 **Change payment method** (on the subscriptions page, and offered from the Phase 1 warning as
 "Move these subscriptions to another card" when another instrument exists):
