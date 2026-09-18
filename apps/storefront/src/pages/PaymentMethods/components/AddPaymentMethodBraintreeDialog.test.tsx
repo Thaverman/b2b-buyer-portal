@@ -1,8 +1,9 @@
 import { act, renderWithProviders, waitFor, within } from 'tests/test-utils';
 
+import { PaymentMethodsError } from '@/shared/service/ssw/customerClient';
 import { themeFrameSelector } from '@/store/selectors';
 
-import { PaymentMethodsError, vaultBraintreeInstrument } from '../api';
+import { vaultBraintreeInstrument } from '../api';
 import { emptyBillingValues, getBillingCountries, getBillingPrefill } from '../billingPrefill';
 import { createDropinWithTimeout } from '../dropin';
 

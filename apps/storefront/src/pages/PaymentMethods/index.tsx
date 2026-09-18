@@ -8,6 +8,12 @@ import B3Spin from '@/components/spin/B3Spin';
 import { useB3Lang } from '@/lib/lang';
 import { PageProps } from '@/pages/PageProps';
 import { isSubscriptionsAvailable } from '@/shared/service/ordergroove';
+import {
+  isPaymentMethodsAvailable,
+  listStoredInstruments,
+  PaymentMethodsError,
+  StoredInstrument,
+} from '@/shared/service/ssw/customerClient';
 import { useAppSelector } from '@/store';
 import { snackbar } from '@/utils/b3Tip';
 import { isHostFlagEnabled } from '@/utils/hostFlag';
@@ -20,15 +26,7 @@ import {
   deriveSubscriptionCheckStatus,
   useSubscriptionsUsingInstrument,
 } from './hooks/useSubscriptionsUsingInstrument';
-import {
-  deleteStoredInstrument,
-  getBraintreeClientToken,
-  isPaymentMethodsAvailable,
-  listStoredInstruments,
-  PaymentMethodsError,
-  setDefaultStoredInstrument,
-  StoredInstrument,
-} from './api';
+import { deleteStoredInstrument, getBraintreeClientToken, setDefaultStoredInstrument } from './api';
 import { hasActiveCart } from './cartPresence';
 import { getVaultAccess, NATIVE_ADD_PAYMENT_METHOD_PATH } from './vaultAccess';
 

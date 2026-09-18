@@ -14,9 +14,9 @@ import {
   within,
 } from 'tests/test-utils';
 
+import { StoredInstrument } from '@/shared/service/ssw/customerClient';
 import { snackbar } from '@/utils/b3Tip';
 
-import { StoredInstrument } from './api';
 import { emptyBillingValues, getBillingCountries, getBillingPrefill } from './billingPrefill';
 import { hasActiveCart } from './cartPresence';
 import { createStoredCardForm, StoredCardForm } from './hostedForm';

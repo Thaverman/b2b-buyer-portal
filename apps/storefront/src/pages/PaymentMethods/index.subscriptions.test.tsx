@@ -14,7 +14,8 @@ import {
   waitFor,
 } from 'tests/test-utils';
 
-import { StoredInstrument } from './api';
+import { StoredInstrument } from '@/shared/service/ssw/customerClient';
+
 import { hasActiveCart } from './cartPresence';
 import PaymentMethods from '.';
 

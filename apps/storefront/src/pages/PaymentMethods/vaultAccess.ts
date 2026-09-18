@@ -1,4 +1,4 @@
-import { PaymentMethodsError } from './api';
+import { PaymentMethodsError } from '@/shared/service/ssw/customerClient';
 
 // The BigCommerce storefront mints the vault access token (VAT, ~30 min TTL) into the
 // native add-payment-method page context; checkout-sdk's stored-card hosted form only
