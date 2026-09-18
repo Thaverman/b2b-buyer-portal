@@ -35,6 +35,8 @@ const buildCardWith = builder<SubscriptionCardModel>(() => ({
     locality: 'Springfield, IL 62701',
   },
   payment: { brand: 'Visa', last4: '1111', expiry: '3/2028' },
+  paymentId: 'pay-a',
+  billingAddressId: 'addr-1',
   cancelledOn: null,
 }));
 

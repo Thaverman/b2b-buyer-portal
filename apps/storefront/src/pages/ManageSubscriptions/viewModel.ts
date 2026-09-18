@@ -64,6 +64,10 @@ export interface SubscriptionCard {
   /** Ordergroove address public_id the subscription ships to */
   shippingAddressId: string;
   payment: PaymentSummary | null;
+  /** the Ordergroove payment record this subscription charges today */
+  paymentId: string;
+  /** that record's billing address, carried onto a new record; null until payments load */
+  billingAddressId: string | null;
   /** Ordergroove timestamp when cancelled; null for active cards and for retired ones with no date */
   cancelledOn: string | null;
 }
@@ -252,6 +256,8 @@ export const buildSubscriptionCards = (
       shippingAddress: address ? summarizeAddress(address) : null,
       shippingAddressId: subscription.shipping_address,
       payment: payment ? summarizePayment(payment) : null,
+      paymentId: subscription.payment,
+      billingAddressId: payment?.billing_address ?? null,
       cancelledOn: subscription.cancelled,
     };
   };

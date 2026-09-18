@@ -318,6 +318,21 @@ describe('buildSubscriptionCards', () => {
 
     expect(cancelled.map((card) => card.publicId)).toEqual([newer.public_id, older.public_id]);
   });
+
+  it('carries the current payment record and its billing address', () => {
+    const payment = buildOgPaymentWith({ public_id: 'pay-a', billing_address: 'addr-1' });
+    const subscription = buildOgSubscriptionWith({ payment: payment.public_id });
+
+    const [loaded] = buildSubscriptionCards([subscription], {
+      ...nothingLoaded,
+      payments: [payment],
+    }).active;
+    const [unloaded] = buildSubscriptionCards([subscription], nothingLoaded).active;
+
+    expect(loaded).toMatchObject({ paymentId: 'pay-a', billingAddressId: 'addr-1' });
+    // The id is the subscription's own field, so it is known before payments load; the address is not.
+    expect(unloaded).toMatchObject({ paymentId: 'pay-a', billingAddressId: null });
+  });
 });
 
 describe('buildRecentOrders', () => {
