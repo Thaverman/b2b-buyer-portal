@@ -1,6 +1,12 @@
 import { buildOgPaymentWith } from 'tests/test-utils';
 
-import { buildCardOptions, ccTypeFor, formatExpiry } from './cardOptions';
+import {
+  buildCardOptions,
+  ccTypeFor,
+  displayBrand,
+  formatExpiry,
+  formatRawExpiry,
+} from './cardOptions';
 import { StoredInstrument } from './customerClient';
 
 describe('card options', () => {
@@ -32,7 +38,7 @@ describe('card options', () => {
     expect(options).toEqual([
       {
         token: 'tok-a',
-        brand: 'VISA',
+        brand: 'Visa',
         last4: '4242',
         expiry: '03/2028',
         isCurrent: true,
@@ -40,7 +46,7 @@ describe('card options', () => {
       },
       {
         token: 'tok-b',
-        brand: 'AMEX',
+        brand: 'American Express',
         last4: '1881',
         expiry: '03/2028',
         isCurrent: false,
@@ -101,5 +107,32 @@ describe('card type and expiry', () => {
   it('formats expiry as zero-padded MM/YYYY', () => {
     expect(formatExpiry(3, 2028)).toBe('03/2028');
     expect(formatExpiry(12, 2030)).toBe('12/2030');
+  });
+
+  it('pads the bare month Ordergroove stores', () => {
+    expect(formatRawExpiry('3/2028')).toBe('03/2028');
+    expect(formatRawExpiry('12/2029')).toBe('12/2029');
+    // Nothing to pad: show what arrived rather than invent a date.
+    expect(formatRawExpiry('')).toBe('');
+    expect(formatRawExpiry('unknown')).toBe('unknown');
+  });
+
+  it('prints one brand shape whatever casing the source used', () => {
+    // BigCommerce answers "VISA", Ordergroove's own table answers "Visa", and the two appear on
+    // the same screen — the picker sits beside the card line that named the card it replaces.
+    expect(displayBrand('VISA')).toBe('Visa');
+    expect(displayBrand('Visa')).toBe('Visa');
+    expect(displayBrand('AMEX')).toBe('American Express');
+    expect(displayBrand(' diners club ')).toBe('Diners');
+    // A brand Ordergroove does not name is shown exactly as it arrived.
+    expect(displayBrand('UNIONPAY')).toBe('UNIONPAY');
+  });
+
+  it('keeps the Ordergroove card type reachable from the brand it displays', () => {
+    // The create body reads ccTypeFor(option.brand), so normalizing the display must round-trip
+    // or a card renders correctly and is created in Ordergroove with no card type.
+    expect(ccTypeFor(displayBrand('AMEX'))).toBe(3);
+    expect(ccTypeFor(displayBrand('MASTERCARD'))).toBe(2);
+    expect(ccTypeFor(displayBrand('VISA'))).toBe(1);
   });
 });

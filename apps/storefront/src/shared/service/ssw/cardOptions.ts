@@ -5,6 +5,7 @@ import { StoredInstrument } from './customerClient';
 export interface CardOption {
   /** BigCommerce stored-instrument token */
   token: string;
+  /** the brand as the customer sees it, in one shape across both pages */
   brand: string;
   last4: string;
   /** "MM/YYYY" */
@@ -40,8 +41,22 @@ export const CARD_BRANDS: Record<number, string> = {
 
 export const ccTypeFor = (brand: string) => CC_TYPES[brand.trim().toUpperCase()];
 
+/**
+ * One brand shape for every screen. BigCommerce answers "VISA" and Ordergroove's own table answers
+ * "Visa", and both reach the customer on the same page. A brand Ordergroove does not name is shown
+ * as it arrived. Every name this returns maps back through `ccTypeFor`, which the create body needs.
+ */
+export const displayBrand = (brand: string) => CARD_BRANDS[ccTypeFor(brand)] ?? brand;
+
 export const formatExpiry = (month: number, year: number) =>
   `${String(month).padStart(2, '0')}/${year}`;
+
+/** Ordergroove stores the expiry as text with a bare month ("3/2028"); the picker zero-pads it. */
+export const formatRawExpiry = (expiry: string) => {
+  const [month, year] = expiry.split('/');
+
+  return month && year ? formatExpiry(Number(month), Number(year)) : expiry;
+};
 
 /**
  * One option per saved BigCommerce card, in the order the middleware returns them (default first),
@@ -65,7 +80,7 @@ export const buildCardOptions = (
 
     return {
       token: instrument.token,
-      brand: instrument.brand,
+      brand: displayBrand(instrument.brand),
       last4: instrument.last4,
       expiry: formatExpiry(instrument.expiryMonth, instrument.expiryYear),
       isCurrent: payment?.public_id === currentPaymentId,

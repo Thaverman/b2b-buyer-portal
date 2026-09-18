@@ -399,7 +399,11 @@ it('offers to move the subscriptions, then shows the card is clear without delet
   await user.click((await screen.findAllByRole('button', { name: 'Delete' }))[0]);
   expect(await screen.findByText(/This card is used by 1 active subscription/)).toBeInTheDocument();
 
-  await user.click(screen.getByRole('radio', { name: 'AMEX ending in 1881 · exp 11/2029' }));
+  // "this card" would read as the card being deleted; the radios are the other cards.
+  expect(screen.getByText('Move them all to another card:')).toBeInTheDocument();
+  await user.click(
+    screen.getByRole('radio', { name: 'American Express ending in 1881 · exp 11/2029' }),
+  );
   await user.click(screen.getByRole('button', { name: 'Move subscriptions' }));
 
   expect(await screen.findByText('No subscriptions use this card.')).toBeInTheDocument();

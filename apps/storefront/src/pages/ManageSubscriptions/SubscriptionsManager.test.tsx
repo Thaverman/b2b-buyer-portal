@@ -190,7 +190,7 @@ it('lists every active subscription across pages with its product, schedule, add
   expect(
     screen.getAllByText('Ships to Jane Doe, Acme Co, 1 Main St, Springfield, IL 62701'),
   ).toHaveLength(2);
-  expect(screen.getAllByText('Paid with Visa ending in 1111 · exp 3/2028')).toHaveLength(2);
+  expect(screen.getAllByText('Paid with Visa ending in 1111 · exp 03/2028')).toHaveLength(2);
   expect(screen.queryByText(/couldn't/)).not.toBeInTheDocument();
 });
 
@@ -213,7 +213,7 @@ it('degrades cell by cell when secondary lookups fail and offers a retry', async
 
   expect(await screen.findByText('Product 1_2')).toBeInTheDocument();
   expect(await screen.findByText('Ships to Unavailable')).toBeInTheDocument();
-  expect(screen.getByText('Paid with Mastercard ending in 4444 · exp 1/2029')).toBeInTheDocument();
+  expect(screen.getByText('Paid with Mastercard ending in 4444 · exp 01/2029')).toBeInTheDocument();
   expect(screen.getByText("Some subscription details couldn't be loaded.")).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
 });

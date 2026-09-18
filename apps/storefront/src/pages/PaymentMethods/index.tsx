@@ -8,6 +8,7 @@ import B3Spin from '@/components/spin/B3Spin';
 import { useB3Lang } from '@/lib/lang';
 import { PageProps } from '@/pages/PageProps';
 import { isSubscriptionsAvailable } from '@/shared/service/ordergroove';
+import { displayBrand } from '@/shared/service/ssw/cardOptions';
 import {
   isPaymentMethodsAvailable,
   listStoredInstruments,
@@ -267,7 +268,7 @@ function PaymentMethods({ variant }: PaymentMethodsProps) {
             {pendingDelete &&
               b3Lang('paymentMethods.deleteDialog.content', {
                 card: b3Lang('paymentMethods.cardLabel', {
-                  brand: pendingDelete.brand,
+                  brand: displayBrand(pendingDelete.brand),
                   last4: pendingDelete.last4,
                 }),
               })}

@@ -1,6 +1,7 @@
 import { Box, Button, Card, CardContent, Chip, Typography } from '@mui/material';
 
 import { useB3Lang } from '@/lib/lang';
+import { displayBrand } from '@/shared/service/ssw/cardOptions';
 import { StoredInstrument } from '@/shared/service/ssw/customerClient';
 
 interface PaymentMethodRowProps {
@@ -28,7 +29,7 @@ function PaymentMethodRow({
         <Box sx={{ flex: 1, minWidth: '12rem' }}>
           <Typography variant="subtitle1">
             {b3Lang('paymentMethods.cardLabel', {
-              brand: instrument.brand,
+              brand: displayBrand(instrument.brand),
               last4: instrument.last4,
             })}
           </Typography>

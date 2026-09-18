@@ -156,7 +156,7 @@ it('renders cards when the backend returns PascalCase keys (.NET serialization)'
 
   renderWithProviders(<PaymentMethods />);
 
-  expect(await screen.findByText('VISA •••• 4242')).toBeInTheDocument();
+  expect(await screen.findByText('Visa •••• 4242')).toBeInTheDocument();
   expect(screen.getByText('Default')).toBeInTheDocument();
 });
 
@@ -174,7 +174,7 @@ it('renders a saved card with brand, last4, expiry and default chip', async () =
 
   renderWithProviders(<PaymentMethods />);
 
-  expect(await screen.findByText('VISA •••• 4242')).toBeInTheDocument();
+  expect(await screen.findByText('Visa •••• 4242')).toBeInTheDocument();
   expect(screen.getByText('Expires 12/2030')).toBeInTheDocument();
   expect(screen.getByText('Default')).toBeInTheDocument();
   expect(screen.queryByText('Expired')).not.toBeInTheDocument();
@@ -237,7 +237,7 @@ it('shows the load error with a working retry button', async () => {
 
   await user.click(screen.getByRole('button', { name: 'Try again' }));
 
-  expect(await screen.findByText('AMEX •••• 0005')).toBeInTheDocument();
+  expect(await screen.findByText('American Express •••• 0005')).toBeInTheDocument();
 });
 
 it('shows the unavailable state when BC_CONTEXT is not configured', () => {
@@ -294,8 +294,10 @@ it('sets a card as default and re-renders from the refreshed list', async () => 
 
   // the refreshed list moved the default: the chip is now in the AMEX card and
   // the set-as-default action moved to the VISA card
-  const amexCard = screen.getByText('AMEX •••• 0005').closest('.MuiCard-root') as HTMLElement;
-  const visaCard = screen.getByText('VISA •••• 4242').closest('.MuiCard-root') as HTMLElement;
+  const amexCard = screen
+    .getByText('American Express •••• 0005')
+    .closest('.MuiCard-root') as HTMLElement;
+  const visaCard = screen.getByText('Visa •••• 4242').closest('.MuiCard-root') as HTMLElement;
   expect(within(amexCard).getByText('Default')).toBeInTheDocument();
   expect(
     within(amexCard).queryByRole('button', { name: 'Set as default' }),
@@ -385,14 +387,14 @@ it('deletes a card after confirmation and re-renders from the refreshed list', a
 
   const { user } = renderWithProviders(<PaymentMethods />);
 
-  await screen.findByText('AMEX •••• 0005');
+  await screen.findByText('American Express •••• 0005');
 
   // each row has a Delete button; the second belongs to the AMEX row
   await user.click(screen.getAllByRole('button', { name: 'Delete' })[1]);
 
   expect(
     await screen.findByText(
-      'AMEX •••• 0005 will be permanently removed from your saved cards and from your payment provider, and will no longer be available at checkout. This cannot be undone.',
+      'American Express •••• 0005 will be permanently removed from your saved cards and from your payment provider, and will no longer be available at checkout. This cannot be undone.',
     ),
   ).toBeInTheDocument();
 
@@ -405,7 +407,7 @@ it('deletes a card after confirmation and re-renders from the refreshed list', a
   });
   expect(requestBody).toHaveBeenCalledWith({ Jwt: 'fresh-jwt', Token: amex.token });
   await waitFor(() => {
-    expect(screen.queryByText('AMEX •••• 0005')).not.toBeInTheDocument();
+    expect(screen.queryByText('American Express •••• 0005')).not.toBeInTheDocument();
   });
 });
 
@@ -428,7 +430,7 @@ it('does not delete when the confirmation dialog is cancelled', async () => {
   await user.click(await screen.findByRole('button', { name: 'Cancel' }));
 
   expect(deleteRequests).not.toHaveBeenCalled();
-  expect(screen.getByText('VISA •••• 4242')).toBeInTheDocument();
+  expect(screen.getByText('Visa •••• 4242')).toBeInTheDocument();
 });
 
 it('closes the dialog and shows an error when the delete fails', async () => {
@@ -454,7 +456,7 @@ it('closes the dialog and shows an error when the delete fails', async () => {
   await waitFor(() => {
     expect(screen.queryByText('Delete card?')).not.toBeInTheDocument();
   });
-  expect(screen.getByText('VISA •••• 4242')).toBeInTheDocument();
+  expect(screen.getByText('Visa •••• 4242')).toBeInTheDocument();
 });
 
 describe('add card gating', () => {
@@ -480,7 +482,7 @@ describe('add card gating', () => {
 
     renderWithProviders(<PaymentMethods />);
 
-    expect(await screen.findByText('VISA •••• 4242')).toBeInTheDocument();
+    expect(await screen.findByText('Visa •••• 4242')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add card' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Add card' })).not.toBeInTheDocument();
   });

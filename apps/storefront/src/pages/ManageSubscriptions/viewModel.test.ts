@@ -229,7 +229,8 @@ describe('buildSubscriptionCards', () => {
         line2: 'Suite 4',
         locality: 'Springfield, IL 62701',
       },
-      payment: { brand: 'Visa', last4: '1111', expiry: '3/2028' },
+      // Ordergroove stores a bare month; the card picker pads it, so the card line pads it too.
+      payment: { brand: 'Visa', last4: '1111', expiry: '03/2028' },
     });
   });
 

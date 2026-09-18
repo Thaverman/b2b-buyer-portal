@@ -8,7 +8,7 @@ import { PaymentSummary } from './viewModel';
  */
 export { displayCalendarDate as formatDate } from '@/utils/b3DateFormat';
 
-/** "Visa ending in 1111 · exp 3/2028", or the unbranded form for a card type the table does not name. */
+/** "Visa ending in 1111 · exp 03/2028", or the unbranded form for a card type the table does not name. */
 export const describePayment = (payment: PaymentSummary, b3Lang: LangFormatFunction) =>
   payment.brand
     ? b3Lang('subscriptions.card.payment', {

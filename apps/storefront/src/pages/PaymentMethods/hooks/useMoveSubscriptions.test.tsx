@@ -138,7 +138,7 @@ it('moves every subscription onto the chosen card and refreshes the check', asyn
     invalidate.mock.calls.map(([filters]) => (filters as { queryKey: unknown[] }).queryKey),
   ).toContainEqual(['subscriptionsUsingToken', customerId, 'tok-a']);
   expect(snackbar.success).toHaveBeenCalledWith(
-    'Subscriptions moved to AMEX ending in 1881 · exp 11/2029.',
+    'Subscriptions moved to American Express ending in 1881 · exp 11/2029.',
   );
 });
 

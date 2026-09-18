@@ -777,7 +777,7 @@
   "paymentMethods.deleteDialog.subscriptions.consequence": "If you delete it, these subscriptions can't be charged at their next order. Change their payment method first.",
   "paymentMethods.deleteDialog.subscriptions.manage": "Manage subscriptions",
   "paymentMethods.deleteDialog.subscriptions.checkFailed": "We couldn't check whether any subscriptions use this card.",
-  "paymentMethods.deleteDialog.move.title": "Use this card for all my subscriptions",
+  "paymentMethods.deleteDialog.move.title": "Move them all to another card:",
   "paymentMethods.deleteDialog.move.confirm": "Move subscriptions",
   "paymentMethods.deleteDialog.move.success": "Subscriptions moved to {card}.",
   "paymentMethods.deleteDialog.move.none": "No subscriptions use this card.",

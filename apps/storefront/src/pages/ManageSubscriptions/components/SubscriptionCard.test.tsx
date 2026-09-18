@@ -34,7 +34,7 @@ const buildCardWith = builder<SubscriptionCardModel>(() => ({
     line2: null,
     locality: 'Springfield, IL 62701',
   },
-  payment: { brand: 'Visa', last4: '1111', expiry: '3/2028' },
+  payment: { brand: 'Visa', last4: '1111', expiry: '03/2028' },
   paymentId: 'pay-a',
   billingAddressId: 'addr-1',
   cancelledOn: null,
@@ -77,7 +77,7 @@ it('renders every field of a loaded active card', () => {
   expect(
     screen.getByText('Ships to Jane Doe, Acme Co, 1 Main St, Springfield, IL 62701'),
   ).toBeInTheDocument();
-  expect(screen.getByText('Paid with Visa ending in 1111 · exp 3/2028')).toBeInTheDocument();
+  expect(screen.getByText('Paid with Visa ending in 1111 · exp 03/2028')).toBeInTheDocument();
   expect(screen.getByText('Next order 3 Oct 2026')).toBeInTheDocument();
   // Desktop: the schedule is its own column, outside the details group (the mobile test checks the inverse).
   expect(

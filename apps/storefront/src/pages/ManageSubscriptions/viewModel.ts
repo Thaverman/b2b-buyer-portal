@@ -9,7 +9,7 @@ import {
   OgProduct,
   OgSubscription,
 } from '@/shared/service/ordergroove';
-import { CARD_BRANDS } from '@/shared/service/ssw/cardOptions';
+import { CARD_BRANDS, formatRawExpiry } from '@/shared/service/ssw/cardOptions';
 import { formatOrderId } from '@/utils/orderId';
 
 interface ProductSummary {
@@ -32,7 +32,7 @@ export interface PaymentSummary {
   /** null for a card type Ordergroove's table does not name */
   brand: string | null;
   last4: string;
-  /** "M/YYYY" as Ordergroove sends it */
+  /** "MM/YYYY", padded to the shape the card picker prints */
   expiry: string;
 }
 
@@ -126,7 +126,7 @@ const summarizeAddress = (address: OgAddress): AddressSummary => ({
 const summarizePayment = (payment: OgPayment): PaymentSummary => ({
   brand: CARD_BRANDS[payment.cc_type] ?? null,
   last4: payment.cc_number_ending,
-  expiry: payment.cc_exp_date,
+  expiry: formatRawExpiry(payment.cc_exp_date),
 });
 
 interface UpcomingOrder {
