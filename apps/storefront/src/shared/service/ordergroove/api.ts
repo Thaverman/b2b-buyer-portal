@@ -186,7 +186,7 @@ const paymentUrl = (paymentId: string, action: string) =>
   `${API_BASE}/payments/${encodeURIComponent(paymentId)}/${action}/`;
 
 /** A BigCommerce stored instrument, in the shape Ordergroove's create endpoint wants. */
-export interface NewPaymentInput {
+interface NewPaymentInput {
   /** the BigCommerce stored-instrument token — Ordergroove's token_id, byte for byte (spec §11.2) */
   tokenId: string;
   last4: string;

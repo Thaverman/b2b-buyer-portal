@@ -12,7 +12,7 @@ import {
 import { CardOption, ccTypeFor } from '@/shared/service/ssw/cardOptions';
 import { snackbar } from '@/utils/b3Tip';
 
-export interface ChangeCardVariables {
+interface ChangeCardVariables {
   subscriptionId: string;
   option: CardOption;
   /** billing address of the subscription's current record, carried onto a new one */

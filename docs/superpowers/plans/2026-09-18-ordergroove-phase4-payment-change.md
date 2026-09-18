@@ -216,7 +216,7 @@ Expected: every `->` shows `200`; both restore lines report `true`. If a restore
 This task moves code without changing behaviour, so it has no new test of its own: the existing
 payment-methods suites are the test, and they must pass unchanged.
 
-- [ ] **Step 1: Create the shared module** by moving lines 1–149 of `src/pages/PaymentMethods/api.ts` verbatim into `src/shared/service/ssw/customerClient.ts`, with two edits:
+- [x] **Step 1: Create the shared module** by moving lines 1–149 of `src/pages/PaymentMethods/api.ts` verbatim into `src/shared/service/ssw/customerClient.ts`, with two edits:
 
 - drop `import { BillingFormValues } from './billingPrefill';` (only the Braintree vault uses it, which stays in the page)
 - change `import { getCurrentCustomerJWT } from '@/shared/service/bc';` and the other `@/` imports — they are already alias imports and need no change
@@ -228,7 +228,7 @@ The moved surface is exactly: `StoredInstrument`, `StoredInstrumentsResponse`, `
 `listStoredInstruments`. Keep every comment — they record why the casing is tolerated and why a 422
 carries no detail.
 
-- [ ] **Step 2: Reduce the page's `api.ts`** to its own actions:
+- [x] **Step 2: Reduce the page's `api.ts`** to its own actions:
 
 ```ts
 import {
@@ -256,7 +256,7 @@ export const vaultBraintreeInstrument = ({ … }) => post('VaultBraintreeInstrum
 Keep `vaultBraintreeInstrument` exactly as it is today, body and comments included; only its
 `post` now comes from the shared module.
 
-- [ ] **Step 3: Repoint the importers.** Find them:
+- [x] **Step 3: Repoint the importers.** Find them:
 
 Run: `grep -rn "StoredInstrument\|listStoredInstruments\|PaymentMethodsError\|isPaymentMethodsAvailable" src --include=*.ts --include=*.tsx | grep "from './api'\|from '../api'\|from '../../api'"`
 
@@ -266,18 +266,18 @@ For each hit, import those four names from `@/shared/service/ssw/customerClient`
 `components/PaymentMethodRow.tsx`, `components/AddPaymentMethodBraintreeDialog.tsx`,
 `vaultAccess.ts`, and the four test files. Do **not** re-export from `./api` — one canonical path.
 
-- [ ] **Step 4: Run the payment-methods and shared suites**
+- [x] **Step 4: Run the payment-methods and shared suites**
 
 Run: `yarn vitest run src/pages/PaymentMethods src/shared/service`
 Expected: every file green, with the same test counts as before the move. A failure here is a
 missed import, not a behaviour change.
 
-- [ ] **Step 5: Type-check and lint**
+- [x] **Step 5: Type-check and lint**
 
 Run: `yarn tsc --noEmit` then `yarn eslint --fix src/shared/service/ssw/customerClient.ts src/pages/PaymentMethods`
 Expected: both exit 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/storefront/src/shared/service/ssw/customerClient.ts apps/storefront/src/pages/PaymentMethods
@@ -306,7 +306,7 @@ git commit -m "refactor: B2B-0000 Lift the SSW customer middleware client into a
   - `changeSubscriptionPayment(customerId: string, subscriptionId: string, paymentId: string): Promise<OgSubscription>`
   - `usePaymentForAll(customerId: string, paymentId: string): Promise<unknown>`
 
-- [ ] **Step 1: Write the failing tests** — append to `api.test.ts`, adding `changeSubscriptionPayment`, `createPayment`, `usePaymentForAll` to the existing `from './api'` import list (alphabetical), and `buildOgSubscriptionWith` is already imported.
+- [x] **Step 1: Write the failing tests** — append to `api.test.ts`, adding `changeSubscriptionPayment`, `createPayment`, `usePaymentForAll` to the existing `from './api'` import list (alphabetical), and `buildOgSubscriptionWith` is already imported.
 
 ```ts
 describe('payment changes', () => {
@@ -413,12 +413,12 @@ describe('payment changes', () => {
 });
 ```
 
-- [ ] **Step 2: Run the file to verify the new tests fail**
+- [x] **Step 2: Run the file to verify the new tests fail**
 
 Run: `yarn vitest run src/shared/service/ordergroove/api.test.ts`
 Expected: the new cases fail — `createPayment is not a function` and siblings. The existing cases stay green.
 
-- [ ] **Step 3: Add the three calls** at the end of `api.ts`, beside the Phase 3a actions. Nothing else in `api.ts` changes — `parse`, `ogFetch` and `ogMutate` are untouched:
+- [x] **Step 3: Add the three calls** at the end of `api.ts`, beside the Phase 3a actions. Nothing else in `api.ts` changes — `parse`, `ogFetch` and `ogMutate` are untouched:
 
 ```ts
 const paymentUrl = (paymentId: string, action: string) =>
@@ -475,16 +475,16 @@ export const usePaymentForAll = (customerId: string, paymentId: string) =>
 An upcoming order follows its subscription's new payment on its own (Task 0 finding A), so there is
 no order-level repoint here.
 
-- [ ] **Step 4: Export from the barrel** — in `index.ts` add `changeSubscriptionPayment`, `createPayment`, `usePaymentForAll` to the `from './api'` list (alphabetical) and `NewPaymentInput` to the `export type` list.
+- [x] **Step 4: Export from the barrel** — in `index.ts` add `changeSubscriptionPayment`, `createPayment`, `usePaymentForAll` to the `from './api'` list (alphabetical) and `NewPaymentInput` to the `export type` list.
 
-- [ ] **Step 5: Run the file to verify it passes**
+- [x] **Step 5: Run the file to verify it passes**
 
 Run: `yarn vitest run src/shared/service/ordergroove/api.test.ts`
 Expected: every case passes, the pre-existing ones included.
 
-- [ ] **Step 7: Type-check** — `yarn tsc --noEmit`. Expected: exit 0.
+- [x] **Step 7: Type-check** — `yarn tsc --noEmit`. Expected: exit 0.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add apps/storefront/src/shared/service/ordergroove/api.ts apps/storefront/src/shared/service/ordergroove/index.ts apps/storefront/src/shared/service/ordergroove/api.test.ts
@@ -520,7 +520,7 @@ Also produced, on `SubscriptionCard` in `viewModel.ts`:
   - `paymentId: string` — the subscription's current Ordergroove payment record (`subscription.payment`)
   - `billingAddressId: string | null` — that record's `billing_address`, null until payments load
 
-- [ ] **Step 1: Write the failing tests** — put the card-option cases in the **new**
+- [x] **Step 1: Write the failing tests** — put the card-option cases in the **new**
 `src/shared/service/ssw/cardOptions.test.ts`, importing `buildCardOptions`, `ccTypeFor`,
 `formatExpiry` from `./cardOptions`, `StoredInstrument` from `./customerClient`, and
 `buildOgPaymentWith` from `tests/test-utils`.
@@ -617,12 +617,12 @@ describe('card type and expiry', () => {
 });
 ```
 
-- [ ] **Step 2: Run the file to verify the new tests fail**
+- [x] **Step 2: Run the file to verify the new tests fail**
 
 Run: `yarn vitest run src/shared/service/ssw/cardOptions.test.ts`
 Expected: the file fails to resolve `./cardOptions`.
 
-- [ ] **Step 3: Implement** — create `src/shared/service/ssw/cardOptions.ts` opening with
+- [x] **Step 3: Implement** — create `src/shared/service/ssw/cardOptions.ts` opening with
 
 ```ts
 import { OgPayment } from '@/shared/service/ordergroove';
@@ -694,12 +694,12 @@ export const buildCardOptions = (
 };
 ```
 
-- [ ] **Step 4: Run the file to verify it passes**
+- [x] **Step 4: Run the file to verify it passes**
 
 Run: `yarn vitest run src/shared/service/ssw/cardOptions.test.ts`
 Expected: every case passes.
 
-- [ ] **Step 5: Write the failing test for the two new card fields** — append to
+- [x] **Step 5: Write the failing test for the two new card fields** — append to
 `src/pages/ManageSubscriptions/viewModel.test.ts`:
 
 ```ts
@@ -719,12 +719,12 @@ it('carries the current payment record and its billing address', () => {
 });
 ```
 
-- [ ] **Step 6: Run it to verify it fails**
+- [x] **Step 6: Run it to verify it fails**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/viewModel.test.ts`
 Expected: fails — `paymentId` and `billingAddressId` are not on the card.
 
-- [ ] **Step 7: Add the two fields** — in `viewModel.ts`, extend `SubscriptionCard`:
+- [x] **Step 7: Add the two fields** — in `viewModel.ts`, extend `SubscriptionCard`:
 
 ```ts
   /** the Ordergroove payment record this subscription charges today */
@@ -743,14 +743,14 @@ and in `toCard`:
 Then add both fields to the `buildCardWith` defaults in all five card-builder test files listed
 above, using `paymentId: 'pay-a'` and `billingAddressId: 'addr-1'`.
 
-- [ ] **Step 8: Run the subscriptions suite**
+- [x] **Step 8: Run the subscriptions suite**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions src/shared/service/ssw`
 Expected: every file green.
 
-- [ ] **Step 9: Type-check and lint** — `yarn tsc --noEmit`; `yarn eslint --fix src/shared/service/ssw src/pages/ManageSubscriptions`. Both exit 0.
+- [x] **Step 9: Type-check and lint** — `yarn tsc --noEmit`; `yarn eslint --fix src/shared/service/ssw src/pages/ManageSubscriptions`. Both exit 0.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add apps/storefront/src/shared/service/ssw apps/storefront/src/pages/ManageSubscriptions
@@ -776,7 +776,7 @@ git commit -m "feat: B2B-0000 Build saved-card options joined to their Ordergroo
   - `ChangeCardDialog` props `{ options: CardOption[]; isOpen: boolean; isPending: boolean; onClose: () => void; onConfirm: (option: CardOption) => void }`
   - `SubscriptionActions` renders the `Change card` button on every active card.
 
-- [ ] **Step 1: Add the copy** — in `en.json`, after the `subscriptions.actions.changeDate.success` line:
+- [x] **Step 1: Add the copy** — in `en.json`, after the `subscriptions.actions.changeDate.success` line:
 
 ```json
   "subscriptions.actions.changeCard": "Change card",
@@ -791,7 +791,7 @@ git commit -m "feat: B2B-0000 Build saved-card options joined to their Ordergroo
 
 (Do not run eslint on `en.json` — it reports a bogus error on JSON.)
 
-- [ ] **Step 2: Write the failing hook test** — append to `useSubscriptionActions.test.tsx`:
+- [x] **Step 2: Write the failing hook test** — append to `useSubscriptionActions.test.tsx`:
 
 ```ts
 describe('changeCard', () => {
@@ -906,12 +906,12 @@ Add `CardOption` from `@/shared/service/ssw/cardOptions` and `buildOgPaymentWith
 `tests/test-utils`. The `orders/o-1/change_payment` handlers in the first two cases are harmless
 leftovers — delete them; Task 0 finding A proved the order follows on its own.
 
-- [ ] **Step 3: Run it to verify it fails**
+- [x] **Step 3: Run it to verify it fails**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/hooks/useSubscriptionActions.test.tsx`
 Expected: `actions().changeCard` is undefined — "Cannot read properties of undefined (reading 'mutate')".
 
-- [ ] **Step 4: Implement the mutation** — in `useSubscriptionActions.ts`, extend the imports and add before the `return`:
+- [x] **Step 4: Implement the mutation** — in `useSubscriptionActions.ts`, extend the imports and add before the `return`:
 
 ```ts
 export interface ChangeCardVariables {
@@ -948,12 +948,12 @@ const changeCard = useMutation({
 
 and return it: `return { skip, sendNow, changeDate, changeCard };`
 
-- [ ] **Step 5: Run the hook test to verify it passes**
+- [x] **Step 5: Run the hook test to verify it passes**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/hooks/useSubscriptionActions.test.tsx`
 Expected: all cases pass.
 
-- [ ] **Step 6: Write the failing dialog test** — `components/actions/ChangeCardDialog.test.tsx`:
+- [x] **Step 6: Write the failing dialog test** — `components/actions/ChangeCardDialog.test.tsx`:
 
 ```tsx
 import { ReactElement } from 'react';
@@ -1047,12 +1047,12 @@ it('disables Save while the write is pending', () => {
 });
 ```
 
-- [ ] **Step 7: Run it to verify it fails**
+- [x] **Step 7: Run it to verify it fails**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/components/actions/ChangeCardDialog.test.tsx`
 Expected: fails to resolve `./ChangeCardDialog`.
 
-- [ ] **Step 8: Create the dialog** — `ChangeCardDialog.tsx`:
+- [x] **Step 8: Create the dialog** — `ChangeCardDialog.tsx`:
 
 ```tsx
 import { useEffect, useState } from 'react';
@@ -1159,12 +1159,12 @@ export default ChangeCardDialog;
 `b3Lang` values are typed `string | number | Date`, so the sentence cannot carry a React node: pass
 `{ link: '' }` and render the button after the text, as above. Record the split at Task 6.
 
-- [ ] **Step 9: Run the dialog test to verify it passes**
+- [x] **Step 9: Run the dialog test to verify it passes**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/components/actions/ChangeCardDialog.test.tsx`
 Expected: three cases pass.
 
-- [ ] **Step 10: Write the failing row test** — append to `SubscriptionActions.test.tsx`:
+- [x] **Step 10: Write the failing row test** — append to `SubscriptionActions.test.tsx`:
 
 ```tsx
 it('offers Change card even when nothing is scheduled', async () => {
@@ -1183,12 +1183,12 @@ it('offers Change card even when nothing is scheduled', async () => {
 });
 ```
 
-- [ ] **Step 11: Run it to verify it fails**
+- [x] **Step 11: Run it to verify it fails**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/components/actions/SubscriptionActions.test.tsx`
 Expected: the new case fails — no `Change card` button, and the row renders nothing at all for a card with no upcoming order.
 
-- [ ] **Step 12: Wire the row** — in `SubscriptionActions.tsx`:
+- [x] **Step 12: Wire the row** — in `SubscriptionActions.tsx`:
 
 1. Add `'changeCard'` to `OpenDialog`.
 2. Replace the early `return null` so the row renders whenever the card is active, and gate only the three order actions:
@@ -1249,14 +1249,14 @@ only when `upcoming` exists, since each needs its order id.
 `card.paymentId` and `card.billingAddressId` come from Task 3; the card builders in the test files
 already carry them.
 
-- [ ] **Step 13: Run the ManageSubscriptions suite**
+- [x] **Step 13: Run the ManageSubscriptions suite**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions`
 Expected: every file green.
 
-- [ ] **Step 14: Type-check and lint** — `yarn tsc --noEmit`; `yarn eslint --fix src/pages/ManageSubscriptions`. Both exit 0.
+- [x] **Step 14: Type-check and lint** — `yarn tsc --noEmit`; `yarn eslint --fix src/pages/ManageSubscriptions`. Both exit 0.
 
-- [ ] **Step 15: Commit**
+- [x] **Step 15: Commit**
 
 ```bash
 git add apps/storefront/src/lib/lang/locales/en.json apps/storefront/src/pages/ManageSubscriptions
@@ -1280,7 +1280,7 @@ git commit -m "feat: B2B-0000 Let a customer move a subscription onto another sa
   - `useMoveSubscriptions(customerId: number, token: string | undefined, enabled: boolean)` returning `{ options: CardOption[]; move: UseMutationResult<void, Error, CardOption> }`
   - `DeleteSubscriptionWarning` gains FOUR props: `{ moveOptions: CardOption[]; isMoving: boolean; hasMoved: boolean; onMove: (option: CardOption) => void }`
 
-- [ ] **Step 1: Add the copy** — in `en.json`, after `paymentMethods.deleteDialog.subscriptions.checkFailed`:
+- [x] **Step 1: Add the copy** — in `en.json`, after `paymentMethods.deleteDialog.subscriptions.checkFailed`:
 
 ```json
   "paymentMethods.deleteDialog.move.title": "Use this card for all my subscriptions",
@@ -1290,7 +1290,7 @@ git commit -m "feat: B2B-0000 Let a customer move a subscription onto another sa
   "paymentMethods.deleteDialog.move.option": "{brand} ending in {last4} · exp {expiry}",
 ```
 
-- [ ] **Step 2: Write the failing hook test** — `hooks/useMoveSubscriptions.test.tsx`. It follows the
+- [x] **Step 2: Write the failing hook test** — `hooks/useMoveSubscriptions.test.tsx`. It follows the
 `useSubscriptionActions` harness: a probe component, `renderWithProviders`, and a spy on
 `QueryClient.prototype.invalidateQueries`.
 
@@ -1456,12 +1456,12 @@ it('reports a failed move', async () => {
 });
 ```
 
-- [ ] **Step 3: Run it to verify it fails**
+- [x] **Step 3: Run it to verify it fails**
 
 Run: `yarn vitest run src/pages/PaymentMethods/hooks/useMoveSubscriptions.test.tsx`
 Expected: fails to resolve `./useMoveSubscriptions`.
 
-- [ ] **Step 4: Implement the hook** — `hooks/useMoveSubscriptions.ts`:
+- [x] **Step 4: Implement the hook** — `hooks/useMoveSubscriptions.ts`:
 
 ```ts
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -1557,12 +1557,12 @@ export const useMoveSubscriptions = (
 `buildCardOptions` is imported from the shared module Task 3 created, not from the subscriptions
 page — a page importing another page's view model would fail dependency-cruiser.
 
-- [ ] **Step 5: Run the hook test to verify it passes**
+- [x] **Step 5: Run the hook test to verify it passes**
 
 Run: `yarn vitest run src/pages/PaymentMethods/hooks/useMoveSubscriptions.test.tsx`
 Expected: four cases pass.
 
-- [ ] **Step 6: Write the failing dialog test** — append to `index.subscriptions.test.tsx`:
+- [x] **Step 6: Write the failing dialog test** — append to `index.subscriptions.test.tsx`:
 
 ```tsx
 it('offers to move the subscriptions, then shows the card is clear without deleting it', async () => {
@@ -1630,12 +1630,12 @@ it('does not offer a move when there is nowhere to move to', async () => {
 Reuse the file's existing `mockInstruments`, `page` and `renderPage` helpers; if a helper has a
 different name in that file, use the one that is there rather than adding another.
 
-- [ ] **Step 7: Run it to verify it fails**
+- [x] **Step 7: Run it to verify it fails**
 
 Run: `yarn vitest run src/pages/PaymentMethods/index.subscriptions.test.tsx`
 Expected: both new cases fail — there is no `Move subscriptions` button.
 
-- [ ] **Step 8: Extend the warning component** — in `DeleteSubscriptionWarning.tsx` add the props and render the offer inside the existing `Alert`, after the consequence line and before the manage button:
+- [x] **Step 8: Extend the warning component** — in `DeleteSubscriptionWarning.tsx` add the props and render the offer inside the existing `Alert`, after the consequence line and before the manage button:
 
 ```tsx
 interface DeleteSubscriptionWarningProps {
@@ -1705,7 +1705,7 @@ has not run; after a successful move the query re-runs and returns an empty arra
 
 with `hasMoved: boolean` as a seventh prop, true once the page's move mutation has succeeded.
 
-- [ ] **Step 9: Wire the page** — in `PaymentMethods/index.tsx`:
+- [x] **Step 9: Wire the page** — in `PaymentMethods/index.tsx`:
 
 ```tsx
   const moveSubscriptions = useMoveSubscriptions(
@@ -1733,14 +1733,14 @@ Also disable the dialog's Delete and Cancel while `moveSubscriptions.move.isPend
 the existing `disabledSaveBtn` expression and the left-click guard. Reset nothing else: closing the
 dialog clears `pendingDelete`, and the hook's queries are keyed on the token.
 
-- [ ] **Step 10: Run the payment-methods suites**
+- [x] **Step 10: Run the payment-methods suites**
 
 Run: `yarn vitest run src/pages/PaymentMethods`
 Expected: every file green, the two new cases included.
 
-- [ ] **Step 11: Type-check and lint** — `yarn tsc --noEmit`; `yarn eslint --fix src/pages/PaymentMethods`. Both exit 0.
+- [x] **Step 11: Type-check and lint** — `yarn tsc --noEmit`; `yarn eslint --fix src/pages/PaymentMethods`. Both exit 0.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git add apps/storefront/src/lib/lang/locales/en.json apps/storefront/src/pages/PaymentMethods
@@ -1756,7 +1756,7 @@ git commit -m "feat: B2B-0000 Offer to move subscriptions to another card before
 - Modify: `.memory/b2b-buyer-portal--ordergroove-custom-msp-architecture.md`
 - Modify: this plan (tick the boxes; record the Task 0 findings if not done)
 
-- [ ] **Step 1: Type-check and lint everything**
+- [x] **Step 1: Type-check and lint everything**
 
 ```bash
 yarn tsc --noEmit
@@ -1768,7 +1768,7 @@ yarn lint:knip
 Expected: `tsc` exit 0; dependency-cruiser "no dependency violations"; `lint:eslint` exit 0; knip
 reports only the pre-existing `BillingStateOption` in `src/pages/PaymentMethods/billingPrefill.ts`.
 
-- [ ] **Step 2: Run the scoped suites, then the full suite against the baseline**
+- [x] **Step 2: Run the scoped suites, then the full suite against the baseline**
 
 ```bash
 yarn vitest run src/pages/ManageSubscriptions src/pages/PaymentMethods src/shared/service
@@ -1785,7 +1785,7 @@ Expected: every name the `comm` prints passes when run on its own. Run each one 
 also fails alone is a real regression to fix before continuing. The timing-out set shuffles run to
 run, so names appearing and disappearing is normal.
 
-- [ ] **Step 3: Align the spec with what shipped** — edit the Phase 4 spec:
+- [x] **Step 3: Align the spec with what shipped** — edit the Phase 4 spec:
 
 1. §3.2 and §9.1: record Task 0 finding A — the upcoming order DOES follow its subscription — and
    strike `changeOrderPayment` from the table, saying the probe removed it.
@@ -1798,7 +1798,7 @@ run, so names appearing and disappearing is normal.
    React values, record the split.
 5. §11.2: replace the spike's remembered inventory with Task 0 finding B's live numbers.
 
-- [ ] **Step 4: Record the outcome in the memory note** — append to the Ordergroove note in
+- [x] **Step 4: Record the outcome in the memory note** — append to the Ordergroove note in
 `.memory/`, after the Phase 3a sections:
 
 ```
@@ -1827,7 +1827,7 @@ keeping its trailing `Related board:` line) and append the same section to the M
 `memory.entries` `_id 6a982e6f24e380927044ba89` (`body` field) as the earlier phases did. The Mongo
 command uses a runtime credential variable, so run it from the main checkout, not a worktree.
 
-- [ ] **Step 5: Commit the docs**
+- [x] **Step 5: Commit the docs**
 
 ```bash
 git add docs/superpowers/specs/2026-09-17-ordergroove-phase4-payment-change-design.md docs/superpowers/plans/2026-09-18-ordergroove-phase4-payment-change.md .memory/b2b-buyer-portal--ordergroove-custom-msp-architecture.md
