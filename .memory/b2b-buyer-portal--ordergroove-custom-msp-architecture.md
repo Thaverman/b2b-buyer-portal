@@ -390,3 +390,23 @@ real gateway tokens; otherwise last4/brand is a heuristic only.
   ("03/2028"), so the two never match as strings. A first run aborted between its two repoints on
   exactly that mismatch and left one subscription on the wrong card until a restore script moved it
   back. Match the picker's own "(current)" label instead of the card line.
+
+
+## Phase 4 on the DEPLOYED sandbox bundle (2026-09-18, read-only)
+Sandbox served `index.js` last-modified 18 Sep 2026 18:37 UTC — after the merge — and the check ran
+with NO route interception and NO injection, so this is what a customer gets.
+- 14 cards, no hosted iframe, and all 14 carry `Change card` beside Skip / Send now / Change date.
+- The picker offers all three saved cards, marks and preselects the current one, and keeps Save
+  disabled until a different card is chosen.
+- The delete dialog names 13 subscriptions (5 listed, "and 8 more"), offers the other two cards,
+  keeps "Move subscriptions" disabled until one is picked, and still shows Cancel / Delete.
+- Every rendered next-order date matches the API's `place` calendar day (12 distinct dates, two
+  shared by two cards each) — the displayFormat off-by-one is gone in the deployed build.
+- Zero non-GET requests to Ordergroove, zero `DeleteStoredInstrument`, zero failed requests, zero
+  error alerts. Scripts: `pw/sandbox-phase4-deployed.mjs`, `pw/sandbox-phase4-dates.mjs`.
+- TWO COSMETIC DEFECTS now visible in production copy, neither fixed: (1) the card line renders
+  Ordergroove's `cc_type`/`cc_exp_date` ("Visa ... exp 3/2028") while the picker renders the BC
+  stored instrument ("VISA ... exp 03/2028"), and with three Visa cards all ending 1111 the expiry
+  is the only distinguishing token; (2) the delete dialog's heading "Use this card for all my
+  subscriptions" sits above radios for the OTHER cards, so "this card" reads as the card being
+  deleted.
