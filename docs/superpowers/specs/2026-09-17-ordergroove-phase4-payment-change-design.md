@@ -103,7 +103,7 @@ the `use` prefix reads as a React hook, which it is not.
 ### 3.3 Creating a record
 
 ```ts
-export interface NewPaymentInput {
+interface NewPaymentInput {
   /** the BigCommerce stored-instrument token — Ordergroove's token_id, byte for byte (spike §2) */
   tokenId: string;
   last4: string;
