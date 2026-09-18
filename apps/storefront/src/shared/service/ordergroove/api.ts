@@ -181,3 +181,50 @@ export const changeNextOrderDate = (
     'PATCH',
     { order_date: orderDate },
   );
+
+const paymentUrl = (paymentId: string, action: string) =>
+  `${API_BASE}/payments/${encodeURIComponent(paymentId)}/${action}/`;
+
+/** A BigCommerce stored instrument, in the shape Ordergroove's create endpoint wants. */
+export interface NewPaymentInput {
+  /** the BigCommerce stored-instrument token — Ordergroove's token_id, byte for byte (spec §11.2) */
+  tokenId: string;
+  last4: string;
+  /** "MM/YYYY", zero-padded */
+  expiry: string;
+  /** Ordergroove credit-card type code; omitted for a brand we do not map */
+  ccType?: number;
+  /** the billing address of the subscription's current record, when known */
+  billingAddress?: string;
+}
+
+/**
+ * Registers a card Ordergroove does not hold yet. One-way: Ordergroove has no delete for payment
+ * records, so callers must look for a live record with the same token first (spec §5).
+ */
+export const createPayment = (customerId: string, input: NewPaymentInput) =>
+  ogMutate<OgPayment>(customerId, `${API_BASE}/payments/create/`, 'POST', {
+    customer: customerId,
+    token_id: input.tokenId,
+    cc_number_ending: input.last4,
+    cc_exp_date: input.expiry,
+    ...(input.ccType === undefined ? {} : { cc_type: input.ccType }),
+    ...(input.billingAddress === undefined ? {} : { billing_address: input.billingAddress }),
+  });
+
+export const changeSubscriptionPayment = (
+  customerId: string,
+  subscriptionId: string,
+  paymentId: string,
+) =>
+  ogMutate<OgSubscription>(customerId, subscriptionUrl(subscriptionId, 'change_payment'), 'PATCH', {
+    payment: paymentId,
+  });
+
+/**
+ * Moves every subscription AND every upcoming order of the customer onto this record — verified
+ * live 2026-09-18 (14 of 14 subscriptions, 12 of 12 orders), which is why the copy says
+ * "all my subscriptions" rather than "these".
+ */
+export const usePaymentForAll = (customerId: string, paymentId: string) =>
+  ogMutate<unknown>(customerId, paymentUrl(paymentId, 'use_for_all'), 'POST');

@@ -1,5 +1,7 @@
 export {
   changeNextOrderDate,
+  changeSubscriptionPayment,
+  createPayment,
   getProduct,
   getSubscriptionsUsingToken,
   listAddresses,
@@ -10,10 +12,12 @@ export {
   orderHistoryUrl,
   sendOrderNow,
   skipSubscription,
+  usePaymentForAll,
   withTimeout,
 } from './api';
 export { isCustomManagerAvailable, isSubscriptionsAvailable } from './config';
 export { OrdergrooveError } from './errors';
+export type { NewPaymentInput } from './api';
 export type {
   FrequencyPeriod,
   OgAddress,

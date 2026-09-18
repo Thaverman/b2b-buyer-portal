@@ -14,6 +14,8 @@ import {
 
 import {
   changeNextOrderDate,
+  changeSubscriptionPayment,
+  createPayment,
   getProduct,
   getSubscriptionsUsingToken,
   listAddresses,
@@ -24,6 +26,7 @@ import {
   orderHistoryUrl,
   sendOrderNow,
   skipSubscription,
+  usePaymentForAll,
 } from './api';
 import { invalidateAuthorization } from './auth';
 
@@ -430,5 +433,111 @@ describe('writes', () => {
     await vi.advanceTimersByTimeAsync(5000);
     await assertion;
     expect(settled).toBe(true);
+  });
+});
+
+describe('payment changes', () => {
+  it('creates a payment record from a stored instrument', async () => {
+    const received = vi.fn();
+    const payment = buildOgPaymentWith({ public_id: 'pay-new' });
+    server.use(
+      http.post(`${ogBase}/payments/create/`, async ({ request }) => {
+        received(await request.json());
+
+        return HttpResponse.json(payment);
+      }),
+    );
+
+    const result = await createPayment('80591', {
+      tokenId: 'tok-1',
+      last4: '4242',
+      expiry: '03/2028',
+      ccType: 1,
+      billingAddress: 'addr-1',
+    });
+
+    expect(result).toEqual(payment);
+    expect(received).toHaveBeenCalledWith({
+      customer: '80591',
+      token_id: 'tok-1',
+      cc_number_ending: '4242',
+      cc_exp_date: '03/2028',
+      cc_type: 1,
+      billing_address: 'addr-1',
+    });
+  });
+
+  it('omits the optional fields it was not given', async () => {
+    const received = vi.fn();
+    server.use(
+      http.post(`${ogBase}/payments/create/`, async ({ request }) => {
+        received(await request.json());
+
+        return HttpResponse.json(buildOgPaymentWith('WHATEVER_VALUES'));
+      }),
+    );
+
+    await createPayment('80591', { tokenId: 'tok-1', last4: '4242', expiry: '03/2028' });
+
+    expect(received).toHaveBeenCalledWith({
+      customer: '80591',
+      token_id: 'tok-1',
+      cc_number_ending: '4242',
+      cc_exp_date: '03/2028',
+    });
+  });
+
+  it('repoints one subscription at a payment record', async () => {
+    const received = vi.fn();
+    const subscription = buildOgSubscriptionWith({ payment: 'pay-2' });
+    server.use(
+      http.patch(`${ogBase}/subscriptions/sub-1/change_payment/`, async ({ request }) => {
+        received(await request.json());
+
+        return HttpResponse.json(subscription);
+      }),
+    );
+
+    expect(await changeSubscriptionPayment(someCustomerId(), 'sub-1', 'pay-2')).toEqual(
+      subscription,
+    );
+    expect(received).toHaveBeenCalledWith({ payment: 'pay-2' });
+  });
+
+  it('uses a payment for every subscription and order the customer has', async () => {
+    const calls = vi.fn();
+    server.use(
+      http.post(`${ogBase}/payments/pay-2/use_for_all/`, async ({ request }) => {
+        calls(request.method, await request.text());
+
+        // Verified live 2026-09-18: 200 with a parseable JSON body, and it moves orders too.
+        return HttpResponse.json({});
+      }),
+    );
+
+    await usePaymentForAll(someCustomerId(), 'pay-2');
+
+    expect(calls).toHaveBeenCalledWith('POST', '');
+  });
+
+  it('maps failures on the use-for-all call', async () => {
+    server.use(
+      http.post(
+        `${ogBase}/payments/pay-2/use_for_all/`,
+        () => new HttpResponse(null, { status: 500 }),
+      ),
+    );
+    await expect(usePaymentForAll(someCustomerId(), 'pay-2')).rejects.toMatchObject({
+      kind: 'upstream',
+    });
+
+    server.use(
+      http.post(`${ogBase}/payments/pay-2/use_for_all/`, () =>
+        HttpResponse.json({ detail: 'Authentication Failed' }, { status: 403 }),
+      ),
+    );
+    await expect(usePaymentForAll(someCustomerId(), 'pay-2')).rejects.toMatchObject({
+      kind: 'sessionExpired',
+    });
   });
 });
