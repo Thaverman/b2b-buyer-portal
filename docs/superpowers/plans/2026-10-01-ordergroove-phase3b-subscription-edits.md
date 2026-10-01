@@ -1226,18 +1226,26 @@ const renderOpen = (dialog: (isOpen: boolean) => ReactElement) => {
   return view;
 };
 
+type CancelDialogProps = Parameters<typeof CancelDialog>[0];
+
+// Explicit props with defaults, not a JSX spread: CLAUDE.md forbids new jsx-props-no-spreading violations.
 const dialog = (
   isOpen: boolean,
-  over: Partial<Parameters<typeof CancelDialog>[0]> = {},
+  {
+    card = buildCardWith('WHATEVER_VALUES'),
+    isPending = false,
+    onClose = vi.fn(),
+    onSkipInstead = vi.fn(),
+    onConfirm = vi.fn(),
+  }: Partial<Omit<CancelDialogProps, 'isOpen'>> = {},
 ): ReactElement => (
   <CancelDialog
-    card={buildCardWith('WHATEVER_VALUES')}
+    card={card}
     isOpen={isOpen}
-    isPending={false}
-    onClose={vi.fn()}
-    onSkipInstead={vi.fn()}
-    onConfirm={vi.fn()}
-    {...over}
+    isPending={isPending}
+    onClose={onClose}
+    onSkipInstead={onSkipInstead}
+    onConfirm={onConfirm}
   />
 );
 
@@ -1325,8 +1333,6 @@ it('forgets the previous choice when reopened', async () => {
   expect(screen.getByRole('radio', { name: 'I stopped using this product' })).not.toBeChecked();
 });
 ```
-
-Note on the `{...over}` spread: `react/jsx-props-no-spreading` is disabled project-wide (CLAUDE.md), and this is test code; if the reviewer prefers, replace the spread with explicit props.
 
 - [ ] **Step 2: Write the failing Reactivate dialog tests** — `ReactivateDialog.test.tsx`:
 
@@ -1982,16 +1988,25 @@ const buildCardWith = builder<SubscriptionCardModel>(() => ({
   cancelledOn: null,
 }));
 
-const renderSelects = (over: Partial<Parameters<typeof QuantityFrequencySelects>[0]> = {}) =>
+type SelectsProps = Parameters<typeof QuantityFrequencySelects>[0];
+
+// Explicit props with defaults, not a JSX spread: CLAUDE.md forbids new jsx-props-no-spreading violations.
+const renderSelects = ({
+  card = buildCardWith('WHATEVER_VALUES'),
+  disabled = false,
+  quantityPending = false,
+  frequencyPending = false,
+  onChangeQuantity = vi.fn(),
+  onChangeFrequency = vi.fn(),
+}: Partial<SelectsProps> = {}) =>
   renderWithProviders(
     <QuantityFrequencySelects
-      card={buildCardWith('WHATEVER_VALUES')}
-      disabled={false}
-      quantityPending={false}
-      frequencyPending={false}
-      onChangeQuantity={vi.fn()}
-      onChangeFrequency={vi.fn()}
-      {...over}
+      card={card}
+      disabled={disabled}
+      quantityPending={quantityPending}
+      frequencyPending={frequencyPending}
+      onChangeQuantity={onChangeQuantity}
+      onChangeFrequency={onChangeFrequency}
     />,
   );
 
