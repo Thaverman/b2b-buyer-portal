@@ -185,12 +185,22 @@ it('lists every active subscription across pages with its product, schedule, add
 
   expect(await screen.findByText('Kraft Paper Shopping Bags')).toBeInTheDocument();
   expect(screen.getByText('Tissue Paper')).toBeInTheDocument();
-  expect(screen.getByText('Qty 2 · every 4 weeks')).toBeInTheDocument();
-  expect(screen.getByText('Qty 1 · every 2 weeks')).toBeInTheDocument();
+  // An active card shows its schedule in the selects, which replace the "Qty · every" line.
+  const bagsGroup = within(screen.getByRole('group', { name: 'Kraft Paper Shopping Bags' }));
+  expect(bagsGroup.getByRole('combobox', { name: /^Quantity/ })).toHaveTextContent('2');
+  expect(bagsGroup.getByRole('combobox', { name: /^Frequency/ })).toHaveTextContent(
+    'every 4 weeks',
+  );
+  const tissueGroup = within(screen.getByRole('group', { name: 'Tissue Paper' }));
+  expect(tissueGroup.getByRole('combobox', { name: /^Quantity/ })).toHaveTextContent('1');
+  expect(tissueGroup.getByRole('combobox', { name: /^Frequency/ })).toHaveTextContent(
+    'every 2 weeks',
+  );
   expect(await screen.findByText('Next order 3 Oct 2026')).toBeInTheDocument();
   expect(screen.getByText('No upcoming order')).toBeInTheDocument();
+  // The line now ends "· Change" after the address, which is a button of its own.
   expect(
-    screen.getAllByText('Ships to Jane Doe, Acme Co, 1 Main St, Springfield, IL 62701'),
+    screen.getAllByText(/^Ships to Jane Doe, Acme Co, 1 Main St, Springfield, IL 62701/),
   ).toHaveLength(2);
   expect(screen.getAllByText('Paid with Visa ending in 1111 · exp 03/2028')).toHaveLength(2);
   expect(screen.queryByText(/couldn't/)).not.toBeInTheDocument();
@@ -380,8 +390,8 @@ it('skips a subscription from its card and shows the moved date', async () => {
 });
 
 it('offers actions only on active cards with an upcoming order', async () => {
-  const scheduled = buildOgSubscriptionWith({ product: '9537_12118' });
-  const unscheduled = buildOgSubscriptionWith({ product: '7674_9534' });
+  const scheduled = buildOgSubscriptionWith({ product: '9537_12118', quantity: 2 });
+  const unscheduled = buildOgSubscriptionWith({ product: '7674_9534', quantity: 3 });
   const cancelled = buildOgSubscriptionWith({
     product: '9492_11808',
     cancelled: '2026-08-01 10:00:00',
@@ -413,6 +423,22 @@ it('offers actions only on active cards with an upcoming order', async () => {
   expect(unscheduledGroup.queryByRole('button', { name: 'Send now' })).not.toBeInTheDocument();
   expect(unscheduledGroup.queryByRole('button', { name: 'Change date' })).not.toBeInTheDocument();
   expect(unscheduledGroup.getByRole('button', { name: 'Change card' })).toBeInTheDocument();
+  expect(unscheduledGroup.getByRole('button', { name: 'Cancel subscription' })).toBeInTheDocument();
+  expect(unscheduledGroup.getByRole('combobox', { name: /^Quantity/ })).toBeInTheDocument();
+  // Addresses were mocked empty, so there is nothing to move to and no Change control.
+  expect(unscheduledGroup.queryByRole('button', { name: 'Change' })).not.toBeInTheDocument();
+  // Two cards, two quantities: each select shows its own card's.
+  expect(
+    within(screen.getByRole('group', { name: 'Scheduled' })).getByRole('combobox', {
+      name: /^Quantity/,
+    }),
+  ).toHaveTextContent('2');
+  expect(unscheduledGroup.getByRole('combobox', { name: /^Quantity/ })).toHaveTextContent('3');
+  // A select's id also feeds its aria-labelledby, so no two may match. The text checks above cannot
+  // see a shared id: each select keeps its own text and accessible name either way.
+  const selectIds = screen.getAllByRole('combobox').map((select) => select.id);
+  expect(selectIds).toHaveLength(4);
+  expect(new Set(selectIds).size).toBe(4);
 
   await user.click(screen.getByRole('button', { name: '1 cancelled subscription' }));
   expect(
@@ -428,4 +454,84 @@ it('links back to the hosted manager in the top window', async () => {
   const link = await screen.findByRole('link', { name: 'Manage in the subscription manager' });
   expect(link).toHaveAttribute('href', `${BigCommerceStorefrontAPIBaseURL}/subscriptions`);
   expect(link).toHaveAttribute('target', '_top');
+});
+
+it('changes the quantity from the card and shows the new value once Ordergroove has it', async () => {
+  const subscription = buildOgSubscriptionWith({ product: '9537_12118', quantity: 2 });
+  const received = vi.fn();
+  let changed = false;
+  mockResources({
+    subscriptions: [subscription],
+    products: { '9537_12118': buildOgProductWith({ name: 'Kraft Paper Shopping Bags' }) },
+  });
+  // Later handlers win in MSW: the list answers the new quantity once the write has landed.
+  server.use(
+    http.get(`${ogBase}/subscriptions/`, () =>
+      HttpResponse.json(page([{ ...subscription, quantity: changed ? 3 : 2 }])),
+    ),
+    http.patch(
+      `${ogBase}/subscriptions/${subscription.public_id}/change_quantity/`,
+      async ({ request }) => {
+        received(await request.json());
+        changed = true;
+
+        return HttpResponse.json({ ...subscription, quantity: 3 });
+      },
+    ),
+  );
+
+  const { user } = renderPage();
+
+  const group = await screen.findByRole('group', { name: 'Kraft Paper Shopping Bags' });
+  expect(within(group).getByRole('combobox', { name: /^Quantity/ })).toHaveTextContent('2');
+  await user.click(within(group).getByRole('combobox', { name: /^Quantity/ }));
+  await user.click(screen.getByRole('option', { name: '3' }));
+
+  await waitFor(() =>
+    expect(within(group).getByRole('combobox', { name: /^Quantity/ })).toHaveTextContent('3'),
+  );
+  expect(received).toHaveBeenCalledWith({ quantity: 3 });
+  expect(snackbar.success).toHaveBeenCalledWith('Quantity updated.');
+});
+
+it('cancels a subscription without a reason and moves it to the cancelled list', async () => {
+  const subscription = buildOgSubscriptionWith({ product: '9537_12118' });
+  const received = vi.fn();
+  let cancelled = false;
+  mockResources({
+    subscriptions: [subscription],
+    products: { '9537_12118': buildOgProductWith({ name: 'Kraft Paper Shopping Bags' }) },
+  });
+  server.use(
+    http.get(`${ogBase}/subscriptions/`, () =>
+      HttpResponse.json(
+        page([
+          cancelled
+            ? { ...subscription, cancelled: '2026-10-01 10:00:00', live: false }
+            : subscription,
+        ]),
+      ),
+    ),
+    http.patch(`${ogBase}/subscriptions/${subscription.public_id}/cancel/`, async ({ request }) => {
+      received(await request.json());
+      cancelled = true;
+
+      return HttpResponse.json({ ...subscription, cancelled: '2026-10-01 10:00:00', live: false });
+    }),
+  );
+
+  const { user } = renderPage();
+
+  await screen.findByRole('group', { name: 'Kraft Paper Shopping Bags' });
+  await user.click(screen.getByRole('button', { name: 'Cancel subscription' }));
+  await user.click(
+    within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel subscription' }),
+  );
+
+  expect(await screen.findByText("You don't have any active subscriptions.")).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '1 cancelled subscription' })).toBeInTheDocument();
+  expect(received).toHaveBeenCalledWith({
+    cancel_reason: '114|Cancelled without exit survey response',
+  });
+  expect(snackbar.success).toHaveBeenCalledWith('Subscription cancelled.');
 });
