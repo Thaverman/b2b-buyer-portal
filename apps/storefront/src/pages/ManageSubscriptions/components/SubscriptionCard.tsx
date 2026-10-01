@@ -4,7 +4,7 @@ import { Box, Card, CardContent, Link, Skeleton, Typography } from '@mui/materia
 import { useMobile } from '@/hooks/useMobile';
 import { useB3Lang } from '@/lib/lang';
 
-import { describePayment, formatDate } from '../format';
+import { describeAddress, describeFrequency, describePayment, formatDate } from '../format';
 import { SubscriptionCard as SubscriptionCardModel } from '../viewModel';
 
 /** True while the query behind a cell is still pending; false once it settled, even by failing. */
@@ -36,22 +36,8 @@ function SubscriptionCard({ card, variant, loading, actions }: SubscriptionCardP
     return value ?? fallback;
   };
 
-  const frequency =
-    card.frequencyDays % 7 === 0
-      ? b3Lang('subscriptions.card.everyWeeks', { count: card.frequencyDays / 7 })
-      : b3Lang('subscriptions.card.everyDays', { count: card.frequencyDays });
-
-  const shipping =
-    card.shippingAddress &&
-    [
-      card.shippingAddress.name,
-      card.shippingAddress.company,
-      card.shippingAddress.line1,
-      card.shippingAddress.line2,
-      card.shippingAddress.locality,
-    ]
-      .filter(Boolean)
-      .join(', ');
+  const frequency = describeFrequency(card.every, card.everyPeriod, b3Lang);
+  const shipping = card.shippingAddress && describeAddress(card.shippingAddress);
 
   const paymentText = () => (card.payment ? describePayment(card.payment, b3Lang) : null);
 

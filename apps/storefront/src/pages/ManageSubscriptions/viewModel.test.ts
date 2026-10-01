@@ -7,13 +7,19 @@ import {
   buildOgSubscriptionWith,
 } from 'tests/test-utils';
 
+import { OgAddress } from '@/shared/service/ordergroove';
 import { formatOrderId } from '@/utils/orderId';
 
 import {
   addIntervals,
+  buildAddressOptions,
   buildRecentOrders,
   buildSubscriptionCards,
+  cancelReasonBody,
   changeDatePresets,
+  frequencyKey,
+  frequencyOptions,
+  quantityOptions,
 } from './viewModel';
 
 const nothingLoaded = {
@@ -202,7 +208,6 @@ describe('buildSubscriptionCards', () => {
       shipping_address: address.public_id,
       payment: payment.public_id,
       quantity: 2,
-      frequency_days: 28,
     });
 
     const [card] = buildSubscriptionCards([subscription], {
@@ -215,7 +220,6 @@ describe('buildSubscriptionCards', () => {
     expect(card).toMatchObject({
       externalProductId: '9537_12118',
       quantity: 2,
-      frequencyDays: 28,
       product: {
         name: 'Kraft Paper Shopping Bags',
         sku: '9537',
@@ -421,5 +425,144 @@ describe('buildRecentOrders', () => {
       '2026-08-01',
       '2026-07-01',
     ]);
+  });
+});
+
+describe('schedule options', () => {
+  // Ordergroove merchant configuration captured from SSW's manager bundle (spec §4.3, §12.2).
+  const sswList = [
+    { every: 2, period: 1 },
+    { every: 4, period: 1 },
+    { every: 6, period: 1 },
+    { every: 8, period: 1 },
+    { every: 10, period: 1 },
+    { every: 12, period: 1 },
+    { every: 1, period: 1 },
+    { every: 2, period: 2 },
+    { every: 4, period: 2 },
+    { every: 6, period: 2 },
+    { every: 8, period: 2 },
+    { every: 10, period: 2 },
+    { every: 12, period: 2 },
+  ];
+
+  it("offers SSW's frequency list in the manager's order when the current schedule is on it", () => {
+    expect(frequencyOptions(4, 2)).toEqual(sswList);
+  });
+
+  it('appends a schedule SSW does not offer as the last option, exactly once', () => {
+    expect(frequencyOptions(10, 3)).toEqual([...sswList, { every: 10, period: 3 }]);
+    expect(frequencyOptions(4, 3)).toHaveLength(14);
+  });
+
+  it('keys a schedule for a select as every-period', () => {
+    expect(frequencyKey({ every: 4, period: 2 })).toBe('4-2');
+  });
+
+  it('offers quantities 1 to 20, plus the current one when it is larger', () => {
+    const oneToTwenty = Array.from({ length: 20 }, (_, index) => index + 1);
+
+    expect(quantityOptions(2)).toEqual(oneToTwenty);
+    expect(quantityOptions(20)).toEqual(oneToTwenty);
+    expect(quantityOptions(32)).toEqual([...oneToTwenty, 32]);
+  });
+});
+
+describe('cancel reason body', () => {
+  it("sends the manager's own values: listed reason, Other with and without details, no survey", () => {
+    expect(cancelReasonBody({ code: 8 })).toBe('8 | This product is too expensive');
+    expect(cancelReasonBody({ code: 1, details: '  Moving house  ' })).toBe('1 | Moving house');
+    expect(cancelReasonBody({ code: 1, details: '   ' })).toBe('1');
+    expect(cancelReasonBody({ code: 1 })).toBe('1');
+    expect(cancelReasonBody(null)).toBe('114|Cancelled without exit survey response');
+  });
+});
+
+describe('address options', () => {
+  const address = (over: Partial<OgAddress>) =>
+    buildOgAddressWith({
+      first_name: 'Jane',
+      last_name: 'Doe',
+      company_name: 'Acme Co',
+      address: '1 Main St',
+      address2: null,
+      city: 'Springfield',
+      state_province_code: 'IL',
+      zip_postal_code: '62701',
+      country_code: 'US',
+      live: true,
+      ...over,
+    });
+
+  it('collapses records that differ only in case and spacing, keeping the first live one', () => {
+    const first = address({});
+    const shouting = address({ first_name: 'JANE', address: '1  main   st' });
+    const elsewhere = address({ address: '2 Oak Ave' });
+
+    const options = buildAddressOptions([first, shouting, elsewhere], elsewhere.public_id);
+
+    expect(options.map((option) => option.publicId)).toEqual([
+      elsewhere.public_id,
+      first.public_id,
+    ]);
+    expect(options[0].isCurrent).toBe(true);
+    expect(options[1].summary.line1).toBe('1 Main St');
+  });
+
+  it('collapses one street entered with a different company, suite, city spelling or ZIP+4, as the hosted manager does', () => {
+    // Task 0 finding J: 24 live records, 22 nine-field identities, 10 distinct street lines — and the
+    // manager offered exactly 10. Ordergroove mints a record per checkout, so these are one place.
+    const first = address({});
+    const variants = [
+      address({ company_name: 'Store Supply', address2: 'Suite 4' }),
+      address({ city: 'Springfeild', zip_postal_code: '62701-1206' }),
+      address({ first_name: 'Tim', last_name: 'Test', company_name: null }),
+    ];
+
+    const options = buildAddressOptions([first, ...variants], first.public_id);
+
+    expect(options).toHaveLength(1);
+    expect(options[0].publicId).toBe(first.public_id);
+  });
+
+  it('lets the current record win its duplicate group so the preselected id is the one Ordergroove holds', () => {
+    const twin = address({});
+    const current = address({});
+
+    expect(buildAddressOptions([twin, current], current.public_id)).toEqual([
+      {
+        publicId: current.public_id,
+        summary: expect.objectContaining({ name: 'Jane Doe' }),
+        isCurrent: true,
+      },
+    ]);
+  });
+
+  it('drops retired records except the current one', () => {
+    const current = address({ live: false });
+    const retired = address({ live: false, address: '9 Old Rd' });
+    const live = address({ address: '2 Oak Ave' });
+
+    expect(
+      buildAddressOptions([retired, live, current], current.public_id).map(
+        (option) => option.publicId,
+      ),
+    ).toEqual([current.public_id, live.public_id]);
+  });
+
+  it('sorts the current address first, then by name', () => {
+    const zed = address({ first_name: 'Zed', last_name: 'Young', address: '3 Pine Ct' });
+    const amy = address({ first_name: 'Amy', last_name: 'Adams', address: '4 Elm Rd' });
+    const current = address({ first_name: 'Mia', last_name: 'Moss', address: '5 Birch Ln' });
+
+    expect(
+      buildAddressOptions([zed, amy, current], current.public_id).map(
+        (option) => option.summary.name,
+      ),
+    ).toEqual(['Mia Moss', 'Amy Adams', 'Zed Young']);
+  });
+
+  it('has nothing to offer while addresses have not loaded', () => {
+    expect(buildAddressOptions(undefined, 'addr-1')).toEqual([]);
   });
 });

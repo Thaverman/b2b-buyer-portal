@@ -30,7 +30,6 @@ const buildCardWith = builder<SubscriptionCardModel>(() => ({
   externalProductId: '9537_12118',
   product: { name: 'Kraft Paper Shopping Bags', imageUrl: null, detailUrl: null, sku: null },
   quantity: 1,
-  frequencyDays: 28,
   every: 4,
   everyPeriod: 2,
   nextOrderDate: '2026-10-03',

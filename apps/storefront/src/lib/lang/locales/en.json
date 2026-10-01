@@ -813,6 +813,7 @@
   "subscriptions.card.quantity": "Qty {count}",
   "subscriptions.card.everyWeeks": "every {count, plural, one {week} other {# weeks}}",
   "subscriptions.card.everyDays": "every {count, plural, one {day} other {# days}}",
+  "subscriptions.card.everyMonths": "every {count, plural, one {month} other {# months}}",
   "subscriptions.card.nextOrder": "Next order {date}",
   "subscriptions.card.noUpcomingOrder": "No upcoming order",
   "subscriptions.card.shipsTo": "Ships to",

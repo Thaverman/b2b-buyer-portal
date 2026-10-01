@@ -21,7 +21,6 @@ const buildCardWith = builder<SubscriptionCardModel>(() => ({
     sku: faker.string.numeric(4),
   },
   quantity: faker.number.int({ min: 1, max: 9 }),
-  frequencyDays: 28,
   every: 4,
   everyPeriod: 2,
   nextOrderDate: '2026-10-03',
@@ -56,7 +55,6 @@ it('renders every field of a loaded active card', () => {
       sku: '9537',
     },
     quantity: 2,
-    frequencyDays: 28,
   });
 
   renderWithProviders(
@@ -139,14 +137,28 @@ it('falls back cell by cell once the lookups settled without a record', () => {
 it('describes an unbranded card and a daily frequency', () => {
   const card = buildCardWith({
     payment: { brand: null, last4: '4242', expiry: '12/2027' },
-    frequencyDays: 10,
+    every: 3,
+    everyPeriod: 1,
     quantity: 1,
   });
 
   renderWithProviders(<SubscriptionCard card={card} variant="active" loading={settled} />);
 
   expect(screen.getByText('Paid with Card ending in 4242 · exp 12/2027')).toBeInTheDocument();
-  expect(screen.getByText('Qty 1 · every 10 days')).toBeInTheDocument();
+  expect(screen.getByText('Qty 1 · every 3 days')).toBeInTheDocument();
+});
+
+it('reads a monthly schedule from the configured period, not from frequency days', () => {
+  // SSW sells 10- and 12-month subscriptions; frequency_days (300, 360) is not what the customer chose.
+  const card = buildCardWith({ quantity: 1, every: 10, everyPeriod: 3 });
+
+  renderWithProviders(
+    <SubscriptionCard card={card} variant="active" loading={settled} />,
+    withDateFormat,
+  );
+
+  expect(screen.getByText('Qty 1 · every 10 months')).toBeInTheDocument();
+  expect(screen.queryByText(/days/)).not.toBeInTheDocument();
 });
 
 it('shows the cancellation instead of a next order on a cancelled card', () => {

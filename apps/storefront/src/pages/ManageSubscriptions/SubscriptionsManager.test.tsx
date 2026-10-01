@@ -161,6 +161,8 @@ it('lists every active subscription across pages with its product, schedule, add
     product: '7674_9534',
     quantity: 1,
     frequency_days: 14,
+    every: 2,
+    every_period: 2,
     shipping_address: address.public_id,
     payment: payment.public_id,
   });

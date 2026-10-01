@@ -4,17 +4,14 @@ import B3Spin from '@/components/spin/B3Spin';
 import { useB3Lang } from '@/lib/lang';
 import { OrdergrooveError } from '@/shared/service/ordergroove';
 import { useAppSelector } from '@/store';
-import { BigCommerceStorefrontAPIBaseURL } from '@/utils/basicConfig';
 
 import SubscriptionActions from './components/actions/SubscriptionActions';
 import CancelledSubscriptions from './components/CancelledSubscriptions';
 import RecentOrders from './components/RecentOrders';
 import SubscriptionCard, { CellLoading } from './components/SubscriptionCard';
 import { useSubscriptionsData } from './hooks/useSubscriptionsData';
+import { HOSTED_MANAGER_URL } from './format';
 import { buildRecentOrders, buildSubscriptionCards } from './viewModel';
-
-// Until Phase 3, every action still lives on the theme's hosted manager page.
-const HOSTED_MANAGER_URL = `${BigCommerceStorefrontAPIBaseURL}/subscriptions`;
 
 const isSessionExpired = (error: unknown) =>
   error instanceof OrdergrooveError && error.kind === 'sessionExpired';
