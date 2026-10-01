@@ -95,14 +95,14 @@ it('lets the customer pick another frequency', async () => {
   ));
 
   await user.click(screen.getByRole('combobox', { name: /^Frequency/ }));
-  await user.click(screen.getByRole('option', { name: 'every 6 weeks' }));
+  await user.click(screen.getByRole('option', { name: 'every 6 days' }));
   await user.click(screen.getByRole('button', { name: 'Reactivate' }));
 
-  expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({ every: 6, everyPeriod: 2 }));
+  expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({ every: 6, everyPeriod: 1 }));
 });
 
 it('refuses a first order date before the minimum', async () => {
-  const { user } = renderOpen((isOpen) => (
+  renderOpen((isOpen) => (
     <ReactivateDialog
       card={buildCardWith('WHATEVER_VALUES')}
       isOpen={isOpen}
@@ -119,7 +119,6 @@ it('refuses a first order date before the minimum', async () => {
 
   fireEvent.change(date, { target: { value: dayjs().add(30, 'day').format('YYYY-MM-DD') } });
   expect(screen.getByRole('button', { name: 'Reactivate' })).toBeEnabled();
-  await user.click(screen.getByRole('button', { name: 'Cancel' }));
 });
 
 it('disables Reactivate while the write is pending', () => {

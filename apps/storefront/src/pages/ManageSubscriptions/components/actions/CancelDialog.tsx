@@ -79,6 +79,7 @@ function CancelDialog({
           <Button
             variant="text"
             size="small"
+            disabled={isPending}
             onClick={onSkipInstead}
             sx={{ px: 0, verticalAlign: 'baseline' }}
           >

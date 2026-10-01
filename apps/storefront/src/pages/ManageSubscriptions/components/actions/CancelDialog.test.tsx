@@ -32,16 +32,21 @@ const renderOpen = (dialog: (isOpen: boolean) => ReactElement) => {
 
 const dialog = (
   isOpen: boolean,
-  over: Partial<Parameters<typeof CancelDialog>[0]> = {},
+  {
+    card = buildCardWith('WHATEVER_VALUES'),
+    isPending = false,
+    onClose = vi.fn(),
+    onSkipInstead = vi.fn(),
+    onConfirm = vi.fn(),
+  }: Partial<Omit<Parameters<typeof CancelDialog>[0], 'isOpen'>> = {},
 ): ReactElement => (
   <CancelDialog
-    card={buildCardWith('WHATEVER_VALUES')}
+    card={card}
     isOpen={isOpen}
-    isPending={false}
-    onClose={vi.fn()}
-    onSkipInstead={vi.fn()}
-    onConfirm={vi.fn()}
-    {...over}
+    isPending={isPending}
+    onClose={onClose}
+    onSkipInstead={onSkipInstead}
+    onConfirm={onConfirm}
   />
 );
 
@@ -117,6 +122,7 @@ it('keeps the subscription from the left button and holds everything while pendi
 
   result.rerender(dialog(true, { onClose, isPending: true }));
   expect(screen.getByRole('button', { name: 'Cancel subscription' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Skip next order' })).toBeDisabled();
   await user.click(screen.getByRole('button', { name: 'Keep subscription' }));
   expect(onClose).toHaveBeenCalledTimes(1);
 });
