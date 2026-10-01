@@ -20,7 +20,7 @@
 - Period codes: `1` = days, `2` = weeks, `3` = months. Schedule text everywhere comes from `every`/`every_period` through `describeFrequency`, never from `frequency_days`.
 - **Frequency list is a constant** (spec §4.3, decision 9) in the manager's order; the card's current schedule is appended as the last option when it is not in the list. **Quantity** options are `1…20` plus the current value when greater (spec §4.4).
 - **Cancel body** (spec §4.5): a listed reason sends `"{code} | {canonical English label}"` (spaces around the pipe); Other with details sends `"1 | {details trimmed}"`; Other with no details sends `"1"`; no selection sends `114|Cancelled without exit survey response` **verbatim, no spaces**. The body always carries the English labels of §4.5 whatever the radios show.
-- **Address options** (spec §4.6): live records plus the current one even when retired; deduplicated on lower-cased, whitespace-collapsed `first_name`, `last_name`, `company_name`, `address`, `address2`, `city`, `state_province_code`, `zip_postal_code`, `country_code`; the current record wins its duplicate group, otherwise the first live record; current first, then by name.
+- **Address options** (spec §4.6, amended by Task 0 finding J): live records plus the current one even when retired; deduplicated on the lower-cased, whitespace-collapsed **street line (`address`) alone** — the hosted manager collapses this customer's 24 live records to its 10 "Ship to" choices on exactly that key, where the spec's nine-field identity leaves 22; the current record wins its duplicate group, otherwise the first live record; current first, then by name. Task 8 records the amendment against §4.6.
 - Imports: `@/` alias, `lodash-es` only, named MUI imports. Import groups separated by blank lines: externals, then `@/…`, then relative. ESLint airbnb is on: no `for…of`, no `await` in loops, **no nested ternaries**, no `console`, braces on every `if`. Do not add violations of the disabled-rule list in CLAUDE.md (no `any`, no `!` assertions, no JSX prop spreading, no new `eslint-disable`).
 - knip fails on unused exports: **export only what another `src` file consumes.** A module landed one task before its consumer shows as an orphan to `lint:dependencies` until then; `yarn lint` runs in full at Task 8.
 - Commit subject format: `type: B2B-0000 Short description`; end every commit message with `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`. Stage by explicit path — this tree carries other sessions' uncommitted work (`HeadlessController/`, `Login/`, `b3Fetch.ts`, `b3Login.ts` were dirty on 2026-10-01; never touch or stage them).
@@ -295,6 +295,7 @@ Expected: `mint ok`; every `->` status `200`; every restore line reads the origi
 - Finding H — `reactivate`: accepted `next_order_date` = **tomorrow** `[x] yes` → `FIRST_ORDER_MIN_DAYS = 1` in Task 4 (`200` on the first attempt, no retry needed; today itself was not tried); `[ ] no, needed today + 2` → `FIRST_ORDER_MIN_DAYS = 2` and the hint copy in Task 3 reads "Choose a date at least two days from today."; `live`/`cancelled`/`start_date` after `true` / `null` / `2026-10-01`; an upcoming order appeared dated `2026-10-02`.
 - Finding I — `cancel` after reactivate: status `200`; `cancel_reason` stored as `"114|Cancelled without exit survey response"` (verbatim: the string sent, code prefix included), `cancel_reason_code` `114` (parsed from the prefix); the upcoming order **disappeared** `yes` (none after the cancel). Side effect the API will not undo: that subscription's `cancelled` is now `2026-10-01 15:33:49` (was `2026-03-08 07:38:28`) and its reason was overwritten (was `"113|Disengaged"` / `113`).
 - Finding J — addresses: total `24`, live `24`, distinct live identities `22` (the manager showed **10**; a mismatch means the §4.6 normalisation differs from the manager's and Task 2's fixture must be re-derived from the log before coding). **MISMATCH, 22 vs 10:** the log holds counts only, no identities, so it cannot supply that fixture; the subscription's current address is live (`true`).
+  - **Resolution (controller, 2026-10-01, read-only dump of the 24 live records):** distinct counts by candidate identity — nine fields 22; name + street + address2 + ZIP 18; street + address2 + city + state + ZIP 18; street + ZIP 14; **street line alone 10**, the manager's count. Ruling: the picker's identity is the normalised street line (Global Constraints and Task 2 amended). The same dump re-read the account: 14 active / 4 cancelled / 12 upcoming orders, and every upcoming-order line's address equals its subscription's — the G restore reached the order.
 - Auth: the mint went through `test-onlineservices.storesupply.com` host with `Jwt` + `customerId` — `test-onlineservices` still accepted it (`mint ok`).
 
 - [x] **Step 4: Delete nothing, commit nothing.** The script stays in scratch.
@@ -584,6 +585,22 @@ describe('address options', () => {
     expect(options[1].summary.line1).toBe('1 Main St');
   });
 
+  it('collapses one street entered with a different company, suite, city spelling or ZIP+4, as the hosted manager does', () => {
+    // Task 0 finding J: 24 live records, 22 nine-field identities, 10 distinct street lines — and the
+    // manager offered exactly 10. Ordergroove mints a record per checkout, so these are one place.
+    const first = address({});
+    const variants = [
+      address({ company_name: 'Store Supply', address2: 'Suite 4' }),
+      address({ city: 'Springfeild', zip_postal_code: '62701-1206' }),
+      address({ first_name: 'Tim', last_name: 'Test', company_name: null }),
+    ];
+
+    const options = buildAddressOptions([first, ...variants], first.public_id);
+
+    expect(options).toHaveLength(1);
+    expect(options[0].publicId).toBe(first.public_id);
+  });
+
   it('lets the current record win its duplicate group so the preselected id is the one Ordergroove holds', () => {
     const twin = address({});
     const current = address({});
@@ -736,26 +753,17 @@ export interface AddressOption {
 
 const normalise = (value: string | null) => (value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 
-// Ordergroove address records carry no type, so a billing record collapses into its shipping twin.
-const addressIdentity = (address: OgAddress) =>
-  [
-    address.first_name,
-    address.last_name,
-    address.company_name,
-    address.address,
-    address.address2,
-    address.city,
-    address.state_province_code,
-    address.zip_postal_code,
-    address.country_code,
-  ]
-    .map(normalise)
-    .join('|');
+// Ordergroove mints an address record per checkout and carries no address type, so one place
+// accumulates records that differ in company, suite line, city spelling or ZIP+4, and billing
+// records sit beside their shipping twins. The hosted manager collapses them on the street line
+// alone (24 live records → its 10 "Ship to" choices for the fixture customer, Task 0 finding J);
+// the picker does the same so both screens offer the same list.
+const addressIdentity = (address: OgAddress) => normalise(address.address);
 
 /**
- * One choice per distinct address: live records plus the current one even when retired. The
+ * One choice per distinct street line: live records plus the current one even when retired. The
  * current record wins its duplicate group so the preselected radio is the id Ordergroove already
- * holds; otherwise the first live record. Current first, then by name (spec §4.6).
+ * holds; otherwise the first live record. Current first, then by name (spec §4.6 as amended).
  */
 export const buildAddressOptions = (
   addresses: OgAddress[] | undefined,
