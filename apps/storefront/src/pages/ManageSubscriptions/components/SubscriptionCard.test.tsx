@@ -177,3 +177,26 @@ it('shows the cancellation instead of a next order on a cancelled card', () => {
   expect(screen.getByText('Cancelled')).toBeInTheDocument();
   expect(screen.queryByText('No upcoming order')).not.toBeInTheDocument();
 });
+
+it('renders the schedule controls in place of the quantity line and the shipping action after the address', () => {
+  renderWithProviders(
+    <SubscriptionCard
+      card={buildCardWith({ quantity: 2 })}
+      variant="active"
+      loading={settled}
+      scheduleControls={<div>schedule controls</div>}
+      shippingAction={<button type="button">Change</button>}
+    />,
+    withDateFormat,
+  );
+
+  expect(screen.getByText('schedule controls')).toBeInTheDocument();
+  expect(screen.queryByText(/^Qty 2/)).not.toBeInTheDocument();
+  // In the quantity line's place: directly above the shipping line.
+  expect(screen.getByText('schedule controls').nextElementSibling).toBe(
+    screen.getByText(/Ships to/),
+  );
+  expect(screen.getByText(/Ships to/)).toHaveTextContent(
+    'Ships to Jane Doe, Acme Co, 1 Main St, Springfield, IL 62701 · Change',
+  );
+});

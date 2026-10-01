@@ -19,11 +19,22 @@ interface SubscriptionCardProps {
   card: SubscriptionCardModel;
   variant: 'active' | 'cancelled';
   loading: CellLoading;
+  /** the inline quantity and frequency controls (3b); replaces the "Qty · every" line when given */
+  scheduleControls?: ReactNode;
+  /** rendered after the shipping address, e.g. the Change control (3b) */
+  shippingAction?: ReactNode;
   /** the actions row (Phase 3); rendered at the end of the details group */
   actions?: ReactNode;
 }
 
-function SubscriptionCard({ card, variant, loading, actions }: SubscriptionCardProps) {
+function SubscriptionCard({
+  card,
+  variant,
+  loading,
+  scheduleControls,
+  shippingAction,
+  actions,
+}: SubscriptionCardProps) {
   const b3Lang = useB3Lang();
   const [isMobile] = useMobile();
 
@@ -104,12 +115,20 @@ function SubscriptionCard({ card, variant, loading, actions }: SubscriptionCardP
               )}
             </Typography>
           )}
-          <Typography variant="body2">
-            {b3Lang('subscriptions.card.quantity', { count: card.quantity })} · {frequency}
-          </Typography>
+          {scheduleControls ?? (
+            <Typography variant="body2">
+              {b3Lang('subscriptions.card.quantity', { count: card.quantity })} · {frequency}
+            </Typography>
+          )}
           <Typography variant="body2" color="text.secondary">
             {b3Lang('subscriptions.card.shipsTo')}{' '}
             {cell(loading.shipping, shipping, b3Lang('subscriptions.card.unavailable'))}
+            {shippingAction && (
+              <>
+                {' · '}
+                {shippingAction}
+              </>
+            )}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             {b3Lang('subscriptions.card.paidWith')}{' '}
