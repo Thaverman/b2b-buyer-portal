@@ -2,10 +2,17 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { useB3Lang } from '@/lib/lang';
 import {
+  cancelSubscription,
   changeNextOrderDate,
+  changeShippingAddress,
+  changeSubscriptionFrequency,
   changeSubscriptionPayment,
+  changeSubscriptionQuantity,
   createPayment,
+  FrequencyPeriod,
   OrdergrooveError,
+  reactivateSubscription,
+  ReactivationInput,
   sendOrderNow,
   skipSubscription,
 } from '@/shared/service/ordergroove';
@@ -20,7 +27,7 @@ interface ChangeCardVariables {
 }
 
 /**
- * The three 3a writes as mutations. Success re-reads the resources a write changes and confirms
+ * Every subscription write as a mutation. Success re-reads the resources a write changes and confirms
  * with a snackbar; failure reports and changes nothing locally (spec §5). Each card instantiates
  * this hook, so pending state is per card.
  */
@@ -104,5 +111,69 @@ export const useSubscriptionActions = (customerId: number) => {
     onError,
   });
 
-  return { skip, sendNow, changeDate, changeCard };
+  const changeFrequency = useMutation({
+    mutationFn: ({
+      subscriptionId,
+      every,
+      everyPeriod,
+    }: {
+      subscriptionId: string;
+      every: number;
+      everyPeriod: FrequencyPeriod;
+    }) => changeSubscriptionFrequency(id, subscriptionId, every, everyPeriod),
+    // The probe saw a schedule change leave the upcoming order's date alone (Task 0 finding E);
+    // 'upcoming' is refreshed regardless (spec §5.2) so the card can never show a stale order.
+    onSuccess: () =>
+      succeed('subscriptions.actions.frequency.success', ['subscriptions', 'upcoming']),
+    onError,
+  });
+
+  const changeQuantity = useMutation({
+    mutationFn: ({ subscriptionId, quantity }: { subscriptionId: string; quantity: number }) =>
+      changeSubscriptionQuantity(id, subscriptionId, quantity),
+    onSuccess: () =>
+      succeed('subscriptions.actions.quantity.success', ['subscriptions', 'upcoming']),
+    onError,
+  });
+
+  const cancel = useMutation({
+    mutationFn: ({
+      subscriptionId,
+      cancelReason,
+    }: {
+      subscriptionId: string;
+      cancelReason: string;
+    }) => cancelSubscription(id, subscriptionId, cancelReason),
+    // Cancelling removes the subscription's items from its upcoming order (Task 0 finding I).
+    onSuccess: () => succeed('subscriptions.actions.cancel.success', ['subscriptions', 'upcoming']),
+    onError,
+  });
+
+  const reactivate = useMutation({
+    mutationFn: ({ subscriptionId, ...input }: ReactivationInput & { subscriptionId: string }) =>
+      reactivateSubscription(id, subscriptionId, input),
+    onSuccess: () =>
+      succeed('subscriptions.actions.reactivate.success', ['subscriptions', 'upcoming']),
+    onError,
+  });
+
+  const changeAddress = useMutation({
+    mutationFn: ({ subscriptionId, addressId }: { subscriptionId: string; addressId: string }) =>
+      changeShippingAddress(id, subscriptionId, addressId),
+    onSuccess: () =>
+      succeed('subscriptions.actions.address.success', ['subscriptions', 'upcoming']),
+    onError,
+  });
+
+  return {
+    skip,
+    sendNow,
+    changeDate,
+    changeCard,
+    changeFrequency,
+    changeQuantity,
+    cancel,
+    reactivate,
+    changeAddress,
+  };
 };

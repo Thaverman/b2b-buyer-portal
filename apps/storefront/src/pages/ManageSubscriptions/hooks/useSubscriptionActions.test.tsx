@@ -368,3 +368,116 @@ describe('changeCard', () => {
     expect(created).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('subscription edits', () => {
+  // All five share the 3a contract: PATCH the subscription, refresh subscriptions and upcoming
+  // orders, confirm with the action's own copy.
+  const mockEdit = (action: string) => {
+    const received = vi.fn();
+    server.use(
+      http.patch(`${ogBase}/subscriptions/s-1/${action}/`, async ({ request }) => {
+        received(await request.json());
+
+        return HttpResponse.json(buildOgSubscriptionWith('WHATEVER_VALUES'));
+      }),
+    );
+
+    return received;
+  };
+  const subscriptionKeys = (customerId: number) => [
+    ['ordergroove', customerId, 'subscriptions'],
+    ['ordergroove', customerId, 'upcoming'],
+  ];
+
+  it('changes the frequency with Ordergroove field names', async () => {
+    const received = mockEdit('change_frequency');
+    const { customerId } = renderActions();
+
+    actions().changeFrequency.mutate({ subscriptionId: 's-1', every: 6, everyPeriod: 2 });
+
+    await waitFor(() => expect(actions().changeFrequency.isSuccess).toBe(true));
+    expect(received).toHaveBeenCalledWith({ every: 6, every_period: 2 });
+    expect(invalidatedKeys()).toEqual(subscriptionKeys(customerId));
+    expect(snackbar.success).toHaveBeenCalledWith('Frequency updated.');
+  });
+
+  it('changes the quantity', async () => {
+    const received = mockEdit('change_quantity');
+    const { customerId } = renderActions();
+
+    actions().changeQuantity.mutate({ subscriptionId: 's-1', quantity: 3 });
+
+    await waitFor(() => expect(actions().changeQuantity.isSuccess).toBe(true));
+    expect(received).toHaveBeenCalledWith({ quantity: 3 });
+    expect(invalidatedKeys()).toEqual(subscriptionKeys(customerId));
+    expect(snackbar.success).toHaveBeenCalledWith('Quantity updated.');
+  });
+
+  it('cancels with the reason body it is handed', async () => {
+    const received = mockEdit('cancel');
+    const { customerId } = renderActions();
+
+    actions().cancel.mutate({
+      subscriptionId: 's-1',
+      cancelReason: '114|Cancelled without exit survey response',
+    });
+
+    await waitFor(() => expect(actions().cancel.isSuccess).toBe(true));
+    expect(received).toHaveBeenCalledWith({
+      cancel_reason: '114|Cancelled without exit survey response',
+    });
+    expect(invalidatedKeys()).toEqual(subscriptionKeys(customerId));
+    expect(snackbar.success).toHaveBeenCalledWith('Subscription cancelled.');
+  });
+
+  it('reactivates with the schedule and the first order date', async () => {
+    const received = mockEdit('reactivate');
+    const { customerId } = renderActions();
+
+    actions().reactivate.mutate({
+      subscriptionId: 's-1',
+      startDate: '2026-10-01',
+      every: 4,
+      everyPeriod: 2,
+      nextOrderDate: '2026-10-02',
+    });
+
+    await waitFor(() => expect(actions().reactivate.isSuccess).toBe(true));
+    expect(received).toHaveBeenCalledWith({
+      start_date: '2026-10-01',
+      every: 4,
+      every_period: 2,
+      next_order_date: '2026-10-02',
+    });
+    expect(invalidatedKeys()).toEqual(subscriptionKeys(customerId));
+    expect(snackbar.success).toHaveBeenCalledWith('Subscription reactivated.');
+  });
+
+  it('changes the shipping address', async () => {
+    const received = mockEdit('change_shipping');
+    const { customerId } = renderActions();
+
+    actions().changeAddress.mutate({ subscriptionId: 's-1', addressId: 'addr-2' });
+
+    await waitFor(() => expect(actions().changeAddress.isSuccess).toBe(true));
+    expect(received).toHaveBeenCalledWith({ shipping_address: 'addr-2' });
+    expect(invalidatedKeys()).toEqual(subscriptionKeys(customerId));
+    expect(snackbar.success).toHaveBeenCalledWith('Shipping address updated.');
+  });
+
+  it('reports a failed cancel and leaves the cache alone', async () => {
+    server.use(
+      http.patch(`${ogBase}/subscriptions/s-1/cancel/`, () =>
+        HttpResponse.json({ detail: 'locked' }, { status: 423 }),
+      ),
+    );
+    renderActions();
+
+    actions().cancel.mutate({ subscriptionId: 's-1', cancelReason: '1' });
+
+    await waitFor(() => expect(actions().cancel.isError).toBe(true));
+    expect(invalidate).not.toHaveBeenCalled();
+    expect(snackbar.error).toHaveBeenCalledWith("We couldn't apply that change. Please try again.");
+    expect(snackbar.success).not.toHaveBeenCalled();
+  });
+});
