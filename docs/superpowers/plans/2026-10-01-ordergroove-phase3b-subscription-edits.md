@@ -81,7 +81,7 @@ The five inputs the spec implies but no 3a test exercises, most likely to bite f
 **Interfaces:**
 - Produces: findings E–J (below) that Tasks 1, 2, 4 and 8 read.
 
-- [ ] **Step 1: Write the probe script** to `<scratch>/og-edit-probe.mjs`
+- [x] **Step 1: Write the probe script** to `<scratch>/og-edit-probe.mjs`
 
 ```js
 // Reversible write probe of Ordergroove for customer 80591 (Phase 3b Task 0).
@@ -282,22 +282,22 @@ if (c1.cancelled === null || snap.nextFor(C.public_id)) {
 }
 ```
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 Run: `ENV_FILE=/home/thaverman/repos/customb2baccount/b2b-buyer-portal/apps/storefront/.env node <scratch>/og-edit-probe.mjs 2>&1 | tee <scratch>/og-edit-probe.log`
 Expected: `mint ok`; every `->` status `200`; every restore line reads the original value; `H` shows `live true, cancelled null` and an upcoming order; `I` shows `cancelled` set and `upcoming order for C after cancel: none`. If any `!! RESTORE BY HAND` line prints, do exactly that before anything else.
 
-- [ ] **Step 3: Record the findings here** (edit this file; later tasks read these lines)
+- [x] **Step 3: Record the findings here** (edit this file; later tasks read these lines)
 
-- Finding E — `change_frequency`: status `[ ]`; the record's `every`/`every_period`/`frequency_days` after the change `[ ]`; whether the upcoming order **moved** when the schedule changed `[ ] yes / no` (if yes, the hook's invalidation of `upcoming` is what redraws the date, and Task 9 must expect the date to move). Whether the response is the subscription `[ ]`.
-- Finding F — `change_quantity`: status `[ ]`; whether the upcoming order's **item quantity follows** the subscription `[ ] yes / no` (the card shows the subscription's quantity either way).
-- Finding G — `change_shipping`: status `[ ]`; whether the upcoming order's `shipping_address` **follows** `[ ] yes / no` (not displayed; recorded for the cutover).
-- Finding H — `reactivate`: accepted `next_order_date` = **tomorrow** `[ ] yes` → `FIRST_ORDER_MIN_DAYS = 1` in Task 4; `[ ] no, needed today + 2` → `FIRST_ORDER_MIN_DAYS = 2` and the hint copy in Task 3 reads "Choose a date at least two days from today."; `live`/`cancelled`/`start_date` after `[ ]`; an upcoming order appeared dated `[ ]`.
-- Finding I — `cancel` after reactivate: status `[ ]`; `cancel_reason` stored as `[ ]` (verbatim string? parsed?), `cancel_reason_code` `[ ]`; the upcoming order **disappeared** `[ ] yes / no`.
-- Finding J — addresses: total `[ ]`, live `[ ]`, distinct live identities `[ ]` (the manager showed **10**; a mismatch means the §4.6 normalisation differs from the manager's and Task 2's fixture must be re-derived from the log before coding).
-- Auth: the mint went through `[ ]` host with `Jwt` + `customerId` — note whether `test-onlineservices` still accepted it.
+- Finding E — `change_frequency`: status `200`; the record's `every`/`every_period`/`frequency_days` after the change `6` / `2` / `42` (sent `{ every: 6, every_period: 2 }` to a subscription that was `10` / `3`); whether the upcoming order **moved** when the schedule changed `no` (next order `2027-08-01` before the change, after it, and after the restore; one subscription, 10 months to 6 weeks; if yes, the hook's invalidation of `upcoming` is what redraws the date, and Task 9 must expect the date to move; since no, Task 9 should expect it not to move). Whether the response is the subscription `likely: 33 top-level keys (reactivate returned 33 too), but only the key count was logged, so the shape is unconfirmed`. Restore read back `10` / `3`.
+- Finding F — `change_quantity`: status `200`; whether the upcoming order's **item quantity follows** the subscription `yes` (sent `quantity + 1`: record `2`, item quantity on the upcoming order `2`; after the restore both `1`) (the card shows the subscription's quantity either way).
+- Finding G — `change_shipping`: status `200`; whether the upcoming order's `shipping_address` **follows** `yes` (record moved `true`, upcoming order's address moved `true`; the restore put the record back, `true`, but the order's address after the restore was not logged) (not displayed; recorded for the cutover).
+- Finding H — `reactivate`: accepted `next_order_date` = **tomorrow** `[x] yes` → `FIRST_ORDER_MIN_DAYS = 1` in Task 4 (`200` on the first attempt, no retry needed; today itself was not tried); `[ ] no, needed today + 2` → `FIRST_ORDER_MIN_DAYS = 2` and the hint copy in Task 3 reads "Choose a date at least two days from today."; `live`/`cancelled`/`start_date` after `true` / `null` / `2026-10-01`; an upcoming order appeared dated `2026-10-02`.
+- Finding I — `cancel` after reactivate: status `200`; `cancel_reason` stored as `"114|Cancelled without exit survey response"` (verbatim: the string sent, code prefix included), `cancel_reason_code` `114` (parsed from the prefix); the upcoming order **disappeared** `yes` (none after the cancel). Side effect the API will not undo: that subscription's `cancelled` is now `2026-10-01 15:33:49` (was `2026-03-08 07:38:28`) and its reason was overwritten (was `"113|Disengaged"` / `113`).
+- Finding J — addresses: total `24`, live `24`, distinct live identities `22` (the manager showed **10**; a mismatch means the §4.6 normalisation differs from the manager's and Task 2's fixture must be re-derived from the log before coding). **MISMATCH, 22 vs 10:** the log holds counts only, no identities, so it cannot supply that fixture; the subscription's current address is live (`true`).
+- Auth: the mint went through `test-onlineservices.storesupply.com` host with `Jwt` + `customerId` — `test-onlineservices` still accepted it (`mint ok`).
 
-- [ ] **Step 4: Delete nothing, commit nothing.** The script stays in scratch.
+- [x] **Step 4: Delete nothing, commit nothing.** The script stays in scratch.
 
 ---
 
