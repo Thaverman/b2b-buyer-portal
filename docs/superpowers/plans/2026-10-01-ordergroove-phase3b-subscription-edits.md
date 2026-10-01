@@ -408,7 +408,7 @@ Expected: the five new tests fail with `is not a function` / "No export named"; 
 - [ ] **Step 3: Implement** — in `api.ts`, add `FrequencyPeriod` to the `./types` import, then insert after `changeNextOrderDate`:
 
 ```ts
-/** Ordergroove regenerates the upcoming order from the new schedule (Task 0 finding E). */
+/** In the Phase 3b probe a schedule change left the upcoming order's date alone (Task 0 finding E). */
 export const changeSubscriptionFrequency = (
   customerId: string,
   subscriptionId: string,
@@ -1058,7 +1058,8 @@ change the doc comment's first words from "The three 3a writes as mutations." to
       every: number;
       everyPeriod: FrequencyPeriod;
     }) => changeSubscriptionFrequency(id, subscriptionId, every, everyPeriod),
-    // Ordergroove regenerates the upcoming order from the new schedule (Task 0 finding E).
+    // The probe saw a schedule change leave the upcoming order's date alone (Task 0 finding E);
+    // 'upcoming' is refreshed regardless (spec §5.2) so the card can never show a stale order.
     onSuccess: () =>
       succeed('subscriptions.actions.frequency.success', ['subscriptions', 'upcoming']),
     onError,
@@ -3592,7 +3593,7 @@ await pickOption(n, 'Frequency', before.frequency);
 await (async () => { const started = Date.now(); while (Date.now() - started < 40000) { if ((await comboText(n, 'Frequency')) === before.frequency) return; await collectAlerts(); await page.waitForTimeout(250); } await fail('frequency did not restore — restore by hand'); })();
 summary.frequencyRestored = await comboText(n, 'Frequency');
 if (nextOrder(await cardText(n)) !== before.nextOrder) {
-  // Finding E: the schedule change regenerated the order. Put the date back through the dialog.
+  // Finding E saw the date stay put; this branch is insurance in case Ordergroove ever regenerates it.
   if (!(await clickInCard(n, 'Change date'))) await fail('no Change date button for the date restore — restore by hand');
   await waitFor((doc) => !!doc.querySelector('[role="dialog"] input[type="radio"]'), 15000, 'the change-date dialog');
   await pickRadio('Pick a date');
