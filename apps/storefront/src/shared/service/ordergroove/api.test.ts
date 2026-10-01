@@ -447,11 +447,14 @@ describe('subscription edits', () => {
   const subscription = buildOgSubscriptionWith('WHATEVER_VALUES');
   const edit = (action: string, received: ReturnType<typeof vi.fn>) =>
     server.use(
-      http.patch(`${ogBase}/subscriptions/${subscription.public_id}/${action}/`, async ({ request }) => {
-        received(await request.json());
+      http.patch(
+        `${ogBase}/subscriptions/${subscription.public_id}/${action}/`,
+        async ({ request }) => {
+          received(await request.json());
 
-        return HttpResponse.json(subscription);
-      }),
+          return HttpResponse.json(subscription);
+        },
+      ),
     );
 
   it('changes the frequency with Ordergroove field names', async () => {

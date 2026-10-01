@@ -217,26 +217,36 @@ export const changeNextOrderDate = (
     { order_date: orderDate },
   );
 
-/** Ordergroove regenerates the upcoming order from the new schedule (Task 0 finding E). */
+/** In the Phase 3b probe a schedule change left the upcoming order's date alone (Task 0 finding E). */
 export const changeSubscriptionFrequency = (
   customerId: string,
   subscriptionId: string,
   every: number,
   everyPeriod: FrequencyPeriod,
 ) =>
-  ogMutate<OgSubscription>(customerId, subscriptionUrl(subscriptionId, 'change_frequency'), 'PATCH', {
-    every,
-    every_period: everyPeriod,
-  });
+  ogMutate<OgSubscription>(
+    customerId,
+    subscriptionUrl(subscriptionId, 'change_frequency'),
+    'PATCH',
+    {
+      every,
+      every_period: everyPeriod,
+    },
+  );
 
 export const changeSubscriptionQuantity = (
   customerId: string,
   subscriptionId: string,
   quantity: number,
 ) =>
-  ogMutate<OgSubscription>(customerId, subscriptionUrl(subscriptionId, 'change_quantity'), 'PATCH', {
-    quantity,
-  });
+  ogMutate<OgSubscription>(
+    customerId,
+    subscriptionUrl(subscriptionId, 'change_quantity'),
+    'PATCH',
+    {
+      quantity,
+    },
+  );
 
 /** `cancelReason` is the manager's "{code} | {label}" string or its no-survey default (spec §4.5). */
 export const cancelSubscription = (
@@ -274,9 +284,14 @@ export const changeShippingAddress = (
   subscriptionId: string,
   addressId: string,
 ) =>
-  ogMutate<OgSubscription>(customerId, subscriptionUrl(subscriptionId, 'change_shipping'), 'PATCH', {
-    shipping_address: addressId,
-  });
+  ogMutate<OgSubscription>(
+    customerId,
+    subscriptionUrl(subscriptionId, 'change_shipping'),
+    'PATCH',
+    {
+      shipping_address: addressId,
+    },
+  );
 
 const paymentUrl = (paymentId: string, action: string) =>
   `${API_BASE}/payments/${encodeURIComponent(paymentId)}/${action}/`;
