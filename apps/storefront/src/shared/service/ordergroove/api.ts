@@ -1,6 +1,15 @@
 import { getAuthorizationHeader, invalidateAuthorization } from './auth';
 import { OrdergrooveError } from './errors';
-import { OgAddress, OgItem, OgOrder, OgPage, OgPayment, OgProduct, OgSubscription } from './types';
+import {
+  FrequencyPeriod,
+  OgAddress,
+  OgItem,
+  OgOrder,
+  OgPage,
+  OgPayment,
+  OgProduct,
+  OgSubscription,
+} from './types';
 
 const API_BASE = 'https://restapi.ordergroove.com';
 // The warning is advisory; past this the dialog falls back to "we couldn't check" (spec §6.3).
@@ -207,6 +216,67 @@ export const changeNextOrderDate = (
     'PATCH',
     { order_date: orderDate },
   );
+
+/** Ordergroove regenerates the upcoming order from the new schedule (Task 0 finding E). */
+export const changeSubscriptionFrequency = (
+  customerId: string,
+  subscriptionId: string,
+  every: number,
+  everyPeriod: FrequencyPeriod,
+) =>
+  ogMutate<OgSubscription>(customerId, subscriptionUrl(subscriptionId, 'change_frequency'), 'PATCH', {
+    every,
+    every_period: everyPeriod,
+  });
+
+export const changeSubscriptionQuantity = (
+  customerId: string,
+  subscriptionId: string,
+  quantity: number,
+) =>
+  ogMutate<OgSubscription>(customerId, subscriptionUrl(subscriptionId, 'change_quantity'), 'PATCH', {
+    quantity,
+  });
+
+/** `cancelReason` is the manager's "{code} | {label}" string or its no-survey default (spec §4.5). */
+export const cancelSubscription = (
+  customerId: string,
+  subscriptionId: string,
+  cancelReason: string,
+) =>
+  ogMutate<OgSubscription>(customerId, subscriptionUrl(subscriptionId, 'cancel'), 'PATCH', {
+    cancel_reason: cancelReason,
+  });
+
+export interface ReactivationInput {
+  /** "YYYY-MM-DD", today */
+  startDate: string;
+  every: number;
+  everyPeriod: FrequencyPeriod;
+  /** "YYYY-MM-DD"; Ordergroove rejects a date in the past (reference "Reactivate") */
+  nextOrderDate: string;
+}
+
+export const reactivateSubscription = (
+  customerId: string,
+  subscriptionId: string,
+  input: ReactivationInput,
+) =>
+  ogMutate<OgSubscription>(customerId, subscriptionUrl(subscriptionId, 'reactivate'), 'PATCH', {
+    start_date: input.startDate,
+    every: input.every,
+    every_period: input.everyPeriod,
+    next_order_date: input.nextOrderDate,
+  });
+
+export const changeShippingAddress = (
+  customerId: string,
+  subscriptionId: string,
+  addressId: string,
+) =>
+  ogMutate<OgSubscription>(customerId, subscriptionUrl(subscriptionId, 'change_shipping'), 'PATCH', {
+    shipping_address: addressId,
+  });
 
 const paymentUrl = (paymentId: string, action: string) =>
   `${API_BASE}/payments/${encodeURIComponent(paymentId)}/${action}/`;

@@ -1,7 +1,11 @@
 export {
   applyPaymentToAll,
+  cancelSubscription,
   changeNextOrderDate,
+  changeShippingAddress,
+  changeSubscriptionFrequency,
   changeSubscriptionPayment,
+  changeSubscriptionQuantity,
   createPayment,
   getProduct,
   getSubscriptionsUsingToken,
@@ -11,12 +15,14 @@ export {
   listSubscriptions,
   listUpcomingOrders,
   orderHistoryUrl,
+  reactivateSubscription,
   sendOrderNow,
   skipSubscription,
   withTimeout,
 } from './api';
 export { isCustomManagerAvailable, isSubscriptionsAvailable } from './config';
 export { OrdergrooveError } from './errors';
+export type { ReactivationInput } from './api';
 export type {
   FrequencyPeriod,
   OgAddress,
