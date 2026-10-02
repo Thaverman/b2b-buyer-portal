@@ -5,14 +5,16 @@ import { useB3Lang } from '@/lib/lang';
 
 import { SubscriptionCard as SubscriptionCardModel } from '../viewModel';
 
+import ReactivateAction from './actions/ReactivateAction';
 import SubscriptionCard, { CellLoading } from './SubscriptionCard';
 
 interface CancelledSubscriptionsProps {
   cards: SubscriptionCardModel[];
   loading: CellLoading;
+  customerId: number;
 }
 
-function CancelledSubscriptions({ cards, loading }: CancelledSubscriptionsProps) {
+function CancelledSubscriptions({ cards, loading, customerId }: CancelledSubscriptionsProps) {
   const b3Lang = useB3Lang();
   const [open, setOpen] = useState(false);
 
@@ -39,6 +41,7 @@ function CancelledSubscriptions({ cards, loading }: CancelledSubscriptionsProps)
               card={card}
               variant="cancelled"
               loading={loading}
+              actions={<ReactivateAction card={card} customerId={customerId} />}
             />
           ))}
         </Box>

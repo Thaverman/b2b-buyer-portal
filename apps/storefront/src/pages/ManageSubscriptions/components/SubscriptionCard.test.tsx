@@ -21,7 +21,6 @@ const buildCardWith = builder<SubscriptionCardModel>(() => ({
     sku: faker.string.numeric(4),
   },
   quantity: faker.number.int({ min: 1, max: 9 }),
-  frequencyDays: 28,
   every: 4,
   everyPeriod: 2,
   nextOrderDate: '2026-10-03',
@@ -56,7 +55,6 @@ it('renders every field of a loaded active card', () => {
       sku: '9537',
     },
     quantity: 2,
-    frequencyDays: 28,
   });
 
   renderWithProviders(
@@ -139,14 +137,28 @@ it('falls back cell by cell once the lookups settled without a record', () => {
 it('describes an unbranded card and a daily frequency', () => {
   const card = buildCardWith({
     payment: { brand: null, last4: '4242', expiry: '12/2027' },
-    frequencyDays: 10,
+    every: 3,
+    everyPeriod: 1,
     quantity: 1,
   });
 
   renderWithProviders(<SubscriptionCard card={card} variant="active" loading={settled} />);
 
   expect(screen.getByText('Paid with Card ending in 4242 · exp 12/2027')).toBeInTheDocument();
-  expect(screen.getByText('Qty 1 · every 10 days')).toBeInTheDocument();
+  expect(screen.getByText('Qty 1 · every 3 days')).toBeInTheDocument();
+});
+
+it('reads a monthly schedule from the configured period, not from frequency days', () => {
+  // SSW sells 10- and 12-month subscriptions; frequency_days (300, 360) is not what the customer chose.
+  const card = buildCardWith({ quantity: 1, every: 10, everyPeriod: 3 });
+
+  renderWithProviders(
+    <SubscriptionCard card={card} variant="active" loading={settled} />,
+    withDateFormat,
+  );
+
+  expect(screen.getByText('Qty 1 · every 10 months')).toBeInTheDocument();
+  expect(screen.queryByText(/days/)).not.toBeInTheDocument();
 });
 
 it('shows the cancellation instead of a next order on a cancelled card', () => {
@@ -164,4 +176,27 @@ it('shows the cancellation instead of a next order on a cancelled card', () => {
   expect(screen.getByText('Cancelled on 1 Aug 2026')).toBeInTheDocument();
   expect(screen.getByText('Cancelled')).toBeInTheDocument();
   expect(screen.queryByText('No upcoming order')).not.toBeInTheDocument();
+});
+
+it('renders the schedule controls in place of the quantity line and the shipping action after the address', () => {
+  renderWithProviders(
+    <SubscriptionCard
+      card={buildCardWith({ quantity: 2 })}
+      variant="active"
+      loading={settled}
+      scheduleControls={<div>schedule controls</div>}
+      shippingAction={<button type="button">Change</button>}
+    />,
+    withDateFormat,
+  );
+
+  expect(screen.getByText('schedule controls')).toBeInTheDocument();
+  expect(screen.queryByText(/^Qty 2/)).not.toBeInTheDocument();
+  // In the quantity line's place: directly above the shipping line.
+  expect(screen.getByText('schedule controls').nextElementSibling).toBe(
+    screen.getByText(/Ships to/),
+  );
+  expect(screen.getByText(/Ships to/)).toHaveTextContent(
+    'Ships to Jane Doe, Acme Co, 1 Main St, Springfield, IL 62701 · Change',
+  );
 });

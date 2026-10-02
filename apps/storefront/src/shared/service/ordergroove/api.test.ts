@@ -14,8 +14,12 @@ import {
 
 import {
   applyPaymentToAll,
+  cancelSubscription,
   changeNextOrderDate,
+  changeShippingAddress,
+  changeSubscriptionFrequency,
   changeSubscriptionPayment,
+  changeSubscriptionQuantity,
   createPayment,
   getProduct,
   getSubscriptionsUsingToken,
@@ -25,6 +29,7 @@ import {
   listSubscriptions,
   listUpcomingOrders,
   orderHistoryUrl,
+  reactivateSubscription,
   sendOrderNow,
   skipSubscription,
 } from './api';
@@ -433,6 +438,86 @@ describe('writes', () => {
     await vi.advanceTimersByTimeAsync(5000);
     await assertion;
     expect(settled).toBe(true);
+  });
+});
+
+describe('subscription edits', () => {
+  // The write path (mint, 403 re-mint, 10 s deadline, status mapping) is covered by `writes`;
+  // these pin each endpoint's method, path and JSON body.
+  const subscription = buildOgSubscriptionWith('WHATEVER_VALUES');
+  const edit = (action: string, received: ReturnType<typeof vi.fn>) =>
+    server.use(
+      http.patch(
+        `${ogBase}/subscriptions/${subscription.public_id}/${action}/`,
+        async ({ request }) => {
+          received(await request.json());
+
+          return HttpResponse.json(subscription);
+        },
+      ),
+    );
+
+  it('changes the frequency with Ordergroove field names', async () => {
+    const received = vi.fn();
+    edit('change_frequency', received);
+
+    expect(
+      await changeSubscriptionFrequency(someCustomerId(), subscription.public_id, 6, 2),
+    ).toEqual(subscription);
+    expect(received).toHaveBeenCalledWith({ every: 6, every_period: 2 });
+  });
+
+  it('changes the quantity', async () => {
+    const received = vi.fn();
+    edit('change_quantity', received);
+
+    expect(await changeSubscriptionQuantity(someCustomerId(), subscription.public_id, 3)).toEqual(
+      subscription,
+    );
+    expect(received).toHaveBeenCalledWith({ quantity: 3 });
+  });
+
+  it('cancels with the reason body exactly as given', async () => {
+    const received = vi.fn();
+    edit('cancel', received);
+
+    await cancelSubscription(
+      someCustomerId(),
+      subscription.public_id,
+      '114|Cancelled without exit survey response',
+    );
+
+    expect(received).toHaveBeenCalledWith({
+      cancel_reason: '114|Cancelled without exit survey response',
+    });
+  });
+
+  it('reactivates with a start date, a schedule and a first order date', async () => {
+    const received = vi.fn();
+    edit('reactivate', received);
+
+    await reactivateSubscription(someCustomerId(), subscription.public_id, {
+      startDate: '2026-10-01',
+      every: 4,
+      everyPeriod: 2,
+      nextOrderDate: '2026-10-02',
+    });
+
+    expect(received).toHaveBeenCalledWith({
+      start_date: '2026-10-01',
+      every: 4,
+      every_period: 2,
+      next_order_date: '2026-10-02',
+    });
+  });
+
+  it('changes the shipping address by Ordergroove address id', async () => {
+    const received = vi.fn();
+    edit('change_shipping', received);
+
+    await changeShippingAddress(someCustomerId(), subscription.public_id, 'addr-2');
+
+    expect(received).toHaveBeenCalledWith({ shipping_address: 'addr-2' });
   });
 });
 

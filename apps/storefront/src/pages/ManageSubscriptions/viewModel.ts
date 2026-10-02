@@ -19,7 +19,7 @@ interface ProductSummary {
   sku: string | null;
 }
 
-interface AddressSummary {
+export interface AddressSummary {
   name: string;
   company: string | null;
   line1: string;
@@ -54,7 +54,6 @@ export interface SubscriptionCard {
   externalProductId: string;
   product: ProductSummary | null;
   quantity: number;
-  frequencyDays: number;
   every: number;
   everyPeriod: FrequencyPeriod;
   /** "YYYY-MM-DD" of the earliest upcoming order holding one of its items */
@@ -229,7 +228,6 @@ export const buildSubscriptionCards = (
       externalProductId: subscription.product,
       product: product ? summarizeProduct(product) : null,
       quantity: subscription.quantity,
-      frequencyDays: subscription.frequency_days,
       every: subscription.every,
       everyPeriod: subscription.every_period,
       nextOrderDate: upcomingOrder?.date ?? null,
@@ -302,6 +300,139 @@ export const changeDatePresets = (card: SubscriptionCard): DatePreset[] => {
     period: card.everyPeriod,
     date: addIntervals(from, card.every, card.everyPeriod, multiplier),
   }));
+};
+
+export interface FrequencyOption {
+  every: number;
+  period: FrequencyPeriod;
+}
+
+// Ordergroove merchant configuration as baked into SSW's manager bundle, captured 2026-09-17
+// (spec §12.2): days, then "1 day", then weeks. Not readable from the REST API; revisit here if
+// SSW changes the offer in Ordergroove.
+const FREQUENCY_OPTIONS: readonly FrequencyOption[] = [
+  { every: 2, period: 1 },
+  { every: 4, period: 1 },
+  { every: 6, period: 1 },
+  { every: 8, period: 1 },
+  { every: 10, period: 1 },
+  { every: 12, period: 1 },
+  { every: 1, period: 1 },
+  { every: 2, period: 2 },
+  { every: 4, period: 2 },
+  { every: 6, period: 2 },
+  { every: 8, period: 2 },
+  { every: 10, period: 2 },
+  { every: 12, period: 2 },
+];
+
+/** SSW's list, with the card's own schedule appended when it is not offered (the manager does the same). */
+export const frequencyOptions = (
+  every: number,
+  period: FrequencyPeriod,
+): readonly FrequencyOption[] =>
+  FREQUENCY_OPTIONS.some((option) => option.every === every && option.period === period)
+    ? FREQUENCY_OPTIONS
+    : [...FREQUENCY_OPTIONS, { every, period }];
+
+/** The select value for a schedule, "{every}-{period}" — the same key in every select that offers one. */
+export const frequencyKey = ({ every, period }: FrequencyOption) => `${every}-${period}`;
+
+const MAX_QUANTITY = 20;
+
+/** 1…20, plus the current quantity when it is larger (the manager shows 32 for one SSW subscription). */
+export const quantityOptions = (current: number): number[] => {
+  const options = Array.from({ length: MAX_QUANTITY }, (_, index) => index + 1);
+
+  return current > MAX_QUANTITY ? [...options, current] : options;
+};
+
+// Codes and canonical English labels the manager sends. Ordergroove's reporting keys on them, so
+// the body carries THESE labels whatever language the radios show (spec §4.5).
+export const CANCEL_REASONS = [
+  { code: 2, label: 'I have too many of this product' },
+  { code: 8, label: 'This product is too expensive' },
+  { code: 31, label: 'I had trouble managing my subscription' },
+  {
+    code: 70,
+    label: 'I no longer have any use for this product and I will not need it in the near future',
+  },
+  { code: 3, label: 'I stopped using this product' },
+  { code: 22, label: 'I wanted to switch to a different product/flavor' },
+  { code: 15, label: "I don't like this product" },
+] as const;
+export const OTHER_REASON_CODE = 1;
+// The manager's hidden default — no spaces, unlike the radio values.
+const NO_SURVEY_REASON = '114|Cancelled without exit survey response';
+
+export interface CancelReasonSelection {
+  code: number;
+  /** free text; Other only */
+  details?: string;
+}
+
+/** The `cancel_reason` body: a listed reason, Other with or without details, or the no-survey value. */
+export const cancelReasonBody = (selection: CancelReasonSelection | null): string => {
+  if (!selection) {
+    return NO_SURVEY_REASON;
+  }
+  if (selection.code === OTHER_REASON_CODE) {
+    const details = selection.details?.trim() ?? '';
+
+    return details ? `${OTHER_REASON_CODE} | ${details}` : String(OTHER_REASON_CODE);
+  }
+  const reason = CANCEL_REASONS.find((candidate) => candidate.code === selection.code);
+
+  return reason ? `${reason.code} | ${reason.label}` : NO_SURVEY_REASON;
+};
+
+export interface AddressOption {
+  publicId: string;
+  summary: AddressSummary;
+  isCurrent: boolean;
+}
+
+const normalise = (value: string | null) => (value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+// Ordergroove mints an address record per checkout and carries no address type, so one place
+// accumulates records that differ in company, suite line, city spelling or ZIP+4, and billing
+// records sit beside their shipping twins. The hosted manager collapses them on the street line
+// alone (24 live records → its 10 "Ship to" choices for the fixture customer, Task 0 finding J);
+// the picker does the same so both screens offer the same list.
+const addressIdentity = (address: OgAddress) => normalise(address.address);
+
+/**
+ * One choice per distinct street line: live records plus the current one even when retired. The
+ * current record wins its duplicate group so the preselected radio is the id Ordergroove already
+ * holds; otherwise the first live record. Current first, then by name (spec §4.6 as amended).
+ */
+export const buildAddressOptions = (
+  addresses: OgAddress[] | undefined,
+  currentId: string,
+): AddressOption[] => {
+  const byIdentity = new Map<string, OgAddress>();
+  (addresses ?? [])
+    .filter((address) => address.live || address.public_id === currentId)
+    .forEach((address) => {
+      const identity = addressIdentity(address);
+      if (!byIdentity.has(identity) || address.public_id === currentId) {
+        byIdentity.set(identity, address);
+      }
+    });
+
+  return Array.from(byIdentity.values())
+    .map((address) => ({
+      publicId: address.public_id,
+      summary: summarizeAddress(address),
+      isCurrent: address.public_id === currentId,
+    }))
+    .sort((a, b) => {
+      if (a.isCurrent !== b.isCurrent) {
+        return a.isCurrent ? -1 : 1;
+      }
+
+      return a.summary.name.localeCompare(b.summary.name);
+    });
 };
 
 const outcomeOf = (status: number): OrderOutcome => {

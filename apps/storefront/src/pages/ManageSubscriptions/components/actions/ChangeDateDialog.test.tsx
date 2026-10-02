@@ -23,7 +23,6 @@ const buildCardWith = builder<SubscriptionCardModel>(() => ({
     sku: null,
   },
   quantity: 1,
-  frequencyDays: 28,
   every: 4,
   everyPeriod: 2,
   nextOrderDate: '2026-10-03',

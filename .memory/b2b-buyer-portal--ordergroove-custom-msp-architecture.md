@@ -420,3 +420,71 @@ a test holding that. Verified live against a local build served over the sandbox
 and the picker now print the identical string. NOTE: repeated full page loads on customer 80591 start
 failing ("We couldn't load your subscriptions", all requests 200, later ones never answered) — space
 live runs out, and re-run the deployed bundle as the control before blaming a build.
+
+## Phase 3b implemented (2026-10-01)
+- Parity reached minus swap product and add-new-address (hosted-only by design; the escape link
+  stays). A customer changes quantity and frequency inline (QuantityFrequencySelects, save on
+  change, value always the card's so a failed save snaps back), moves a subscription to another
+  saved address (ChangeAddressDialog, §4.6 dedupe in buildAddressOptions), cancels with an optional
+  reason (CancelDialog; body "{code} | {label}", Other "1 | text" or bare "1", none →
+  "114|Cancelled without exit survey response" verbatim), and reactivates a cancelled one
+  (ReactivateDialog: frequency select + native date input from today + FIRST_ORDER_MIN_DAYS).
+- SHAPE: ActiveSubscriptionCard is the per-card owner (hook instance, open dialog, card-option
+  queries) filling SubscriptionCard's three slots; SubscriptionActions is now only the button row;
+  ReactivateAction owns the cancelled card's one control. One hook instance per card keeps spinners
+  per card and lets the Cancel dialog hand off to Skip.
+- The card's schedule text now comes from every/every_period (describeFrequency), which fixed
+  Phase 2's "every 300 days" for 10-month subscriptions; frequencyDays left the card model.
+- Service names: changeSubscriptionFrequency / changeSubscriptionQuantity / cancelSubscription /
+  reactivateSubscription / changeShippingAddress, all PATCH /subscriptions/{id}/<action>/ with the
+  trailing slash.
+- Task 0 findings E–J (probe 2026-10-01, customer 80591, every write restored except I's overwritten cancel timestamp and reason):
+  - E change_frequency: 200 and the record follows (10 months → 6 weeks read back 6/2,
+    frequency_days 42) but the upcoming order's DATE does not move (2027-08-01 before, after and
+    after the restore); the hook refreshes `upcoming` regardless. Response shape unconfirmed.
+  - F change_quantity: 200, and the upcoming order's item quantity FOLLOWS the subscription.
+  - G change_shipping: 200, and the upcoming order's shipping_address FOLLOWS the subscription.
+  - H reactivate: tomorrow accepted as next_order_date on the first try (live true, cancelled null,
+    an upcoming order dated tomorrow appeared) → FIRST_ORDER_MIN_DAYS = 1; today itself untried.
+  - I cancel right after reactivate: 200, cancel_reason stored VERBATIM with code 114 parsed from
+    the prefix, the upcoming order gone. Side effect the API will not undo: the subscription's
+    cancelled timestamp and reason were overwritten (it had 113|Disengaged).
+  - J addresses: 24 live records → 22 nine-field identities but 10 distinct street lines, and the
+    hosted manager offers exactly 10 → buildAddressOptions keys on the normalised street line
+    ALONE (spec §4.6 amended). Cost: two real addresses sharing a street line in different cities
+    collapse into one choice, as they do in the manager.
+- SAFETY (shared hook): src/hooks/useScrollBar.ts now releases the ThemeFrame scroll lock in an
+  effect cleanup when a component unmounts while open. A cancel moves its card out of the active
+  list (the subscriptions refetch more likely lands before the upcoming one), so the card unmounted
+  with its Cancel dialog open and, with the cancelled list collapsed (the default), the page stayed
+  unscrollable. Pinned by useScrollBar.test.ts and a page case that holds the upcoming refetch.
+- Quality gate: tsc, depcruise, eslint clean; knip = pre-existing BillingStateOption only. Scoped
+  suites: 23 files / 190 tests green. Full suite: 15 failing files vs the 18-file dev baseline,
+  none new (3 baseline-red files passed this time; the set shuffles with load). Five tests inside
+  four baseline-red files failed this time that did not in the baseline run; each of those four
+  files passes whole when run alone.
+- Known gaps (deferred minors; the final whole-branch review triages them):
+  - Task 2: "otherwise the first live record" is unpinned; an unknown cancel code falls back to 114
+    (the type could be tightened); only code 8's label is asserted; frequencyOptions returns the
+    mutable module array; the address sort ties on name; trim/empty-street edges untested;
+    viewModel.ts is ~470 lines.
+  - Task 3: the failure path is tested for cancel only; no request-count guard against a retry;
+    wire literals are hardcoded (file precedent).
+  - Task 4: the radio groups lack accessible names; B3Dialog autoFocus lands on the destructive (so Enter on open cancels with no reason)
+    confirm (shared component); Cancel's radios stay editable while pending (the body is built at
+    click time).
+  - Task 5: tests lean on builder defaults; nothing pins that a select keeps the card's value after
+    a pick; the Saving progressbar has no accessible name; `scheduleControls ??` vs
+    `shippingAction &&` are inconsistent; the two-card id test lives in the page test.
+  - Task 6: onClose/onSuccess wiring is pinned only for Skip, quantity and address; the isPending
+    list is hand-kept; Cancel's right-alignment follows MUI md (900px) while the card switches on
+    useMobile (768px), a cosmetic 769–899px gap; the page-wide combobox id check is brittle; the
+    row test never pins Cancel's text variant; the frequency-write owner test ends before the write
+    settles.
+  - Task 7: ReactivateAction's dismissal and failure paths are untested; multi-card cancelled
+    wiring is untested; dropping changeAddress from the isPending list survives the tests.
+  - Browser-only, for Task 9: spinner position inside the select; keyboard focus after a save (the
+    combobox loses tabindex while disabled); focus after a successful cancel.
+- Live check (Task 9, 2026-10-02, two controller runs under the user's authorisation after the harness denied the implementer's): quantity, frequency and address changed and restored on one subscription through the real UI (the address restore by one allowlisted PATCH after the script's wait tripped on the theme's cart drawer, which carries role=dialog inside the ThemeFrame — scope dialog checks to `.MuiDialog-root`); one cancelled subscription reactivated then cancelled again with the 114 body on the same id; all five writes returned parseable bodies; zero forbidden/failed requests; scroll lock released after the cancel; keyboard focus lands on BODY after an inline save and after a cancel (follow-up). Account re-verified equal to the pre-run snapshot except that subscription's cancel metadata (now 2026-10-02 / 114).
+- Whole-branch review fix wave (d8349d94): the Cancel dialog now opens with "You're cancelling {product}."; the reason and address radio groups and the saving spinner have accessible names; frequencyOptions is readonly; regression guards for the Reactivate dialog's dismissal/failure paths, two-cancelled-card wiring and the address write holding the card. Follow-ups left open: scroll-lock ref counting (Cancel→Skip handoff unlocks the frame while Skip is open) and keyboard focus after an inline save or a cancel (lands on body).
+- Where: plan `docs/superpowers/plans/2026-10-01-ordergroove-phase3b-subscription-edits.md`; SDD ledger lines summarised there; branch `worktree-ordergroove-phase3b-subscription-edits`; merge state recorded at finish.

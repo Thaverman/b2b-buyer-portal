@@ -83,3 +83,37 @@ it('stacks the schedule under the product title on a phone', async () => {
   // card test asserts the inverse.
   expect(await within(group).findByText('Next order 3 Oct 2026')).toBeInTheDocument();
 });
+
+it('stretches the quantity and frequency selects to full width on a phone', async () => {
+  const subscription = buildOgSubscriptionWith({ product: '9537_12118' });
+  server.use(
+    http.get(currentJwtUrl, () => HttpResponse.text('fresh-jwt')),
+    http.post(authEndpoint, () =>
+      HttpResponse.json({ success: true, cookieValue: '80591|1|sig', expiresIn: 7200 }),
+    ),
+    http.get(`${ogBase}/subscriptions/`, () => HttpResponse.json(page([subscription]))),
+    http.get(`${ogBase}/payments/`, () => HttpResponse.json(page([]))),
+    http.get(`${ogBase}/addresses/`, () => HttpResponse.json(page([]))),
+    http.get(`${ogBase}/items/`, () => HttpResponse.json(page([]))),
+    http.get(`${ogBase}/orders/`, () => HttpResponse.json(page([]))),
+    http.get(`${ogBase}/products/9537_12118/`, () =>
+      HttpResponse.json(buildOgProductWith({ name: 'Kraft Paper Shopping Bags' })),
+    ),
+  );
+
+  renderWithProviders(<SubscriptionsManager />, {
+    preloadedState: {
+      company: buildCompanyStateWith({
+        customer: { id: faker.number.int({ min: 1, max: 1_000_000 }) },
+      }),
+      storeInfo: buildStoreInfoStateWith({ timeFormat: { display: 'j M Y' } }),
+    },
+  });
+
+  const group = await screen.findByRole('group', { name: 'Kraft Paper Shopping Bags' });
+  const quantity = within(group).getByRole('combobox', { name: /^Quantity/ });
+  const frequency = within(group).getByRole('combobox', { name: /^Frequency/ });
+
+  expect(quantity.closest('.MuiFormControl-root')).toHaveClass('MuiFormControl-fullWidth');
+  expect(frequency.closest('.MuiFormControl-root')).toHaveClass('MuiFormControl-fullWidth');
+});
