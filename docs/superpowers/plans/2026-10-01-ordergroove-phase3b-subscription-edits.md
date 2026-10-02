@@ -319,7 +319,7 @@ Expected: `mint ok`; every `->` status `200`; every restore line reads the origi
   - `reactivateSubscription(customerId: string, subscriptionId: string, input: ReactivationInput): Promise<OgSubscription>`
   - `changeShippingAddress(customerId: string, subscriptionId: string, addressId: string): Promise<OgSubscription>`
 
-- [ ] **Step 1: Write the failing tests** — append a new `describe` to `api.test.ts` after the `writes` block, and add the five functions to the `./api` import list at the top of the file:
+- [x] **Step 1: Write the failing tests** — append a new `describe` to `api.test.ts` after the `writes` block, and add the five functions to the `./api` import list at the top of the file:
 
 ```ts
 describe('subscription edits', () => {
@@ -400,12 +400,12 @@ describe('subscription edits', () => {
 });
 ```
 
-- [ ] **Step 2: Run them to verify they fail**
+- [x] **Step 2: Run them to verify they fail**
 
 Run: `yarn vitest run src/shared/service/ordergroove/api.test.ts`
 Expected: the five new tests fail with `is not a function` / "No export named"; every other test in the file still passes.
 
-- [ ] **Step 3: Implement** — in `api.ts`, add `FrequencyPeriod` to the `./types` import, then insert after `changeNextOrderDate`:
+- [x] **Step 3: Implement** — in `api.ts`, add `FrequencyPeriod` to the `./types` import, then insert after `changeNextOrderDate`:
 
 ```ts
 /** In the Phase 3b probe a schedule change left the upcoming order's date alone (Task 0 finding E). */
@@ -472,12 +472,12 @@ export const changeShippingAddress = (
 
 Then in `index.ts` add `cancelSubscription`, `changeShippingAddress`, `changeSubscriptionFrequency`, `changeSubscriptionQuantity`, `reactivateSubscription` to the `./api` export list (keep it alphabetical) and add `export type { ReactivationInput } from './api';`.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `yarn vitest run src/shared/service/ordergroove/api.test.ts && yarn tsc --noEmit`
 Expected: all tests pass; `tsc` exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/shared/service/ordergroove/api.ts src/shared/service/ordergroove/index.ts src/shared/service/ordergroove/api.test.ts
@@ -504,7 +504,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Produces (from `format.ts`): `describeFrequency(every, period, b3Lang): string`; `describeAddress(summary: AddressSummary): string`; `HOSTED_MANAGER_URL`.
 - Copy: `subscriptions.card.everyMonths`.
 
-- [ ] **Step 1: Write the failing view-model tests** — append to `viewModel.test.ts` (add `buildAddressOptions`, `cancelReasonBody`, `frequencyKey`, `frequencyOptions`, `quantityOptions` to the `./viewModel` import and `OgAddress` to a new `@/shared/service/ordergroove` import):
+- [x] **Step 1: Write the failing view-model tests** — append to `viewModel.test.ts` (add `buildAddressOptions`, `cancelReasonBody`, `frequencyKey`, `frequencyOptions`, `quantityOptions` to the `./viewModel` import and `OgAddress` to a new `@/shared/service/ordergroove` import):
 
 ```ts
 describe('schedule options', () => {
@@ -638,7 +638,7 @@ describe('address options', () => {
 
 Also in the existing `summarises the product, address and payment records` test, delete the `frequencyDays: 28,` line from the `toMatchObject` expectation and the `frequency_days: 28,` line from its subscription fixture — the card no longer carries `frequencyDays`. Search the file for any other `frequencyDays` and remove it the same way.
 
-- [ ] **Step 2: Write the failing card tests** — in `components/SubscriptionCard.test.tsx`: remove `frequencyDays: 28,` from `buildCardWith`'s defaults and from the `renders every field` fixture; change the daily case in `describes an unbranded card and a daily frequency` from `frequencyDays: 3` to `every: 3, everyPeriod: 1`; then add:
+- [x] **Step 2: Write the failing card tests** — in `components/SubscriptionCard.test.tsx`: remove `frequencyDays: 28,` from `buildCardWith`'s defaults and from the `renders every field` fixture; change the daily case in `describes an unbranded card and a daily frequency` from `frequencyDays: 3` to `every: 3, everyPeriod: 1`; then add:
 
 ```ts
 it('reads a monthly schedule from the configured period, not from frequency days', () => {
@@ -652,12 +652,12 @@ it('reads a monthly schedule from the configured period, not from frequency days
 });
 ```
 
-- [ ] **Step 3: Run both files to verify they fail**
+- [x] **Step 3: Run both files to verify they fail**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/viewModel.test.ts src/pages/ManageSubscriptions/components/SubscriptionCard.test.tsx`
 Expected: the new `schedule options`, `cancel reason body` and `address options` tests fail (`is not a function`); the monthly card test fails showing `every 300 days`-style text or a missing `everyMonths` message. The `frequencyDays` removals alone fail nothing yet.
 
-- [ ] **Step 4: Implement the view model** — in `viewModel.ts`:
+- [x] **Step 4: Implement the view model** — in `viewModel.ts`:
 
 1. `export interface AddressSummary` (add `export`).
 2. In `SubscriptionCard`, delete `frequencyDays: number;`; in `toCard`, delete `frequencyDays: subscription.frequency_days,`.
@@ -795,7 +795,7 @@ export const buildAddressOptions = (
 };
 ```
 
-- [ ] **Step 5: Implement the formatting helpers and the card text** — replace `format.ts` with:
+- [x] **Step 5: Implement the formatting helpers and the card text** — replace `format.ts` with:
 
 ```ts
 import { LangFormatFunction } from '@/lib/lang';
@@ -861,17 +861,17 @@ In `en.json`, after `"subscriptions.card.everyDays"`:
   "subscriptions.card.everyMonths": "every {count, plural, one {month} other {# months}}",
 ```
 
-- [ ] **Step 6: Remove `frequencyDays` from every remaining card fixture**
+- [x] **Step 6: Remove `frequencyDays` from every remaining card fixture**
 
 Run: `grep -rn "frequencyDays" src/pages/ManageSubscriptions`
 Expected hits: the `buildCardWith` builders in `components/actions/SkipDialog.test.tsx`, `SendNowDialog.test.tsx`, `ChangeDateDialog.test.tsx`, `SubscriptionActions.test.tsx` (and any other). Delete the `frequencyDays: 28,` line from each. `grep` again: the only remaining hits must be in `pages/PaymentMethods/` (its own model) — none in `ManageSubscriptions`.
 
-- [ ] **Step 7: Run the tests to verify they pass**
+- [x] **Step 7: Run the tests to verify they pass**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions && yarn tsc --noEmit`
 Expected: every file green; `tsc` exit 0 (a leftover `frequencyDays` anywhere fails here).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/pages/ManageSubscriptions/viewModel.ts src/pages/ManageSubscriptions/viewModel.test.ts src/pages/ManageSubscriptions/format.ts src/pages/ManageSubscriptions/components/SubscriptionCard.tsx src/pages/ManageSubscriptions/components/SubscriptionCard.test.tsx src/pages/ManageSubscriptions/SubscriptionsManager.tsx src/pages/ManageSubscriptions/components/actions/SkipDialog.test.tsx src/pages/ManageSubscriptions/components/actions/SendNowDialog.test.tsx src/pages/ManageSubscriptions/components/actions/ChangeDateDialog.test.tsx src/pages/ManageSubscriptions/components/actions/SubscriptionActions.test.tsx src/lib/lang/locales/en.json
@@ -903,7 +903,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
   All five: success → snackbar (keys below) and invalidate `subscriptions` + `upcoming`; error → the 3a `onError`.
 - Copy keys: `subscriptions.actions.{cancel,reactivate,changeAddress,quantityLabel,frequencyLabel}`, `subscriptions.actions.frequency.success`, `subscriptions.actions.quantity.success`, `subscriptions.actions.cancel.*`, `subscriptions.actions.reactivate.*`, `subscriptions.actions.address.*` (full list in Step 4).
 
-- [ ] **Step 1: Write the failing hook tests** — append to `useSubscriptionActions.test.tsx` (add `buildOgSubscriptionWith` to the `tests/test-utils` import if it is not there; it is):
+- [x] **Step 1: Write the failing hook tests** — append to `useSubscriptionActions.test.tsx` (add `buildOgSubscriptionWith` to the `tests/test-utils` import if it is not there; it is):
 
 ```ts
 describe('subscription edits', () => {
@@ -1020,12 +1020,12 @@ describe('subscription edits', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/hooks/useSubscriptionActions.test.tsx`
 Expected: the six new tests fail (`Cannot read properties of undefined (reading 'mutate')`); the 3a and Phase 4 tests still pass.
 
-- [ ] **Step 3: Implement the hook** — in `useSubscriptionActions.ts`, extend the `@/shared/service/ordergroove` import to
+- [x] **Step 3: Implement the hook** — in `useSubscriptionActions.ts`, extend the `@/shared/service/ordergroove` import to
 
 ```ts
 import {
@@ -1118,7 +1118,7 @@ and make the return
   };
 ```
 
-- [ ] **Step 4: Add the copy** — in `en.json`, insert after the `"subscriptions.actions.changeCard.success"` line (every line ends with a comma; the file continues):
+- [x] **Step 4: Add the copy** — in `en.json`, insert after the `"subscriptions.actions.changeCard.success"` line (every line ends with a comma; the file continues):
 
 ```json
   "subscriptions.actions.cancel": "Cancel subscription",
@@ -1159,12 +1159,12 @@ and make the return
 
 If Task 0 finding H recorded `FIRST_ORDER_MIN_DAYS = 2`, `subscriptions.actions.reactivate.dateHint` reads `"Choose a date at least two days from today."` instead.
 
-- [ ] **Step 5: Run to verify they pass**
+- [x] **Step 5: Run to verify they pass**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/hooks && yarn tsc --noEmit`
 Expected: all green; `tsc` exit 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/pages/ManageSubscriptions/hooks/useSubscriptionActions.ts src/pages/ManageSubscriptions/hooks/useSubscriptionActions.test.tsx src/lib/lang/locales/en.json
@@ -1191,7 +1191,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
   - `ChangeAddressDialog({ options: AddressOption[], isOpen, isPending, onClose, onConfirm: (addressId: string) => void })`
 - The dialogs stay mounted and toggle `isOpen`; they reset their state on every opening. These modules have no `src` consumer until Task 6/7, so `lint:dependencies` reports them as orphans until then — expected.
 
-- [ ] **Step 1: Write the failing Cancel dialog tests** — `CancelDialog.test.tsx`:
+- [x] **Step 1: Write the failing Cancel dialog tests** — `CancelDialog.test.tsx`:
 
 ```tsx
 import { ReactElement } from 'react';
@@ -1334,7 +1334,7 @@ it('forgets the previous choice when reopened', async () => {
 });
 ```
 
-- [ ] **Step 2: Write the failing Reactivate dialog tests** — `ReactivateDialog.test.tsx`:
+- [x] **Step 2: Write the failing Reactivate dialog tests** — `ReactivateDialog.test.tsx`:
 
 ```tsx
 import { ReactElement } from 'react';
@@ -1478,7 +1478,7 @@ it('disables Reactivate while the write is pending', () => {
 
 If Task 0 finding H set `FIRST_ORDER_MIN_DAYS = 2`, replace `tomorrow()` in the first test's three assertions with `dayjs().add(2, 'day')…`, make the refusal test change the date to `tomorrow()` instead of `today()`, and assert the hint "Choose a date at least two days from today.".
 
-- [ ] **Step 3: Write the failing Change address dialog tests** — `ChangeAddressDialog.test.tsx`:
+- [x] **Step 3: Write the failing Change address dialog tests** — `ChangeAddressDialog.test.tsx`:
 
 ```tsx
 import { ReactElement } from 'react';
@@ -1601,12 +1601,12 @@ it('disables Save while the write is pending', () => {
 });
 ```
 
-- [ ] **Step 4: Run the three files to verify they fail**
+- [x] **Step 4: Run the three files to verify they fail**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/components/actions/CancelDialog.test.tsx src/pages/ManageSubscriptions/components/actions/ReactivateDialog.test.tsx src/pages/ManageSubscriptions/components/actions/ChangeAddressDialog.test.tsx`
 Expected: each file fails to import its component ("Failed to resolve import").
 
-- [ ] **Step 5: Implement `CancelDialog.tsx`**
+- [x] **Step 5: Implement `CancelDialog.tsx`**
 
 ```tsx
 import { useEffect, useState } from 'react';
@@ -1731,7 +1731,7 @@ function CancelDialog({
 export default CancelDialog;
 ```
 
-- [ ] **Step 6: Implement `ReactivateDialog.tsx`**
+- [x] **Step 6: Implement `ReactivateDialog.tsx`**
 
 ```tsx
 import { useEffect, useState } from 'react';
@@ -1845,7 +1845,7 @@ export default ReactivateDialog;
 
 Set `FIRST_ORDER_MIN_DAYS` to the value Task 0 finding H recorded.
 
-- [ ] **Step 7: Implement `ChangeAddressDialog.tsx`**
+- [x] **Step 7: Implement `ChangeAddressDialog.tsx`**
 
 ```tsx
 import { useEffect, useState } from 'react';
@@ -1933,12 +1933,12 @@ function ChangeAddressDialog({
 export default ChangeAddressDialog;
 ```
 
-- [ ] **Step 8: Run the three files to verify they pass**
+- [x] **Step 8: Run the three files to verify they pass**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/components/actions && yarn tsc --noEmit && yarn eslint src/pages/ManageSubscriptions/components/actions --max-warnings 0`
 Expected: all green; `tsc` exit 0; eslint clean (run `yarn eslint --fix` on the three new files for prettier reflow if needed).
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/pages/ManageSubscriptions/components/actions/CancelDialog.tsx src/pages/ManageSubscriptions/components/actions/CancelDialog.test.tsx src/pages/ManageSubscriptions/components/actions/ReactivateDialog.tsx src/pages/ManageSubscriptions/components/actions/ReactivateDialog.test.tsx src/pages/ManageSubscriptions/components/actions/ChangeAddressDialog.tsx src/pages/ManageSubscriptions/components/actions/ChangeAddressDialog.test.tsx
@@ -1962,7 +1962,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
   - `QuantityFrequencySelects({ card: SubscriptionCard; disabled: boolean; quantityPending: boolean; frequencyPending: boolean; onChangeQuantity: (quantity: number) => void; onChangeFrequency: (option: FrequencyOption) => void })` — default export. Both selects always show the card's current value; `disabled` holds both; the pending flag swaps that select's arrow for a 16 px `CircularProgress`.
   - `SubscriptionCard` gains `scheduleControls?: ReactNode` (replaces the "Qty 2 · every 4 weeks" line when given) and `shippingAction?: ReactNode` (rendered after the address, separated by " · ").
 
-- [ ] **Step 1: Write the failing selects tests** — `QuantityFrequencySelects.test.tsx`:
+- [x] **Step 1: Write the failing selects tests** — `QuantityFrequencySelects.test.tsx`:
 
 ```tsx
 import { builder, faker, renderWithProviders, screen } from 'tests/test-utils';
@@ -2070,7 +2070,7 @@ it('stretches both selects to full width on a phone', () => {
 });
 ```
 
-- [ ] **Step 2: Write the failing card slot test** — append to `components/SubscriptionCard.test.tsx`:
+- [x] **Step 2: Write the failing card slot test** — append to `components/SubscriptionCard.test.tsx`:
 
 ```tsx
 it('renders the schedule controls in place of the quantity line and the shipping action after the address', () => {
@@ -2093,12 +2093,12 @@ it('renders the schedule controls in place of the quantity line and the shipping
 });
 ```
 
-- [ ] **Step 3: Run both files to verify they fail**
+- [x] **Step 3: Run both files to verify they fail**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/components/actions/QuantityFrequencySelects.test.tsx src/pages/ManageSubscriptions/components/SubscriptionCard.test.tsx`
 Expected: the selects file fails to import; the slot test fails on `schedule controls` not found (and `tsc` would reject the unknown props).
 
-- [ ] **Step 4: Implement `QuantityFrequencySelects.tsx`**
+- [x] **Step 4: Implement `QuantityFrequencySelects.tsx`**
 
 ```tsx
 import { Box, CircularProgress, MenuItem, TextField } from '@mui/material';
@@ -2195,7 +2195,7 @@ function QuantityFrequencySelects({
 export default QuantityFrequencySelects;
 ```
 
-- [ ] **Step 5: Add the slots to `SubscriptionCard.tsx`** — extend the props:
+- [x] **Step 5: Add the slots to `SubscriptionCard.tsx`** — extend the props:
 
 ```tsx
 interface SubscriptionCardProps {
@@ -2240,12 +2240,12 @@ and replace the quantity line and the shipping paragraph with:
           </Typography>
 ```
 
-- [ ] **Step 6: Run to verify they pass**
+- [x] **Step 6: Run to verify they pass**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/components && yarn tsc --noEmit && yarn eslint src/pages/ManageSubscriptions/components --max-warnings 0`
 Expected: all green; `tsc` exit 0; eslint clean.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/pages/ManageSubscriptions/components/actions/QuantityFrequencySelects.tsx src/pages/ManageSubscriptions/components/actions/QuantityFrequencySelects.test.tsx src/pages/ManageSubscriptions/components/SubscriptionCard.tsx src/pages/ManageSubscriptions/components/SubscriptionCard.test.tsx
@@ -2272,7 +2272,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
   - `ActiveSubscriptionCard({ card: SubscriptionCard; loading: CellLoading; customerId: number; addresses: OgAddress[] | undefined })` — default export; the only place that calls `useSubscriptionActions` for an active card.
 - Why the inversion: 3a's `SubscriptionActions` owned the hook and the dialogs and was rendered into the card's `actions` slot. 3b puts controls in three slots of one card (schedule line, address line, actions row) that must share one pending state and one open dialog, and the Cancel dialog must be able to open the Skip dialog. One owner above the card is the only shape that does that without lifting the hook into the page (which would make every card's spinner shared). Task 8 records this against spec §2.3.
 
-- [ ] **Step 1: Rewrite the row test** — replace `SubscriptionActions.test.tsx` with:
+- [x] **Step 1: Rewrite the row test** — replace `SubscriptionActions.test.tsx` with:
 
 ```tsx
 import { renderWithProviders, screen } from 'tests/test-utils';
@@ -2328,7 +2328,7 @@ it('holds every button while a write is in flight', () => {
 });
 ```
 
-- [ ] **Step 2: Write the failing owner tests** — `ActiveSubscriptionCard.test.tsx` (the 3a integration cases move here from the old row test, plus the 3b ones):
+- [x] **Step 2: Write the failing owner tests** — `ActiveSubscriptionCard.test.tsx` (the 3a integration cases move here from the old row test, plus the 3b ones):
 
 ```tsx
 import {
@@ -2563,7 +2563,7 @@ it('keeps a dialog open after a failed write so the customer can retry or leave'
 });
 ```
 
-- [ ] **Step 3: Write the failing page tests** — in `SubscriptionsManager.test.tsx`, extend the test `offers actions only on active cards with an upcoming order`: after the existing `unscheduledGroup` assertions add
+- [x] **Step 3: Write the failing page tests** — in `SubscriptionsManager.test.tsx`, extend the test `offers actions only on active cards with an upcoming order`: after the existing `unscheduledGroup` assertions add
 
 ```tsx
   expect(unscheduledGroup.getByRole('button', { name: 'Cancel subscription' })).toBeInTheDocument();
@@ -2691,12 +2691,12 @@ it('stretches the quantity and frequency selects to full width on a phone', asyn
 });
 ```
 
-- [ ] **Step 4: Run the four files to verify they fail**
+- [x] **Step 4: Run the four files to verify they fail**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/components/actions/SubscriptionActions.test.tsx src/pages/ManageSubscriptions/components/actions/ActiveSubscriptionCard.test.tsx src/pages/ManageSubscriptions/SubscriptionsManager.test.tsx src/pages/ManageSubscriptions/SubscriptionsManager.mobile.test.tsx`
 Expected: the owner file fails to import; the row tests fail (the old row still takes `card`/`customerId`); the three page cases and the phone case fail on missing comboboxes/buttons.
 
-- [ ] **Step 5: Make `SubscriptionActions.tsx` presentational** — replace the file with:
+- [x] **Step 5: Make `SubscriptionActions.tsx` presentational** — replace the file with:
 
 ```tsx
 import { Box, Button } from '@mui/material';
@@ -2759,7 +2759,7 @@ function SubscriptionActions({ hasUpcomingOrder, disabled, onOpen }: Subscriptio
 export default SubscriptionActions;
 ```
 
-- [ ] **Step 6: Implement `ActiveSubscriptionCard.tsx`**
+- [x] **Step 6: Implement `ActiveSubscriptionCard.tsx`**
 
 ```tsx
 import { useState } from 'react';
@@ -2958,7 +2958,7 @@ function ActiveSubscriptionCard({
 export default ActiveSubscriptionCard;
 ```
 
-- [ ] **Step 7: Wire the page** — in `SubscriptionsManager.tsx` replace the `SubscriptionActions` and `SubscriptionCard` imports with
+- [x] **Step 7: Wire the page** — in `SubscriptionsManager.tsx` replace the `SubscriptionActions` and `SubscriptionCard` imports with
 
 ```tsx
 import ActiveSubscriptionCard from './components/actions/ActiveSubscriptionCard';
@@ -2981,12 +2981,12 @@ and the `active.map` with
         ))}
 ```
 
-- [ ] **Step 8: Run to verify they pass**
+- [x] **Step 8: Run to verify they pass**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions && yarn tsc --noEmit && yarn eslint src/pages/ManageSubscriptions --max-warnings 0`
 Expected: every file green (the 3a `skips a subscription…` page case included); `tsc` exit 0; eslint clean. If `ActiveSubscriptionCard.test.tsx` trips the 5 s per-test limit under load, split the `it.each` further rather than raising the timeout.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/pages/ManageSubscriptions/components/actions/ActiveSubscriptionCard.tsx src/pages/ManageSubscriptions/components/actions/ActiveSubscriptionCard.test.tsx src/pages/ManageSubscriptions/components/actions/SubscriptionActions.tsx src/pages/ManageSubscriptions/components/actions/SubscriptionActions.test.tsx src/pages/ManageSubscriptions/SubscriptionsManager.tsx src/pages/ManageSubscriptions/SubscriptionsManager.test.tsx src/pages/ManageSubscriptions/SubscriptionsManager.mobile.test.tsx
@@ -3013,7 +3013,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Consumes: `ReactivateDialog` (Task 4); `useSubscriptionActions().reactivate` (Task 3); `SubscriptionCard`'s `actions` slot.
 - Produces: `ReactivateAction({ card: SubscriptionCard; customerId: number })` — default export; `CancelledSubscriptions` gains `customerId: number`.
 
-- [ ] **Step 1: Write the failing action test** — `ReactivateAction.test.tsx`:
+- [x] **Step 1: Write the failing action test** — `ReactivateAction.test.tsx`:
 
 ```tsx
 import dayjs from 'dayjs';
@@ -3139,7 +3139,7 @@ it('holds the button while the write is in flight', async () => {
 
 If Task 0 finding H set `FIRST_ORDER_MIN_DAYS = 2`, the expected `next_order_date` is `dayjs().add(2, 'day')…`.
 
-- [ ] **Step 2: Write the failing page tests** — in `SubscriptionsManager.test.tsx`, in `offers actions only on active cards with an upcoming order`, replace the final cancelled-card assertion
+- [x] **Step 2: Write the failing page tests** — in `SubscriptionsManager.test.tsx`, in `offers actions only on active cards with an upcoming order`, replace the final cancelled-card assertion
 
 ```tsx
   expect(
@@ -3208,12 +3208,12 @@ it('reactivates a cancelled subscription and lists it among the active ones', as
 });
 ```
 
-- [ ] **Step 3: Run both files to verify they fail**
+- [x] **Step 3: Run both files to verify they fail**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions/components/actions/ReactivateAction.test.tsx src/pages/ManageSubscriptions/SubscriptionsManager.test.tsx`
 Expected: the action file fails to import; the two page cases fail on a missing `Reactivate` button.
 
-- [ ] **Step 4: Implement `ReactivateAction.tsx`**
+- [x] **Step 4: Implement `ReactivateAction.tsx`**
 
 ```tsx
 import { useState } from 'react';
@@ -3265,7 +3265,7 @@ function ReactivateAction({ card, customerId }: ReactivateActionProps) {
 export default ReactivateAction;
 ```
 
-- [ ] **Step 5: Give cancelled cards the action** — in `CancelledSubscriptions.tsx`:
+- [x] **Step 5: Give cancelled cards the action** — in `CancelledSubscriptions.tsx`:
 
 ```tsx
 import ReactivateAction from './actions/ReactivateAction';
@@ -3294,12 +3294,12 @@ and
 
 In `SubscriptionsManager.tsx`: `<CancelledSubscriptions cards={cancelled} loading={loading} customerId={customerId} />`.
 
-- [ ] **Step 6: Run to verify they pass**
+- [x] **Step 6: Run to verify they pass**
 
 Run: `yarn vitest run src/pages/ManageSubscriptions && yarn tsc --noEmit && yarn eslint src/pages/ManageSubscriptions --max-warnings 0`
 Expected: all green; `tsc` exit 0; eslint clean.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/pages/ManageSubscriptions/components/actions/ReactivateAction.tsx src/pages/ManageSubscriptions/components/actions/ReactivateAction.test.tsx src/pages/ManageSubscriptions/components/CancelledSubscriptions.tsx src/pages/ManageSubscriptions/SubscriptionsManager.tsx src/pages/ManageSubscriptions/SubscriptionsManager.test.tsx
@@ -3317,7 +3317,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Modify: `.memory/b2b-buyer-portal--ordergroove-custom-msp-architecture.md`
 - Modify: this plan (tick the boxes; the Task 0 findings must already be recorded)
 
-- [ ] **Step 1: Type-check and lint everything**
+- [x] **Step 1: Type-check and lint everything**
 
 ```bash
 yarn tsc --noEmit
@@ -3328,7 +3328,7 @@ yarn lint:knip
 
 Expected: `tsc` exit 0; dependency-cruiser "no dependency violations" (every new module now has its `src` consumer); `lint:eslint` exit 0 (run `yarn eslint --fix` on the files you touched for prettier reflow, never on `en.json`); knip reports only the pre-existing `BillingStateOption` in `src/pages/PaymentMethods/billingPrefill.ts`. Anything else is yours: an export nothing in `src` consumes (`FrequencyOption`, `frequencyKey`, `CancelReasonSelection`, `AddressOption`, `AddressSummary`, `describeAddress`, `HOSTED_MANAGER_URL`, `ReactivationInput`, `SubscriptionDialog` are each consumed by a component or hook — check before un-exporting) or a file nothing imports.
 
-- [ ] **Step 2: Run the scoped suites, then the full suite against the baseline**
+- [x] **Step 2: Run the scoped suites, then the full suite against the baseline**
 
 ```bash
 yarn vitest run src/pages/ManageSubscriptions src/shared/service/ordergroove
@@ -3343,7 +3343,15 @@ comm -13 /tmp/baseline-failing.txt /tmp/after-failing.txt
 
 Expected: the `comm` output is empty, or lists only files that pass when run alone — run each listed file by itself; a file that also fails alone is a real regression to fix before continuing. Record the counts here (files/tests in the scoped suites; the full-suite delta and what each listed file did alone).
 
-- [ ] **Step 3: Align the spec with what shipped** — edit the Phase 3 spec:
+**Recorded 2026-10-01 (HEAD `91eef5da`, before this docs commit):**
+
+- Step 1: `yarn tsc --noEmit` exit 0 (also with `--incremental false`); `yarn lint:dependencies` "no dependency violations found (787 modules, 3830 dependencies cruised)"; `yarn lint:eslint` exit 0; `yarn lint:knip` reports only `BillingStateOption` in `src/pages/PaymentMethods/billingPrefill.ts:29` (the file is untouched by this branch, so it is the pre-existing `dev` finding; knip exits 1 for it alone).
+- Scoped suites (`src/pages/ManageSubscriptions`, `src/shared/service/ordergroove`): 23 files, 190 tests, all green.
+- Full suite: 15 failed | 107 passed (122 files); 73 failed | 1427 passed | 5 todo (1505 tests); 3 unhandled errors, all from `ShoppingLists/index.test.tsx`. The dev baseline: 18 failed | 97 passed (115 files); 99 failed | 1328 passed | 5 todo (1432 tests); 1 unhandled error. Delta: +7 files (the new test files), +73 tests, −3 failing files, −26 failing tests. All 23 Ordergroove files and `src/hooks/useScrollBar.test.ts` (3 tests) are green in the full run too.
+- `comm -13` of the baseline's failing files against this run's is empty: no new failing file. Three baseline-red files passed this time (`Invoice/index`, `QuickOrder/index.quickpad`, `QuotesList/index`); the red set shuffles with load.
+- Five failing tests inside four baseline-red files were not in the baseline's failing-test list: `CompanyOrderList/index.mobile` (custom status labels) and `MyOrders/index` (can search for orders) failed on element-not-found, `QuickOrder/index.main` (two tests) and `ShoppingListDetails/index` on the 5 s per-test limit. Run alone, each of the four files passes whole: `CompanyOrderList/index.mobile` 14 passed | 1 todo, `MyOrders/index` 43, `QuickOrder/index.main` 50, `ShoppingListDetails/index` 32.
+
+- [x] **Step 3: Align the spec with what shipped** — edit the Phase 3 spec:
 
 1. §2.3 file list: add `components/actions/ActiveSubscriptionCard.tsx` (per-card owner: hook, open dialog, slots, dialogs) and `components/actions/ReactivateAction.tsx`; mark `SubscriptionActions.tsx` as the presentational button row; `CancelledSubscriptions.tsx` takes `customerId`; `SubscriptionCard.tsx` has `scheduleControls` and `shippingAction` slots. State why (Task 6's "Why the inversion").
 2. §3.2: the service functions are `changeSubscriptionFrequency` and `changeSubscriptionQuantity` (Phase 4's `changeSubscriptionPayment` pattern; the hook keeps `changeFrequency`/`changeQuantity`). Record findings E–G beside their rows.
@@ -3355,7 +3363,7 @@ Expected: the `comm` output is empty, or lists only files that pass when run alo
 8. §10.1: replace steps 4–6 with the recorded findings E–J.
 9. §10.2: the phone case asserts the selects' `MuiFormControl-fullWidth` class (the repo's tests already reach for `closest()`); the cancelled-card case now expects exactly one `Reactivate` button.
 
-- [ ] **Step 4: Record the outcome in the memory note** — append to the Ordergroove note in `.memory/`, after the Phase 4 sections:
+- [x] **Step 4: Record the outcome in the memory note** — append to the Ordergroove note in `.memory/`, after the Phase 4 sections:
 
 ```
 ## Phase 3b implemented (YYYY-MM-DD)
@@ -3382,7 +3390,7 @@ Expected: the `comm` output is empty, or lists only files that pass when run alo
 
 Mirror the note to the Obsidian vault copy (`/mnt/c/Users/thaverman/Documents/Obsidian/Programing/Platform/Memory/`, same filename) and, if the Mongo sink is reachable, append the same section there as the earlier phases did.
 
-- [ ] **Step 5: Commit the documentation**
+- [x] **Step 5: Commit the documentation**
 
 ```bash
 git add docs/superpowers/specs/2026-09-17-ordergroove-phase3-subscription-actions-design.md docs/superpowers/plans/2026-10-01-ordergroove-phase3b-subscription-edits.md .memory/b2b-buyer-portal--ordergroove-custom-msp-architecture.md
