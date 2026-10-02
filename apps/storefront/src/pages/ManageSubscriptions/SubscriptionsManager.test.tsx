@@ -109,13 +109,15 @@ const mockResources = ({
 
 // A distinct customer per test keeps the module-level auth cache from leaking between tests.
 // The store's date display format is blank by default; "2026-10-03" renders as "3 Oct 2026".
-const renderPage = () =>
+// Pass a frame to watch the scroll lock the dialogs put on the ThemeFrame's body.
+const renderPage = (themeFrame: Document | null = null) =>
   renderWithProviders(<SubscriptionsManager />, {
     preloadedState: {
       company: buildCompanyStateWith({
         customer: { id: faker.number.int({ min: 1, max: 1_000_000 }) },
       }),
       storeInfo: buildStoreInfoStateWith({ timeFormat: { display: 'j M Y' } }),
+      theme: { themeFrame },
     },
   });
 
@@ -536,6 +538,66 @@ it('cancels a subscription without a reason and moves it to the cancelled list',
     cancel_reason: '114|Cancelled without exit survey response',
   });
   expect(snackbar.success).toHaveBeenCalledWith('Subscription cancelled.');
+});
+
+it('releases the page scroll lock when the cancelled card leaves while upcoming orders still load', async () => {
+  const subscription = buildOgSubscriptionWith({ product: '9537_12118' });
+  // The reducer writes `body.style.overflow` on whatever frame the store holds; a stand-in does.
+  const themeFrame = { body: { style: {} } } as unknown as Document;
+  const waiting = vi.fn();
+  let cancelled = false;
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  mockResources({
+    subscriptions: [subscription],
+    products: { '9537_12118': buildOgProductWith({ name: 'Kraft Paper Shopping Bags' }) },
+  });
+  server.use(
+    http.get(`${ogBase}/subscriptions/`, () =>
+      HttpResponse.json(
+        page([
+          cancelled
+            ? { ...subscription, cancelled: '2026-10-01 10:00:00', live: false }
+            : subscription,
+        ]),
+      ),
+    ),
+    // Once the write has landed the upcoming refetch waits (orders and items are fetched together),
+    // so the subscriptions list moves the card while the cancel mutation is still pending.
+    http.get(`${ogBase}/orders/`, async ({ request }) => {
+      if (cancelled && new URL(request.url).searchParams.get('status') === '1') {
+        waiting();
+        await held;
+      }
+
+      return HttpResponse.json(page([]));
+    }),
+    http.patch(`${ogBase}/subscriptions/${subscription.public_id}/cancel/`, async () => {
+      cancelled = true;
+
+      return HttpResponse.json({ ...subscription, cancelled: '2026-10-01 10:00:00', live: false });
+    }),
+  );
+
+  const { user, store } = renderPage(themeFrame);
+  const lock = () => store.getState().theme.themeFrame?.body.style.overflow;
+
+  await screen.findByRole('group', { name: 'Kraft Paper Shopping Bags' });
+  await user.click(screen.getByRole('button', { name: 'Cancel subscription' }));
+  expect(lock()).toBe('hidden');
+  await user.click(
+    within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel subscription' }),
+  );
+
+  expect(await screen.findByText("You don't have any active subscriptions.")).toBeInTheDocument();
+  // The upcoming refetch is still held, so the write has not finished to close the dialog itself:
+  // the card left with it open, and the page must scroll again anyway.
+  await waitFor(() => expect(waiting).toHaveBeenCalled());
+  await waitFor(() => expect(lock()).toBe('initial'));
+
+  release();
 });
 
 it('reactivates a cancelled subscription and lists it among the active ones', async () => {
