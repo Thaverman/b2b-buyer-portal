@@ -441,9 +441,11 @@ it('offers actions only on active cards with an upcoming order', async () => {
   expect(new Set(selectIds).size).toBe(4);
 
   await user.click(screen.getByRole('button', { name: '1 cancelled subscription' }));
-  expect(
-    within(screen.getByRole('group', { name: 'Cancelled one' })).queryByRole('button'),
-  ).not.toBeInTheDocument();
+  const cancelledGroup = within(screen.getByRole('group', { name: 'Cancelled one' }));
+  expect(cancelledGroup.getAllByRole('button').map((button) => button.textContent)).toEqual([
+    'Reactivate',
+  ]);
+  expect(cancelledGroup.queryByRole('combobox')).not.toBeInTheDocument();
 });
 
 it('links back to the hosted manager in the top window', async () => {
@@ -534,4 +536,56 @@ it('cancels a subscription without a reason and moves it to the cancelled list',
     cancel_reason: '114|Cancelled without exit survey response',
   });
   expect(snackbar.success).toHaveBeenCalledWith('Subscription cancelled.');
+});
+
+it('reactivates a cancelled subscription and lists it among the active ones', async () => {
+  const subscription = buildOgSubscriptionWith({
+    product: '9537_12118',
+    cancelled: '2026-08-01 10:00:00',
+    live: false,
+  });
+  const received = vi.fn();
+  let reactivated = false;
+  mockResources({
+    subscriptions: [subscription],
+    products: { '9537_12118': buildOgProductWith({ name: 'Kraft Paper Shopping Bags' }) },
+  });
+  server.use(
+    http.get(`${ogBase}/subscriptions/`, () =>
+      HttpResponse.json(
+        page([reactivated ? { ...subscription, cancelled: null, live: true } : subscription]),
+      ),
+    ),
+    http.patch(
+      `${ogBase}/subscriptions/${subscription.public_id}/reactivate/`,
+      async ({ request }) => {
+        received(await request.json());
+        reactivated = true;
+
+        return HttpResponse.json({ ...subscription, cancelled: null, live: true });
+      },
+    ),
+  );
+
+  const { user } = renderPage();
+
+  await user.click(await screen.findByRole('button', { name: '1 cancelled subscription' }));
+  const group = await screen.findByRole('group', { name: 'Kraft Paper Shopping Bags' });
+  await user.click(within(group).getByRole('button', { name: 'Reactivate' }));
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Reactivate' }));
+
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('button', { name: '1 cancelled subscription' }),
+    ).not.toBeInTheDocument(),
+  );
+  expect(
+    within(screen.getByRole('group', { name: 'Kraft Paper Shopping Bags' })).getByRole('button', {
+      name: 'Cancel subscription',
+    }),
+  ).toBeInTheDocument();
+  expect(received).toHaveBeenCalledWith(
+    expect.objectContaining({ every: subscription.every, every_period: subscription.every_period }),
+  );
+  expect(snackbar.success).toHaveBeenCalledWith('Subscription reactivated.');
 });

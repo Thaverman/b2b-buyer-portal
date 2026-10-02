@@ -235,6 +235,7 @@ it('saves a quantity straight from the select and holds every control meanwhile'
   await waitFor(() => expect(received).toHaveBeenCalledWith({ quantity: 3 }));
   expect(screen.getByRole('button', { name: 'Skip' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Cancel subscription' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Change' })).toBeDisabled();
   expect(screen.getByRole('combobox', { name: /^Frequency/ })).toHaveAttribute(
     'aria-disabled',
     'true',
@@ -263,6 +264,30 @@ it('saves a frequency straight from the select, with its period', async () => {
   await user.click(screen.getByRole('option', { name: 'every 6 days' }));
 
   await waitFor(() => expect(received).toHaveBeenCalledWith({ every: 6, every_period: 1 }));
+});
+
+it('moves the subscription to the chosen address and closes the dialog', async () => {
+  const received = vi.fn();
+  server.use(
+    http.patch(`${ogBase}/subscriptions/s-1/change_shipping/`, async ({ request }) => {
+      received(await request.json());
+
+      return HttpResponse.json({});
+    }),
+  );
+  const { user } = renderCard(buildCardWith('WHATEVER_VALUES'));
+
+  await user.click(screen.getByRole('button', { name: 'Change' }));
+  const dialog = within(screen.getByRole('dialog'));
+  await user.click(
+    dialog.getByRole('radio', { name: 'Jane Doe, 2 Oak Ave, Springfield, IL 62702' }),
+  );
+  await user.click(dialog.getByRole('button', { name: 'Save' }));
+
+  await waitFor(() =>
+    expect(received).toHaveBeenCalledWith({ shipping_address: office.public_id }),
+  );
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 });
 
 it('holds every control while a dialog write is in flight, then closes the dialog on success', async () => {

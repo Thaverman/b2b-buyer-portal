@@ -81,7 +81,7 @@ function SubscriptionsManager() {
             addresses={addresses.data}
           />
         ))}
-        <CancelledSubscriptions cards={cancelled} loading={loading} />
+        <CancelledSubscriptions cards={cancelled} loading={loading} customerId={customerId} />
         <RecentOrders
           orders={buildRecentOrders(
             orderHistory.data?.pages.flatMap((result) => result.results) ?? [],
