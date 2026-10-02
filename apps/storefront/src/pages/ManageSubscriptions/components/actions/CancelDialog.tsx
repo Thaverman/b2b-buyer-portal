@@ -46,6 +46,10 @@ function CancelDialog({
     }
   }, [isOpen]);
 
+  const product =
+    card.product?.name ??
+    b3Lang('subscriptions.card.unnamedProduct', { id: card.externalProductId });
+
   const selection = (): CancelReasonSelection | null => {
     if (!reason) {
       return null;
@@ -72,6 +76,9 @@ function CancelDialog({
       }}
       handRightClick={() => onConfirm(cancelReasonBody(selection()))}
     >
+      <Typography sx={{ mb: 2 }}>
+        {b3Lang('subscriptions.actions.cancel.body', { product })}
+      </Typography>
       {/* The manager's whole retention flow for SSW is this one nudge (spec §6.2). */}
       {card.nextOrder && (
         <Typography sx={{ mb: 2 }}>
@@ -87,8 +94,14 @@ function CancelDialog({
           </Button>
         </Typography>
       )}
-      <Typography>{b3Lang('subscriptions.actions.cancel.reasonsTitle')}</Typography>
-      <RadioGroup value={reason} onChange={(event) => setReason(event.target.value)}>
+      <Typography id="subscription-cancel-reasons">
+        {b3Lang('subscriptions.actions.cancel.reasonsTitle')}
+      </Typography>
+      <RadioGroup
+        aria-labelledby="subscription-cancel-reasons"
+        value={reason}
+        onChange={(event) => setReason(event.target.value)}
+      >
         {CANCEL_REASONS.map(({ code }) => (
           <FormControlLabel
             key={code}

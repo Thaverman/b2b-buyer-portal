@@ -58,6 +58,7 @@ it('preselects the current address and saves only once another one is chosen', a
     />
   ));
 
+  expect(screen.getByRole('radiogroup', { name: 'Change shipping address' })).toBeInTheDocument();
   expect(
     screen.getByRole('radio', { name: 'Jane Doe, Acme Co, 1 Main St, Springfield, IL 62701' }),
   ).toBeChecked();

@@ -25,8 +25,14 @@ interface QuantityFrequencySelectsProps {
 // Takes the dropdown arrow's place while the write is in flight. The value stays the card's until
 // the refetch lands, so a failed save visibly snaps back (spec §6.3).
 function Saving() {
+  const b3Lang = useB3Lang();
+
   return (
-    <CircularProgress size={16} sx={{ position: 'absolute', right: 12, pointerEvents: 'none' }} />
+    <CircularProgress
+      size={16}
+      aria-label={b3Lang('subscriptions.actions.saving')}
+      sx={{ position: 'absolute', right: 12, pointerEvents: 'none' }}
+    />
   );
 }
 

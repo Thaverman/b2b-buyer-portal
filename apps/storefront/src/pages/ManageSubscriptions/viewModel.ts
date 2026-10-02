@@ -310,7 +310,7 @@ export interface FrequencyOption {
 // Ordergroove merchant configuration as baked into SSW's manager bundle, captured 2026-09-17
 // (spec §12.2): days, then "1 day", then weeks. Not readable from the REST API; revisit here if
 // SSW changes the offer in Ordergroove.
-const FREQUENCY_OPTIONS: FrequencyOption[] = [
+const FREQUENCY_OPTIONS: readonly FrequencyOption[] = [
   { every: 2, period: 1 },
   { every: 4, period: 1 },
   { every: 6, period: 1 },
@@ -327,7 +327,10 @@ const FREQUENCY_OPTIONS: FrequencyOption[] = [
 ];
 
 /** SSW's list, with the card's own schedule appended when it is not offered (the manager does the same). */
-export const frequencyOptions = (every: number, period: FrequencyPeriod): FrequencyOption[] =>
+export const frequencyOptions = (
+  every: number,
+  period: FrequencyPeriod,
+): readonly FrequencyOption[] =>
   FREQUENCY_OPTIONS.some((option) => option.every === every && option.period === period)
     ? FREQUENCY_OPTIONS
     : [...FREQUENCY_OPTIONS, { every, period }];

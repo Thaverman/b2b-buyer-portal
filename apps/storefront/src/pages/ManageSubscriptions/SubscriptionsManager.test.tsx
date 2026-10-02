@@ -651,3 +651,61 @@ it('reactivates a cancelled subscription and lists it among the active ones', as
   );
   expect(snackbar.success).toHaveBeenCalledWith('Subscription reactivated.');
 });
+
+it('reactivates the right one of two cancelled subscriptions', async () => {
+  // The newest cancellation is listed first: Kraft Paper Shopping Bags, then Tissue Paper.
+  const first = buildOgSubscriptionWith({
+    product: '9537_12118',
+    cancelled: '2026-08-01 10:00:00',
+    live: false,
+  });
+  const second = buildOgSubscriptionWith({
+    product: '7674_9534',
+    cancelled: '2026-07-01 10:00:00',
+    live: false,
+  });
+  const reactivated: string[] = [];
+  let release: () => void = () => {};
+  mockResources({
+    subscriptions: [first, second],
+    products: {
+      '9537_12118': buildOgProductWith({ name: 'Kraft Paper Shopping Bags' }),
+      '7674_9534': buildOgProductWith({ name: 'Tissue Paper' }),
+    },
+  });
+  server.use(
+    http.patch(`${ogBase}/subscriptions/:id/reactivate/`, async ({ params }) => {
+      reactivated.push(String(params.id));
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+
+      return HttpResponse.json({});
+    }),
+  );
+
+  const { user } = renderPage();
+
+  await user.click(await screen.findByRole('button', { name: '2 cancelled subscriptions' }));
+  const firstGroup = await screen.findByRole('group', { name: 'Kraft Paper Shopping Bags' });
+  const secondGroup = await screen.findByRole('group', { name: 'Tissue Paper' });
+  await user.click(within(secondGroup).getByRole('button', { name: 'Reactivate' }));
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Reactivate' }));
+
+  await waitFor(() => expect(reactivated).toEqual([second.public_id]));
+  await waitFor(() =>
+    expect(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Reactivate' }),
+    ).toBeDisabled(),
+  );
+  // The write is held: it holds the card it belongs to (its own button and the dialog's, which
+  // renders inside the card) and no other.
+  const held = within(secondGroup).getAllByRole('button', { name: 'Reactivate' });
+  expect(held).toHaveLength(2);
+  held.forEach((button) => expect(button).toBeDisabled());
+  expect(within(firstGroup).getByRole('button', { name: 'Reactivate' })).toBeEnabled();
+
+  release();
+
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+});

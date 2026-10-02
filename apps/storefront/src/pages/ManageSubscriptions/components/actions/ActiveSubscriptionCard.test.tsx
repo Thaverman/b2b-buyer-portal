@@ -267,10 +267,14 @@ it('saves a frequency straight from the select, with its period', async () => {
 });
 
 it('moves the subscription to the chosen address and closes the dialog', async () => {
+  let release: () => void = () => {};
   const received = vi.fn();
   server.use(
     http.patch(`${ogBase}/subscriptions/s-1/change_shipping/`, async ({ request }) => {
       received(await request.json());
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
 
       return HttpResponse.json({});
     }),
@@ -287,6 +291,11 @@ it('moves the subscription to the chosen address and closes the dialog', async (
   await waitFor(() =>
     expect(received).toHaveBeenCalledWith({ shipping_address: office.public_id }),
   );
+  // The address write holds the card like every other write.
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Skip' })).toBeDisabled());
+
+  release();
+
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 });
 

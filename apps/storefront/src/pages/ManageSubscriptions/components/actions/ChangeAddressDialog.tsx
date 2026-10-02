@@ -60,7 +60,11 @@ function ChangeAddressDialog({
         }
       }}
     >
-      <RadioGroup value={choice} onChange={(event) => setChoice(event.target.value)}>
+      <RadioGroup
+        aria-label={b3Lang('subscriptions.actions.address.title')}
+        value={choice}
+        onChange={(event) => setChoice(event.target.value)}
+      >
         {options.map((option) => (
           <FormControlLabel
             key={option.publicId}

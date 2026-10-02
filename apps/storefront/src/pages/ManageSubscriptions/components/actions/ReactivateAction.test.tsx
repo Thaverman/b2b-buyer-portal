@@ -121,3 +121,58 @@ it('holds the button while the write is in flight', async () => {
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   expect(screen.getByRole('button', { name: 'Reactivate' })).toBeEnabled();
 });
+
+it('closes the dialog on Cancel without writing', async () => {
+  const received = vi.fn();
+  server.use(
+    http.patch(`${ogBase}/subscriptions/c-1/reactivate/`, async () => {
+      received();
+
+      return HttpResponse.json({});
+    }),
+  );
+  const { user } = renderWithProviders(
+    <ReactivateAction card={buildCardWith('WHATEVER_VALUES')} customerId={80591} />,
+  );
+
+  await user.click(screen.getByRole('button', { name: 'Reactivate' }));
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }));
+
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(received).not.toHaveBeenCalled();
+});
+
+it('keeps the dialog open and re-enabled after a failed write', async () => {
+  let release: () => void = () => {};
+  server.use(
+    http.patch(`${ogBase}/subscriptions/c-1/reactivate/`, async () => {
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+
+      return new HttpResponse(null, { status: 500 });
+    }),
+  );
+  const { user } = renderWithProviders(
+    <ReactivateAction card={buildCardWith('WHATEVER_VALUES')} customerId={80591} />,
+  );
+
+  await user.click(screen.getByRole('button', { name: 'Reactivate' }));
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Reactivate' }));
+  // Hold the failure until the write is seen in flight, so "enabled again" can only mean settled.
+  await waitFor(() =>
+    expect(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Reactivate' }),
+    ).toBeDisabled(),
+  );
+
+  release();
+
+  await waitFor(() =>
+    expect(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Reactivate' }),
+    ).toBeEnabled(),
+  );
+  // A dialog that is closing stays in the DOM until its exit transition ends, but is not visible.
+  expect(screen.getByRole('dialog')).toBeVisible();
+});

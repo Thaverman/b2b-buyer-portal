@@ -52,15 +52,35 @@ const dialog = (
 
 it("sends the manager's no-survey value when no reason is chosen", async () => {
   const onConfirm = vi.fn();
-  const { user } = renderOpen((isOpen) => dialog(isOpen, { onConfirm }));
+  const { user } = renderOpen((isOpen) =>
+    dialog(isOpen, {
+      card: buildCardWith({
+        product: { name: 'Kraft Paper Shopping Bags', imageUrl: null, detailUrl: null, sku: null },
+      }),
+      onConfirm,
+    }),
+  );
 
+  // With several cards on the page, the dialog has to say which subscription it is about to cancel.
+  expect(screen.getByRole('dialog')).toHaveTextContent(
+    "You're cancelling Kraft Paper Shopping Bags.",
+  );
   expect(screen.getByRole('dialog')).toHaveTextContent('Tell us why (optional)');
+  expect(screen.getByRole('radiogroup', { name: 'Tell us why (optional)' })).toBeInTheDocument();
   expect(screen.getAllByRole('radio')).toHaveLength(8);
   expect(screen.getByRole('radio', { name: 'Other (please specify)' })).not.toBeChecked();
 
   await user.click(screen.getByRole('button', { name: 'Cancel subscription' }));
 
   expect(onConfirm).toHaveBeenCalledWith('114|Cancelled without exit survey response');
+});
+
+it('falls back to the product id while the name is unknown', () => {
+  renderOpen((isOpen) =>
+    dialog(isOpen, { card: buildCardWith({ product: null, externalProductId: '1_2' }) }),
+  );
+
+  expect(screen.getByRole('dialog')).toHaveTextContent("You're cancelling Product 1_2.");
 });
 
 it('sends a listed reason with its canonical label', async () => {

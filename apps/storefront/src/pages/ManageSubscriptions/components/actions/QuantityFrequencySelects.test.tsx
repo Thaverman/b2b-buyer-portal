@@ -93,7 +93,7 @@ it('holds both selects while the row is busy and marks the one that is saving', 
   expect(frequency()).toHaveAttribute('aria-disabled', 'true');
   expect(screen.getAllByRole('progressbar')).toHaveLength(1);
   expect(quantity().closest('.MuiFormControl-root')).toContainElement(
-    screen.getByRole('progressbar'),
+    screen.getByRole('progressbar', { name: 'Saving…' }),
   );
 });
 
