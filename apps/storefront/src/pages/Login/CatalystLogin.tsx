@@ -6,6 +6,7 @@ import { endUserMasqueradingCompany, superAdminEndMasquerade } from '@/shared/se
 import { bcLogoutLogin } from '@/shared/service/bc';
 import { isLoggedInSelector, store, useAppSelector } from '@/store';
 import { clearCompanySlice } from '@/store/slices/company';
+import { safeSessionStorage } from '@/utils/safeStorage';
 
 const logout = () => {
   return bcLogoutLogin().then((res) => {
@@ -65,7 +66,7 @@ export function CatalystLogin() {
           navigate('/orders');
         })
         .then(() => {
-          window.sessionStorage.clear();
+          safeSessionStorage.clear();
           store.dispatch(clearCompanySlice());
           window.b2b.callbacks.dispatchEvent('on-logout');
         });

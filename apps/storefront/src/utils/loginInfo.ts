@@ -41,6 +41,7 @@ import { CompanyStatus, CustomerRole, CustomerRoleName, LoginTypes, UserTypes } 
 import b2bLogger from './b3Logger';
 import { B3LStorage, B3SStorage } from './b3Storage';
 import { channelId, storeHash } from './basicConfig';
+import { safeSessionStorage } from './safeStorage';
 import { getAccountHierarchyIsEnabled } from './storefrontConfig';
 
 const getLoginTokenInfo = () => {
@@ -76,7 +77,7 @@ const clearCurrentCustomerInfo = async () => {
   });
   B3SStorage.set('blockPendingAccountOrderCreation', false);
   B3SStorage.set('loginCustomer', '');
-  sessionStorage.removeItem('b2b-blockPendingAccountOrderCreation');
+  safeSessionStorage.removeItem('b2b-blockPendingAccountOrderCreation');
   store.dispatch(clearCompanySlice());
   store.dispatch(clearMasqueradeCompany());
 };
@@ -123,21 +124,21 @@ export const getCompanyInfo = async (
   store.dispatch(setCompanyStatus(companyInfo.companyStatus));
 
   if (companyInfo.companyStatus === CompanyStatus.REJECTED) {
-    sessionStorage.setItem('b2b-blockRejectedAccountOrderCreation', JSON.stringify(true));
+    safeSessionStorage.setItem('b2b-blockRejectedAccountOrderCreation', JSON.stringify(true));
   } else {
-    sessionStorage.removeItem('b2b-blockRejectedAccountOrderCreation');
+    safeSessionStorage.removeItem('b2b-blockRejectedAccountOrderCreation');
   }
 
   const blockPendingAccountOrderCreation = B3SStorage.get('blockPendingAccountOrderCreation');
   const noNewSFPlaceOrders =
     blockPendingAccountOrderCreation && companyInfo.companyStatus === CompanyStatus.PENDING;
   if (noNewSFPlaceOrders) {
-    sessionStorage.setItem(
+    safeSessionStorage.setItem(
       'b2b-blockPendingAccountOrderCreation',
       JSON.stringify(noNewSFPlaceOrders),
     );
   } else {
-    sessionStorage.removeItem('b2b-blockPendingAccountOrderCreation');
+    safeSessionStorage.removeItem('b2b-blockPendingAccountOrderCreation');
   }
 
   return companyInfo;

@@ -34,6 +34,7 @@ import { channelId } from '@/utils/basicConfig';
 import { getCurrentCustomerInfo } from '@/utils/loginInfo';
 import { logoutSession } from '@/utils/logoutSession';
 import { endMasquerade, startMasquerade } from '@/utils/masquerade';
+import { safeSessionStorage } from '@/utils/safeStorage';
 
 import { getSku } from './getSku';
 
@@ -239,7 +240,7 @@ export default function HeadlessController({ setOpenPage }: HeadlessControllerPr
             } catch (e) {
               b2bLogger.error(e);
             } finally {
-              window.sessionStorage.clear();
+              safeSessionStorage.clear();
               logoutSession();
               window.b2b.callbacks.dispatchEvent('on-logout');
             }

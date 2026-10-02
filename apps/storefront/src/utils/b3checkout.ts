@@ -1,5 +1,7 @@
 import { b2bCheckoutLogin } from '@/shared/service/b2b/graphql/checkout';
 
+import { safeSessionStorage } from './safeStorage';
+
 const redirect = (url: string, isReplaceCurrentUrl?: boolean) => {
   if (isReplaceCurrentUrl) {
     window.location.replace(url);
@@ -29,8 +31,8 @@ export const attemptCheckoutLoginAndRedirect = async (
 };
 
 export const setQuoteToStorage = (quoteId: string, date: any, quoteUuid?: string) => {
-  sessionStorage.setItem('isNewStorefront', JSON.stringify(true));
-  sessionStorage.setItem('quoteCheckoutId', quoteId);
-  sessionStorage.setItem('quoteDate', date?.toString());
-  sessionStorage.setItem('quoteCheckoutUuid', quoteUuid || '');
+  safeSessionStorage.setItem('isNewStorefront', JSON.stringify(true));
+  safeSessionStorage.setItem('quoteCheckoutId', quoteId);
+  safeSessionStorage.setItem('quoteDate', date?.toString());
+  safeSessionStorage.setItem('quoteCheckoutUuid', quoteUuid || '');
 };

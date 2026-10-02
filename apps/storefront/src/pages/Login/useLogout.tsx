@@ -6,6 +6,7 @@ import { bcLogoutLogin } from '@/shared/service/bc';
 import { clearMasqueradeCompany, useAppDispatch, useAppSelector } from '@/store';
 import b2bLogger from '@/utils/b3Logger';
 import { logoutSession } from '@/utils/logoutSession';
+import { safeSessionStorage } from '@/utils/safeStorage';
 
 const useEndMasquerade = () => {
   const isMasquerading = useAppSelector(
@@ -56,7 +57,7 @@ export const useLogout = () => {
         b2bLogger.error(e);
       } finally {
         // SUP-1282 Clear sessionStorage to allow visitors to display the checkout page
-        window.sessionStorage.clear();
+        safeSessionStorage.clear();
         logoutSession();
         if (showLogoutBanner) {
           dispatchEvent('on-logout');

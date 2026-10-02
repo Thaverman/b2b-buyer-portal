@@ -4,6 +4,7 @@ import { LOGIN_LANDING_LOCATIONS } from '@/constants';
 import { store } from '@/store';
 
 import { platform } from './basicConfig';
+import { safeSessionStorage } from './safeStorage';
 
 export const loginJump = (navigate: NavigateFunction, isClearSession = false) => {
   const {
@@ -15,7 +16,7 @@ export const loginJump = (navigate: NavigateFunction, isClearSession = false) =>
     }
 
     if (window.location.href.includes('login.php')) {
-      if (isClearSession) window.sessionStorage.clear();
+      if (isClearSession) safeSessionStorage.clear();
       window.location.href = '/';
       return false;
     }
@@ -25,7 +26,7 @@ export const loginJump = (navigate: NavigateFunction, isClearSession = false) =>
       isOpen: false,
       openUrl: '',
     });
-    if (isClearSession) window.sessionStorage.clear();
+    if (isClearSession) safeSessionStorage.clear();
     window.location.reload();
     return false;
   }

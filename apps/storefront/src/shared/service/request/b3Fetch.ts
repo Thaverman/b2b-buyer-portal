@@ -4,6 +4,7 @@ import { store } from '@/store';
 import { snackbar } from '@/utils/b3Tip';
 import { BigCommerceStorefrontAPIBaseURL, channelId, storeHash } from '@/utils/basicConfig';
 import { logoutSession } from '@/utils/logoutSession';
+import { safeSessionStorage } from '@/utils/safeStorage';
 
 import { getAPIBaseURL, queryParse, RequestType, RequestTypeKeys } from './base';
 import b3Fetch from './fetch';
@@ -109,7 +110,7 @@ const B3Request = {
       const extensions = error?.extensions;
 
       if (extensions?.code === 40101) {
-        window.sessionStorage.clear();
+        safeSessionStorage.clear();
         logoutSession();
 
         if (window.location.hash.startsWith('#/')) {
