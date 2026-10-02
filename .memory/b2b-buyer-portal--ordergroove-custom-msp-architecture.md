@@ -438,7 +438,7 @@ live runs out, and re-run the deployed bundle as the control before blaming a bu
 - Service names: changeSubscriptionFrequency / changeSubscriptionQuantity / cancelSubscription /
   reactivateSubscription / changeShippingAddress, all PATCH /subscriptions/{id}/<action>/ with the
   trailing slash.
-- Task 0 findings E–J (probe 2026-10-01, customer 80591, every write restored):
+- Task 0 findings E–J (probe 2026-10-01, customer 80591, every write restored except I's overwritten cancel timestamp and reason):
   - E change_frequency: 200 and the record follows (10 months → 6 weeks read back 6/2,
     frequency_days 42) but the upcoming order's DATE does not move (2027-08-01 before, after and
     after the restore); the hook refreshes `upcoming` regardless. Response shape unconfirmed.
@@ -455,7 +455,7 @@ live runs out, and re-run the deployed bundle as the control before blaming a bu
     collapse into one choice, as they do in the manager.
 - SAFETY (shared hook): src/hooks/useScrollBar.ts now releases the ThemeFrame scroll lock in an
   effect cleanup when a component unmounts while open. A cancel moves its card out of the active
-  list (the subscriptions refetch usually lands before the upcoming one), so the card unmounted
+  list (the subscriptions refetch more likely lands before the upcoming one), so the card unmounted
   with its Cancel dialog open and, with the cancelled list collapsed (the default), the page stayed
   unscrollable. Pinned by useScrollBar.test.ts and a page case that holds the upcoming refetch.
 - Quality gate: tsc, depcruise, eslint clean; knip = pre-existing BillingStateOption only. Scoped
@@ -470,7 +470,7 @@ live runs out, and re-run the deployed bundle as the control before blaming a bu
     viewModel.ts is ~470 lines.
   - Task 3: the failure path is tested for cancel only; no request-count guard against a retry;
     wire literals are hardcoded (file precedent).
-  - Task 4: the radio groups lack accessible names; B3Dialog autoFocus lands on the destructive
+  - Task 4: the radio groups lack accessible names; B3Dialog autoFocus lands on the destructive (so Enter on open cancels with no reason)
     confirm (shared component); Cancel's radios stay editable while pending (the body is built at
     click time).
   - Task 5: tests lean on builder defaults; nothing pins that a select keeps the card's value after
@@ -485,4 +485,5 @@ live runs out, and re-run the deployed bundle as the control before blaming a bu
     wiring is untested; dropping changeAddress from the isPending list survives the tests.
   - Browser-only, for Task 9: spinner position inside the select; keyboard focus after a save (the
     combobox loses tabindex while disabled); focus after a successful cancel.
-- Live check (Task 9): pending — the controller completes this line.
+- Live check (Task 9, 2026-10-02, two controller runs under the user's authorisation after the harness denied the implementer's): quantity, frequency and address changed and restored on one subscription through the real UI (the address restore by one allowlisted PATCH after the script's wait tripped on the theme's cart drawer, which carries role=dialog inside the ThemeFrame — scope dialog checks to `.MuiDialog-root`); one cancelled subscription reactivated then cancelled again with the 114 body on the same id; all five writes returned parseable bodies; zero forbidden/failed requests; scroll lock released after the cancel; keyboard focus lands on BODY after an inline save and after a cancel (follow-up). Account re-verified equal to the pre-run snapshot except that subscription's cancel metadata (now 2026-10-02 / 114).
+- Where: plan `docs/superpowers/plans/2026-10-01-ordergroove-phase3b-subscription-edits.md`; SDD ledger lines summarised there; branch `worktree-ordergroove-phase3b-subscription-edits`; merge state recorded at finish.

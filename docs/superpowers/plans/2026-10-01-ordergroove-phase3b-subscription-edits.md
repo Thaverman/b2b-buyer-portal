@@ -3409,12 +3409,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Consumes: a deploy-flavour build of this branch; the 3a recipe (request-level login, route interception of the deployed bundle path, `portalEval` into the ThemeFrame); `playwright` with the system Chrome. The sandbox theme emits `customManager: true`, so **no `BC_CONTEXT` injection**.
 - Safety by construction: the script never clicks `Send now`, `Delete`, `Move subscriptions` or `Save` in the card picker; it counts every request whose path contains `send_now`, `use_for_all`, `payments/create`, `DeleteStoredInstrument`, `orders/…/cancel`, `items/…/delete` or `addresses/create` and fails if any fired. It only reactivates a cancelled subscription whose product name no active card shares, so the card it later cancels can be told apart, and it checks the cancel request's id against the reactivate request's id.
 
-- [ ] **Step 1: Build the deploy flavour**
+- [x] **Step 1: Build the deploy flavour**
 
 Run: `VITE_ASSETS_ABSOLUTE_PATH='https://sandbox.storesupply.com/content/b2bBuyerPortal/dist/' yarn build`
 Expected: `apps/storefront/dist/` with hashed chunks; the script aliases the loader's unhashed names.
 
-- [ ] **Step 2: Write the script** to `<scratch>/pw/phase3b-live.mjs`
+- [x] **Step 2: Write the script** to `<scratch>/pw/phase3b-live.mjs`
 
 ```js
 // Live check of Phase 3b on sandbox as customer 80591, through the real UI. REVERSIBLE ONLY:
@@ -3694,14 +3694,14 @@ summary.ok =
 console.log(JSON.stringify(summary, null, 2));
 ```
 
-- [ ] **Step 3: Run it, spaced from any other live run by a few minutes**
+- [x] **Step 3: Run it, spaced from any other live run by a few minutes**
 
 Run: `cd <scratch>/pw && DIST=/home/thaverman/repos/customb2baccount/b2b-buyer-portal/apps/storefront/dist ENV_FILE=/home/thaverman/repos/customb2baccount/b2b-buyer-portal/apps/storefront/.env node phase3b-live.mjs 2>&1 | tee out/phase3b-live.log`
 Expected: `"ok": true`; `quantityRestored`, `frequencyRestored`, `nextOrderRestored`, `addressRestored` equal their `before` values; `cancelTargetedTheReactivatedOne: true`; `cancelBody` carries `114|Cancelled without exit survey response`; `forbidden: []`; `failedRequests: []`; `authMints: 1`; `alerts` lists the five success snackbars. If it fails part-way, the printed `writesMade` says exactly what changed; restore with the probe's helpers or the UI before anything else, then re-read the account.
 
-- [ ] **Step 4: Record the outcome** in this plan (below) and in the memory note's Phase 3b section (Task 8 Step 4 — amend that commit or add a docs commit).
+- [x] **Step 4: Record the outcome** in this plan (below) and in the memory note's Phase 3b section (Task 8 Step 4 — amend that commit or add a docs commit).
 
-**Recorded YYYY-MM-DD:** `[ ]`
+**Recorded 2026-10-02:** two controller runs under the user's explicit authorisation (the implementer's run was denied by the harness as a real-world transaction; it had first found three defects in this script — a months-schedule subject cannot be restored through the select, waits returned before the card re-enabled, and the address restore could land on a sibling record — all fixed before running; see the SDD ledger). Run 1, subject `Large Low Density Merchandise Bags - Case of 500 - Green`: quantity 1→2→1 and frequency every 2 weeks→every 6 weeks→every 2 weeks restored through the UI (`Quantity updated.`, `Frequency updated.`); the next order stayed 2026-10-15 across the frequency change (finding E holds for weeks); the address moved to another saved record (`Shipping address updated.`) and the card re-rendered it, but the script's wait aborted because the theme's cart drawer (`role=dialog`, inside the ThemeFrame) had opened, so the UI address restore and the Change-date branch never ran; the controller restored the exact original `shipping_address` id with one allowlisted PATCH and re-verified the account against the pre-run snapshot (no other change). Run 2 (step 4 only, dialog checks scoped to MUI dialogs): reactivated `White Thank You Plastic T-Shirt Bags - Case of 1,000` — body `start_date` 2026-10-02, `every` 1, `every_period` 1, `next_order_date` 2026-10-03 (`Subscription reactivated.`) — then cancelled it through the dialog with no reason: body `114|Cancelled without exit survey response` on the same id (`Subscription cancelled.`); the cancelled toggle returned to 4. Both runs: `forbidden []`, `failedRequests []`, `authMints 1`; all five writes returned bodies `parse()` could read. `focusAfterQuantitySave` and `focusAfterCancel` were both `BODY` (keyboard focus is dropped — follow-up); `scrollLockAfterCancel` was `initial`; right after reactivation the card read `No upcoming order` until a later refetch (the upcoming list lagged). Screenshots in the scratch `pw/out/`: `phase3b-quantity-pending.png`, `phase3b-failure.png`, `phase3b-step4-*.png`. Side effect, anticipated: the re-cancelled subscription's cancelled timestamp and reason are now 2026-10-02 / 114.
 
 ---
 
